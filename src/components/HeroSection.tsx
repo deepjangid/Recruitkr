@@ -18,11 +18,8 @@ const HeroSection = () => {
 
       <div className="container relative z-10 mx-auto px-4 py-20 text-center">
         <div className="animate-fade-up mx-auto max-w-4xl">
-          <p className="mb-4 inline-block rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary">
-            Full-Stack Hiring & HR Solutions
-          </p>
 
-          <h1 className="mb-6 text-5xl font-extrabold leading-tight tracking-tight md:text-7xl">
+          <h1 className="mb-6 text-5xl font-extrabold leading-tight tracking-tight md:text-7xl" style={{color:'#264A7F'}}>
             Your Hiring Partner.{" "}
             <span className="text-gradient-teal">End to End.</span>
           </h1>

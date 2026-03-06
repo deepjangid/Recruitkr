@@ -6,49 +6,49 @@
 
 @layer base {
   :root {
-    --background: 216 47% 10%;
-    --foreground: 210 40% 96%;
+    --background: 0 0% 100%;
+    --foreground: 216 34% 16%;
 
-    --card: 216 47% 13%;
-    --card-foreground: 210 40% 96%;
+    --card: 0 0% 100%;
+    --card-foreground: 216 34% 16%;
 
-    --popover: 216 47% 13%;
-    --popover-foreground: 210 40% 96%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 216 34% 16%;
 
-    --primary: 212 52% 32%;
-    --primary-foreground: 210 40% 96%;
+    --primary: 216 54% 32%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 216 30% 18%;
-    --secondary-foreground: 210 40% 96%;
+    --secondary: 102 35% 48%;
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 216 30% 18%;
-    --muted-foreground: 215 20% 60%;
+    --muted: 210 20% 96%;
+    --muted-foreground: 215 16% 35%;
 
-    --accent: 30 76% 63%;
-    --accent-foreground: 216 47% 10%;
+    --accent: 102 35% 48%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 216 30% 22%;
-    --input: 216 30% 22%;
-    --ring: 212 52% 32%;
+    --border: 214 22% 88%;
+    --input: 214 22% 88%;
+    --ring: 216 54% 32%;
 
     --radius: 0.5rem;
 
-    --sidebar-background: 216 47% 10%;
-    --sidebar-foreground: 210 40% 96%;
-    --sidebar-primary: 212 52% 32%;
-    --sidebar-primary-foreground: 210 40% 96%;
-    --sidebar-accent: 216 30% 18%;
-    --sidebar-accent-foreground: 210 40% 96%;
-    --sidebar-border: 216 30% 22%;
-    --sidebar-ring: 212 52% 32%;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 216 34% 16%;
+    --sidebar-primary: 216 54% 32%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 20% 96%;
+    --sidebar-accent-foreground: 216 34% 16%;
+    --sidebar-border: 214 22% 88%;
+    --sidebar-ring: 216 54% 32%;
 
-    --navy: 216 47% 10%;
-    --navy-deep: 220 50% 7%;
-    --teal: 212 52% 32%;
-    --teal-glow: 100 35% 47%;
+    --navy: 216 54% 32%;
+    --navy-deep: 216 58% 24%;
+    --teal: 216 54% 32%;
+    --teal-glow: 102 35% 48%;
     --amber: 30 76% 63%;
     --amber-glow: 30 76% 73%;
   }

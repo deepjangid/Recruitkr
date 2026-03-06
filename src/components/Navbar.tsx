@@ -1,6 +1,7 @@
 import { Menu, X, ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import Logo from "../assets/logo.png";
 
 const navItems = [
   { label: "Services", path: "/services" },
@@ -15,9 +16,15 @@ const Navbar = () => {
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-lg">
-      <div className="container mx-auto flex items-center justify-between py-4">
-        <Link to="/" className="font-display text-2xl font-bold tracking-tight">
-          Recruit<span style={{ color: "#264a7f" }}>kr</span>
+      <div className="container mx-auto flex items-center justify-between px-4 py-3 md:py-4">
+        <Link to="/" className="flex items-center">
+          <span className="block h-10 w-[170px] overflow-hidden sm:h-11 sm:w-[190px] md:w-[210px] lg:w-[230px]">
+            <img
+              src={Logo}
+              alt="RecruitKr"
+              className="h-full w-full scale-[1.55] object-contain"
+            />
+          </span>
         </Link>
 
         <div className="hidden items-center gap-8 md:flex">
@@ -76,7 +83,7 @@ const Navbar = () => {
           </Link>
         </div>
 
-        <button className="md:hidden text-foreground" onClick={() => setOpen(!open)}>
+        <button className="text-foreground md:hidden" onClick={() => setOpen(!open)}>
           {open ? <X size={24} /> : <Menu size={24} />}
         </button>
       </div>

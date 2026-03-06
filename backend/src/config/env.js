@@ -17,6 +17,8 @@ const envSchema = z.object({
   AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
   CONTACT_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(5),
   BCRYPT_OR_ARGON2_PEPPER: z.string().min(16),
+  OPENAI_API_KEY: z.string().min(20).optional(),
+  OPENAI_MODEL: z.string().min(3).default('gpt-4o-mini'),
 });
 
 const parsed = envSchema.safeParse(process.env);

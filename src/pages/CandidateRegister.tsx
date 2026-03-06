@@ -2,8 +2,8 @@ import { useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-
-const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000/api/v1").replace(/\/$/, "");
+import { apiPost } from "@/lib/api";
+import { setSession } from "@/lib/auth";
 
 type CandidateForm = {
   fullName: string;
@@ -99,7 +99,7 @@ const CandidateRegister = () => {
       declarationAccepted &&
       representationAuthorized &&
       workModes.length > 0 &&
-      form.password.length >= 8 &&
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9]).{8,}$/.test(form.password) &&
       form.password === form.confirmPassword,
     [declarationAccepted, representationAuthorized, workModes.length, form.password, form.confirmPassword],
   );
@@ -126,21 +126,79 @@ const CandidateRegister = () => {
     try {
       const fd = new FormData();
       fd.append("resume", file);
-      const res = await fetch(`${API_BASE}/resumes/parse`, { method: "POST", body: fd });
-      const json = await res.json();
-      if (!res.ok || !json?.success) throw new Error(json?.message || "Resume parsing failed");
+      const json = await apiPost<{
+        success: boolean;
+        data?: {
+          parsed?: {
+            fullName?: string;
+            dateOfBirth?: string;
+            gender?: string;
+            address?: string;
+            pincode?: string;
+            email?: string;
+            mobile?: string;
+            linkedinUrl?: string;
+            portfolioUrl?: string;
+            highestQualification?: string;
+            experienceStatus?: "fresher" | "experienced";
+            currentCompany?: string;
+            designation?: string;
+            totalExperience?: string;
+            industry?: string;
+            currentCtcLpa?: string;
+            expectedCtcLpa?: string;
+            minimumCtcLpa?: string;
+            noticePeriod?: string;
+            lastWorkingDay?: string;
+            preferredLocation?: string;
+            preferredIndustry?: string;
+            preferredRole?: string;
+            workModes?: Array<"On-site" | "Hybrid" | "Remote">;
+          };
+        };
+      }>(
+        "/resumes/parse",
+        fd,
+      );
+      if (!json?.success) throw new Error("Resume parsing failed");
 
       const parsed = json.data?.parsed || {};
       setForm((prev) => ({
         ...prev,
         fullName: parsed.fullName || prev.fullName,
+        dateOfBirth: parsed.dateOfBirth || prev.dateOfBirth,
+        gender: parsed.gender || prev.gender,
+        address: parsed.address || prev.address,
+        pincode: parsed.pincode || prev.pincode,
         email: parsed.email || prev.email,
         mobile: parsed.mobile || prev.mobile,
         linkedinUrl: parsed.linkedinUrl || prev.linkedinUrl,
         portfolioUrl: parsed.portfolioUrl || prev.portfolioUrl,
         highestQualification: parsed.highestQualification || prev.highestQualification,
-        experienceStatus: parsed.experienceStatus === "experienced" ? "experienced" : prev.experienceStatus,
+        experienceStatus:
+          parsed.experienceStatus === "experienced" || parsed.experienceStatus === "fresher"
+            ? parsed.experienceStatus
+            : prev.experienceStatus,
+        currentCompany: parsed.currentCompany || prev.currentCompany,
+        designation: parsed.designation || prev.designation,
+        totalExperience: parsed.totalExperience || prev.totalExperience,
+        industry: parsed.industry || prev.industry,
+        currentCtcLpa: parsed.currentCtcLpa || prev.currentCtcLpa,
+        expectedCtcLpa: parsed.expectedCtcLpa || prev.expectedCtcLpa,
+        minimumCtcLpa: parsed.minimumCtcLpa || prev.minimumCtcLpa,
+        noticePeriod: parsed.noticePeriod || prev.noticePeriod,
+        lastWorkingDay: parsed.lastWorkingDay || prev.lastWorkingDay,
+        preferredLocation: parsed.preferredLocation || prev.preferredLocation,
+        preferredIndustry: parsed.preferredIndustry || prev.preferredIndustry,
+        preferredRole: parsed.preferredRole || prev.preferredRole,
       }));
+      if (parsed.workModes?.length) {
+        setWorkModes((prev) =>
+          [...new Set([...prev, ...parsed.workModes])].filter((m) =>
+            ["On-site", "Hybrid", "Remote"].includes(m),
+          ),
+        );
+      }
     } catch (error) {
       setServerError(error instanceof Error ? error.message : "Resume parsing failed");
     } finally {
@@ -215,13 +273,16 @@ const CandidateRegister = () => {
         };
       }
 
-      const res = await fetch(`${API_BASE}/auth/register/candidate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const json = await res.json();
-      if (!res.ok || !json?.success) throw new Error(json?.message || "Registration failed");
+      const json = await apiPost<{
+        success: boolean;
+        data?: {
+          accessToken: string;
+          refreshToken?: string;
+          user: { id: string; email: string; role: "candidate" | "client" | "admin" };
+          generatedResume?: { dataBase64?: string; fileName?: string; mimeType?: string };
+        };
+      }>("/auth/register/candidate", payload);
+      if (!json?.success || !json.data?.accessToken || !json.data.user) throw new Error("Registration failed");
 
       if (!resumeFile && json?.data?.generatedResume?.dataBase64) {
         downloadBase64File(
@@ -231,8 +292,14 @@ const CandidateRegister = () => {
         );
       }
 
+      setSession({
+        accessToken: json.data.accessToken,
+        refreshToken: json.data.refreshToken,
+        user: json.data.user,
+      });
+
       setSubmitted(true);
-      setTimeout(() => navigate("/login"), 2500);
+      setTimeout(() => navigate("/dashboard/candidate"), 1200);
     } catch (error) {
       setServerError(error instanceof Error ? error.message : "Registration failed");
     } finally {
@@ -251,7 +318,7 @@ const CandidateRegister = () => {
             <span className="text-4xl">✓</span>
           </div>
           <h2 className="font-display text-3xl font-bold mb-3">Registration Submitted!</h2>
-          <p className="text-muted-foreground">Redirecting you to login...</p>
+          <p className="text-muted-foreground">Redirecting you to dashboard...</p>
         </div>
       </div>
     );
@@ -394,6 +461,7 @@ const CandidateRegister = () => {
                 <div><label className={labelClass}>Password *</label><input type="password" required minLength={8} className={inputClass} value={form.password} onChange={onChange("password")} /></div>
                 <div><label className={labelClass}>Confirm Password *</label><input type="password" required minLength={8} className={inputClass} value={form.confirmPassword} onChange={onChange("confirmPassword")} /></div>
               </div>
+              <p className="mt-2 text-xs text-muted-foreground">Use at least 8 chars with uppercase, lowercase, number, and special character.</p>
               {form.password && form.confirmPassword && form.password !== form.confirmPassword && (
                 <p className="mt-3 text-sm text-red-500">Passwords do not match.</p>
               )}

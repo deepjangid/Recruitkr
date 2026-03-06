@@ -1,19 +1,57 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { apiPost } from "@/lib/api";
+import { setSession } from "@/lib/auth";
 
 const Login = () => {
   const navigate = useNavigate();
   const [userType, setUserType] = useState<"candidate" | "client">("candidate");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (userType === "candidate") navigate("/dashboard/candidate");
-    else navigate("/dashboard/client");
+    setError("");
+    setLoading(true);
+
+    try {
+      const response = await apiPost<{
+        success: boolean;
+        data?: {
+          accessToken: string;
+          refreshToken?: string;
+          user: { id: string; email: string; role: "candidate" | "client" | "admin" };
+        };
+      }>("/auth/login", {
+        email: email.trim().toLowerCase(),
+        password,
+        role: userType,
+      });
+
+      if (!response.success || !response.data?.accessToken || !response.data.user) {
+        throw new Error("Login failed");
+      }
+
+      setSession({
+        accessToken: response.data.accessToken,
+        refreshToken: response.data.refreshToken,
+        user: response.data.user,
+      });
+
+      navigate(userType === "candidate" ? "/dashboard/candidate" : "/dashboard/client");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Login failed");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const inputClass = "w-full rounded-lg border border-border bg-secondary/50 px-4 py-3 text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 transition-colors";
+  const inputClass =
+    "w-full rounded-lg border border-border bg-secondary/50 px-4 py-3 text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 transition-colors";
 
   return (
     <div className="min-h-screen bg-background">
@@ -21,7 +59,6 @@ const Login = () => {
       <div className="pt-28 pb-20 min-h-screen flex items-center">
         <div className="container mx-auto max-w-md px-4">
           <div className="rounded-2xl border border-border bg-card p-8 shadow-2xl">
-            {/* Logo */}
             <div className="text-center mb-8">
               <Link to="/" className="font-display text-3xl font-bold">
                 Recruit<span style={{ color: "#264a7f" }}>kr</span>
@@ -29,21 +66,22 @@ const Login = () => {
               <p className="mt-2 text-muted-foreground text-sm">ANAAGAT HUMANPOWER PRIVATE LIMITED</p>
             </div>
 
-            {/* User Type Tabs */}
             <div className="flex rounded-xl overflow-hidden border border-border mb-8">
               <button
+                type="button"
                 className="flex-1 py-3 text-sm font-semibold transition-all"
                 style={userType === "candidate" ? { background: "linear-gradient(135deg, #264a7f, #69a44f)", color: "white" } : { color: "hsl(var(--muted-foreground))" }}
                 onClick={() => setUserType("candidate")}
               >
-                🎓 Candidate
+                Candidate
               </button>
               <button
+                type="button"
                 className="flex-1 py-3 text-sm font-semibold transition-all"
                 style={userType === "client" ? { background: "linear-gradient(135deg, #e59f56, #264a7f)", color: "white" } : { color: "hsl(var(--muted-foreground))" }}
                 onClick={() => setUserType("client")}
               >
-                🏢 Employer
+                Employer
               </button>
             </div>
 
@@ -53,6 +91,8 @@ const Login = () => {
                 <input
                   type="email"
                   required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className={inputClass}
                   style={{ ["--tw-ring-color" as string]: userType === "candidate" ? "#264a7f" : "#e59f56" }}
                   placeholder="your@email.com"
@@ -63,20 +103,22 @@ const Login = () => {
                 <input
                   type="password"
                   required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   className={inputClass}
                   placeholder="Enter your password"
                 />
-                <div className="text-right mt-1.5">
-                  <a href="#" className="text-xs text-muted-foreground hover:text-primary">Forgot password?</a>
-                </div>
               </div>
+
+              {error && <p className="text-sm text-red-500">{error}</p>}
 
               <button
                 type="submit"
-                className="w-full rounded-xl py-3.5 text-sm font-bold text-white transition-all hover:scale-[1.02] hover:shadow-lg"
+                disabled={loading}
+                className="w-full rounded-xl py-3.5 text-sm font-bold text-white transition-all hover:scale-[1.02] hover:shadow-lg disabled:opacity-60"
                 style={{ background: userType === "candidate" ? "linear-gradient(135deg, #264a7f, #69a44f)" : "linear-gradient(135deg, #e59f56, #264a7f)" }}
               >
-                Login as {userType === "candidate" ? "Candidate" : "Employer"}
+                {loading ? "Logging in..." : `Login as ${userType === "candidate" ? "Candidate" : "Employer"}`}
               </button>
             </form>
 

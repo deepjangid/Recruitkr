@@ -17,7 +17,7 @@ export const parseResume = asyncHandler(async (req, res) => {
     mimeType: req.file.mimetype,
     buffer: req.file.buffer,
   });
-  const hints = parseResumeToCandidateHints(text);
+  const hints = await parseResumeToCandidateHints(text);
 
   res.json({
     success: true,

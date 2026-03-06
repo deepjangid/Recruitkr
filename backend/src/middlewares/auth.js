@@ -23,7 +23,7 @@ export const requireAuth = async (req, _res, next) => {
     if (
       user.passwordChangedAt &&
       payload.iat &&
-      payload.iat * 1000 < new Date(user.passwordChangedAt).getTime()
+      payload.iat * 1000 < new Date(user.passwordChangedAt).getTime() - 1000
     ) {
       throw new ApiError(StatusCodes.UNAUTHORIZED, 'Token expired due to password change');
     }
