@@ -9,6 +9,7 @@ import Sectors from "./pages/Sectors";
 import Process from "./pages/Process";
 import WhyUs from "./pages/WhyUs";
 import Contact from "./pages/Contact";
+import FAQs from "./pages/FAQs";
 import NotFound from "./pages/NotFound";
 import CandidateRegister from "./pages/CandidateRegister";
 import ClientRegister from "./pages/ClientRegister";
@@ -31,6 +32,7 @@ const App = () => (
           <Route path="/process" element={<Process />} />
           <Route path="/why-us" element={<WhyUs />} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/faqs" element={<FAQs />} />
           <Route path="/register/candidate" element={<CandidateRegister />} />
           <Route path="/register/client" element={<ClientRegister />} />
           <Route path="/login" element={<Login />} />
