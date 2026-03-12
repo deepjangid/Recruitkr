@@ -14,8 +14,9 @@ export default {
     },
     extend: {
       fontFamily: {
+        heading: ["Placard", "Placard Next Wide", "Syne", "sans-serif"],
         display: ["Syne", "sans-serif"],
-        body: ["DM Sans", "sans-serif"],
+        body: ["Poppins", "DM Sans", "sans-serif"],
       },
       colors: {
         border: "hsl(var(--border))",

@@ -51,7 +51,7 @@ const Login = () => {
   };
 
   const inputClass =
-    "w-full rounded-lg border border-border bg-secondary/50 px-4 py-3 text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 transition-colors";
+    "w-full rounded-lg border border-border bg-secondary/50 px-4 py-3 text-sm text-foreground placeholder-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors";
 
   return (
     <div className="min-h-screen bg-background">
@@ -60,7 +60,7 @@ const Login = () => {
         <div className="container mx-auto max-w-md px-4">
           <div className="rounded-2xl border border-border bg-card p-8 shadow-2xl">
             <div className="text-center mb-8">
-              <Link to="/" className="font-display text-3xl font-bold">
+              <Link to="/" className="font-heading text-3xl font-bold">
                 Recruit<span style={{ color: "#264a7f" }}>kr</span>
               </Link>
               <p className="mt-2 text-muted-foreground text-sm">ANAAGAT HUMANPOWER PRIVATE LIMITED</p>
@@ -69,16 +69,14 @@ const Login = () => {
             <div className="flex rounded-xl overflow-hidden border border-border mb-8">
               <button
                 type="button"
-                className="flex-1 py-3 text-sm font-semibold transition-all"
-                style={userType === "candidate" ? { background: "linear-gradient(135deg, #264a7f, #69a44f)", color: "white" } : { color: "hsl(var(--muted-foreground))" }}
+                className={`flex-1 py-3 text-sm font-semibold transition-all ${userType === "candidate" ? "btn-gradient" : "text-muted-foreground"}`}
                 onClick={() => setUserType("candidate")}
               >
                 Candidate
               </button>
               <button
                 type="button"
-                className="flex-1 py-3 text-sm font-semibold transition-all"
-                style={userType === "client" ? { background: "linear-gradient(135deg, #e59f56, #264a7f)", color: "white" } : { color: "hsl(var(--muted-foreground))" }}
+                className={`flex-1 py-3 text-sm font-semibold transition-all ${userType === "client" ? "btn-gradient" : "text-muted-foreground"}`}
                 onClick={() => setUserType("client")}
               >
                 Employer
@@ -94,7 +92,6 @@ const Login = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className={inputClass}
-                  style={{ ["--tw-ring-color" as string]: userType === "candidate" ? "#264a7f" : "#e59f56" }}
                   placeholder="your@email.com"
                 />
               </div>
@@ -115,8 +112,7 @@ const Login = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full rounded-xl py-3.5 text-sm font-bold text-white transition-all hover:scale-[1.02] hover:shadow-lg disabled:opacity-60"
-                style={{ background: userType === "candidate" ? "linear-gradient(135deg, #264a7f, #69a44f)" : "linear-gradient(135deg, #e59f56, #264a7f)" }}
+                className="btn-gradient w-full rounded-xl py-3.5 text-sm font-bold transition-all hover:scale-[1.02] hover:shadow-lg disabled:opacity-60"
               >
                 {loading ? "Logging in..." : `Login as ${userType === "candidate" ? "Candidate" : "Employer"}`}
               </button>
@@ -124,12 +120,12 @@ const Login = () => {
 
             <div className="mt-6 pt-6 border-t border-border text-center space-y-2">
               <p className="text-sm text-muted-foreground">Don't have an account?</p>
-              <div className="flex gap-3 justify-center">
+              <div className="flex flex-col items-center justify-center gap-2 sm:flex-row sm:gap-3">
                 <Link to="/register/candidate" className="text-sm font-medium hover:underline" style={{ color: "#264a7f" }}>
                   Register as Candidate
                 </Link>
-                <span className="text-muted-foreground">|</span>
-                <Link to="/register/client" className="text-sm font-medium hover:underline" style={{ color: "#e59f56" }}>
+                <span className="hidden text-muted-foreground sm:inline">|</span>
+                <Link to="/register/client" className="text-sm font-medium hover:underline" style={{ color: "#69a44f" }}>
                   Register as Employer
                 </Link>
               </div>

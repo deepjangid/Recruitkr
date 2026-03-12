@@ -17,7 +17,7 @@ const WhyRecruitkrSection = () => {
             Our Edge
           </p>
           <h2 className="text-4xl font-extrabold tracking-tight md:text-5xl">
-            Why Recruitkr
+            About Us
           </h2>
         </div>
 

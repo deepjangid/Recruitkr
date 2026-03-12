@@ -24,16 +24,16 @@ const Footer = () => {
   const contactEmails = ["support@recruitkr.com", "connect@recruitkr.com", "careers@recruitkr.com"];
 
   return (
-    <footer className="border-t border-border bg-navy-deep py-16">
+    <footer className="border-t border-border bg-navy-deep py-12 sm:py-16">
       <div className="container mx-auto px-4">
         <div className="grid gap-10 text-center md:grid-cols-4 md:text-left">
           <div className="md:col-span-1">
             <a href="/" className="inline-flex items-center justify-center md:justify-start">
-              <span className="block h-12 w-[190px] overflow-hidden sm:w-[210px] md:w-[230px] lg:w-[250px]">
+              <span className="block h-14 w-[220px] overflow-hidden sm:w-[240px] md:w-[260px] lg:w-[280px]">
                 <img
                   src={Logo}
                   alt="RecruitKr"
-                  className="h-full w-full scale-[1.55] object-contain md:object-center"
+                  className="h-full w-full scale-[1.75] object-contain md:object-center"
                 />
               </span>
             </a>
@@ -57,7 +57,13 @@ const Footer = () => {
           </div>
 
           <div>
-            <h4 className="mb-4 text-sm font-bold uppercase tracking-widest text-white">Services</h4>
+            <h4 className="mb-4 text-sm font-bold uppercase tracking-widest">Services</h4>
+            <Link to="/" className="mb-2 block text-sm text-white">
+              Home
+            </Link>
+            <Link to="/why-us" className="mb-2 block text-sm text-white">
+              About Us
+            </Link>
             {["Recruitment", "Payroll", "Staffing", "Gig Placement", "HR Solutions", "Career Counselling"].map((s) => (
               <a key={s} href="#services" className="mb-2 block text-sm text-white">
                 {s}
@@ -66,10 +72,13 @@ const Footer = () => {
             <Link to="/faqs" className="mb-2 block text-sm text-white">
               FAQs
             </Link>
+            <Link to="/blog" className="mb-2 block text-sm text-white">
+              Blog
+            </Link>
           </div>
 
           <div>
-            <h4 className="mb-4 text-sm font-bold uppercase tracking-widest text-white">Sectors</h4>
+            <h4 className="mb-4 text-sm font-bold uppercase tracking-widest">Sectors</h4>
             {["IT", "Healthcare", "Banking", "Retail", "Manufacturing", "Logistics"].map((s) => (
               <a key={s} href="#sectors" className="mb-2 block text-sm text-white">
                 {s}
@@ -78,15 +87,15 @@ const Footer = () => {
           </div>
 
           <div>
-            <h4 className="mb-4 text-sm font-bold uppercase tracking-widest text-white">Contact</h4>
+            <h4 className="mb-4 text-sm font-bold uppercase tracking-widest">Contact</h4>
             <div className="mb-3 space-y-2">
               {contactEmails.map((email) => (
                 <a
                   key={email}
                   href={`mailto:${email}`}
-                  className="flex items-center justify-center gap-2 text-sm text-white md:justify-start"
+                  className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm text-white md:justify-start break-all"
                 >
-                  <Mail size={16} /> {email}
+                  <Mail size={16} className="shrink-0" /> {email}
                 </a>
               ))}
             </div>
@@ -97,7 +106,7 @@ const Footer = () => {
                   href="tel:+919001965072"
                   className="flex items-center justify-center gap-2 text-sm text-white md:justify-start"
                 >
-                  <Phone size={16} /> +91 90019 65072
+                  <Phone size={16} className="shrink-0" /> +91 90019 65072
                 </a>
               </div>
               <div>
@@ -106,7 +115,7 @@ const Footer = () => {
                   href="tel:+919636315150"
                   className="flex items-center justify-center gap-2 text-sm text-white md:justify-start"
                 >
-                  <Phone size={16} /> +91 96363 15150
+                  <Phone size={16} className="shrink-0" /> +91 96363 15150
                 </a>
               </div>
             </div>

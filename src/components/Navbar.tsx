@@ -4,10 +4,12 @@ import { Link } from "react-router-dom";
 import Logo from "../assets/logo.png";
 
 const navItems = [
+  { label: "Home", path: "/" },
+  { label: "About Us", path: "/why-us" },
   { label: "Services", path: "/services" },
   { label: "Sectors", path: "/sectors" },
   { label: "Process", path: "/process" },
-  { label: "Why Us", path: "/why-us" },
+  { label: "Blog", path: "/blog" },
 ];
 
 const Navbar = () => {
@@ -18,11 +20,11 @@ const Navbar = () => {
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-lg">
       <div className="container mx-auto flex items-center justify-between px-4 py-3 md:py-4">
         <Link to="/" className="flex items-center">
-          <span className="block h-10 w-[170px] overflow-hidden sm:h-11 sm:w-[190px] md:w-[210px] lg:w-[230px]">
+          <span className="block h-10 w-[170px] overflow-hidden sm:h-12 sm:w-[230px] md:h-14 md:w-[250px] lg:w-[270px]">
             <img
               src={Logo}
               alt="RecruitKr"
-              className="h-full w-full scale-[1.55] object-contain"
+              className="h-full w-full scale-[1.75] object-contain"
             />
           </span>
         </Link>
@@ -69,21 +71,25 @@ const Navbar = () => {
 
           <Link
             to="/login"
-            className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-foreground transition-all hover:border-primary hover:text-primary"
+            className="btn-gradient rounded-lg px-4 py-2 text-sm font-semibold transition-transform hover:scale-105"
           >
             Login
           </Link>
 
           <Link
             to="/contact"
-            className="rounded-lg px-5 py-2.5 text-sm font-semibold text-white transition-transform hover:scale-105"
-            style={{ background: "linear-gradient(135deg, #264a7f 0%, #69a44f 100%)" }}
+            className="btn-gradient rounded-lg px-5 py-2.5 text-sm font-semibold transition-transform hover:scale-105"
           >
             Get Started
           </Link>
         </div>
 
-        <button className="text-foreground md:hidden" onClick={() => setOpen(!open)}>
+        <button
+          className="text-foreground md:hidden"
+          onClick={() => setOpen(!open)}
+          aria-label={open ? "Close menu" : "Open menu"}
+          aria-expanded={open}
+        >
           {open ? <X size={24} /> : <Menu size={24} />}
         </button>
       </div>
@@ -106,10 +112,10 @@ const Navbar = () => {
           <Link to="/register/client" className="block py-3 text-sm text-muted-foreground hover:text-primary" onClick={() => setOpen(false)}>
             🏢 Register as Employer
           </Link>
-          <Link to="/login" className="mt-2 block rounded-lg border border-border px-5 py-2.5 text-center text-sm font-semibold" onClick={() => setOpen(false)}>
+          <Link to="/login" className="btn-gradient mt-2 block rounded-lg px-5 py-2.5 text-center text-sm font-semibold" onClick={() => setOpen(false)}>
             Login
           </Link>
-          <Link to="/contact" className="mt-2 block rounded-lg px-5 py-2.5 text-center text-sm font-semibold text-white" style={{ background: "linear-gradient(135deg, #264a7f 0%, #69a44f 100%)" }} onClick={() => setOpen(false)}>
+          <Link to="/contact" className="btn-gradient mt-2 block rounded-lg px-5 py-2.5 text-center text-sm font-semibold" onClick={() => setOpen(false)}>
             Get Started
           </Link>
         </div>

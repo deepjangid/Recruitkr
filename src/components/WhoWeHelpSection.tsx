@@ -43,7 +43,7 @@ const WhoWeHelpSection = () => {
               <div className="mx-auto mb-5 inline-flex rounded-full p-4">
                 <panel.icon size={40} />
               </div>
-              <h3 className="mb-3 text-2xl font-bold text-foreground">{panel.title}</h3>
+              <h3 className="mb-3 text-2xl font-bold">{panel.title}</h3>
               <p className="text-sm leading-relaxed text-muted-foreground">
                 {panel.description}
               </p>

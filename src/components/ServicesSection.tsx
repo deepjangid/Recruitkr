@@ -57,13 +57,13 @@ const ServicesSection = () => {
           {services.map((service) => (
             <div
               key={service.title}
-              className="card-hover group rounded-xl border border-border bg-card p-8 transition-colors hover:border-primary/40"
+              className="card-hover group rounded-xl border border-border bg-card p-8 text-center transition-colors hover:border-transparent hover:gradient-teal sm:text-left"
             >
-              <div className="mb-5 inline-flex rounded-lg bg-primary/10 p-3 text-primary transition-colors group-hover:gradient-teal group-hover:text-primary-foreground">
+              <div className="mb-5 inline-flex rounded-lg bg-primary/10 p-3 text-primary transition-colors group-hover:bg-white/15 group-hover:text-white">
                 <service.icon size={28} />
               </div>
-              <h3 className="mb-2 text-xl font-bold">{service.title}</h3>
-              <p className="text-sm leading-relaxed text-muted-foreground">
+              <h3 className="mb-2 text-xl font-bold group-hover:text-white">{service.title}</h3>
+              <p className="text-sm leading-relaxed text-muted-foreground group-hover:text-white/90">
                 {service.description}
               </p>
             </div>

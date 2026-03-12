@@ -1,37 +1,28 @@
 import { ArrowRight, Briefcase } from "lucide-react";
-import heroBg from "@/assets/hero-bg.jpg";
 
 const stats = [
   { value: "500+", label: "Placements" },
-  { value: "12+", label: "Sectors" },
+  { value: "11+", label: "Sectors" },
   { value: "E2E", label: "HR Solutions" },
 ];
 
 const HeroSection = () => {
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20">
-      {/* Background */}
-      <div className="absolute inset-0 z-0">
-        <img src={heroBg} alt="" className="h-full w-full object-cover opacity-60" />
-        <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/70 to-background" />
-      </div>
-
-      <div className="container relative z-10 mx-auto px-4 py-20 text-center">
+    <section className="min-h-screen flex items-center justify-center pt-20">
+      <div className="container mx-auto px-4 py-20 text-center">
         <div className="animate-fade-up mx-auto max-w-4xl">
-
-          <h1 className="mb-6 text-5xl font-extrabold leading-tight tracking-tight md:text-7xl" style={{color:'#264A7F'}}>
-            Your Hiring Partner.{" "}
-            <span className="text-gradient-teal">End to End.</span>
+          <h1 className="mb-6 text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl md:text-7xl">
+            Your Hiring Partner. <span className="text-gradient-teal">End to End.</span>
           </h1>
 
-          <p className="animate-fade-up-delay-1 mx-auto mb-10 max-w-2xl text-lg text-muted-foreground md:text-xl">
+          <p className="animate-fade-up-delay-1 mx-auto mb-10 max-w-2xl text-base text-muted-foreground sm:text-lg md:text-xl">
             Recruitment, Payroll, Staffing, Gig Solutions — Serving Startups, SMBs and Corporates.
           </p>
 
           <div className="animate-fade-up-delay-2 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <a
               href="#cta"
-              className="gradient-teal group inline-flex items-center gap-2 rounded-lg px-8 py-4 text-base font-bold text-primary-foreground transition-transform hover:scale-105"
+              className="btn-gradient group inline-flex w-full items-center justify-center gap-2 rounded-lg px-6 py-4 text-base font-bold transition-transform hover:scale-105 sm:w-auto sm:px-8"
             >
               <Briefcase size={20} />
               Hire Talent
@@ -39,18 +30,17 @@ const HeroSection = () => {
             </a>
             <a
               href="#cta"
-              className="inline-flex items-center gap-2 rounded-lg border-2 border-primary/50 px-8 py-4 text-base font-bold text-primary transition-all hover:border-primary hover:bg-primary/10"
+              className="btn-gradient inline-flex w-full items-center justify-center gap-2 rounded-lg px-6 py-4 text-base font-bold transition-transform hover:scale-105 sm:w-auto sm:px-8"
             >
               Find a Job
             </a>
           </div>
         </div>
 
-        {/* Stats strip */}
-        <div className="animate-fade-up-delay-3 mx-auto mt-20 grid max-w-3xl grid-cols-3 divide-x divide-border rounded-xl border border-border bg-card/60 backdrop-blur-sm">
+        <div className="animate-fade-up-delay-3 mx-auto mt-16 grid max-w-3xl grid-cols-1 divide-y divide-border rounded-xl border border-border bg-card/60 backdrop-blur-sm sm:mt-20 sm:grid-cols-3 sm:divide-y-0 sm:divide-x">
           {stats.map((stat) => (
-            <div key={stat.label} className="px-6 py-6 text-center">
-              <div className="text-3xl font-extrabold text-primary md:text-4xl">{stat.value}</div>
+            <div key={stat.label} className="px-4 py-5 text-center sm:px-6 sm:py-6">
+              <div className="text-2xl font-extrabold text-primary sm:text-3xl md:text-4xl">{stat.value}</div>
               <div className="mt-1 text-sm text-muted-foreground">{stat.label}</div>
             </div>
           ))}

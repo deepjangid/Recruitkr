@@ -124,15 +124,15 @@ const CandidateDashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card/60">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link to="/" className="font-display text-2xl font-bold">
+        <div className="container mx-auto flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <Link to="/" className="font-heading text-2xl font-bold">
             Recruit<span style={{ color: "#264a7f" }}>kr</span>
           </Link>
-          <div className="flex gap-2">
-            <button className="px-3 py-2 rounded-lg border border-border text-sm" onClick={() => setTab("overview")}>Overview</button>
-            <button className="px-3 py-2 rounded-lg border border-border text-sm" onClick={() => setTab("jobs")}>Browse Jobs</button>
-            <button className="px-3 py-2 rounded-lg border border-border text-sm" onClick={() => setTab("applications")}>My Applications</button>
-            <button className="px-3 py-2 rounded-lg border border-border text-sm" onClick={logout}>Logout</button>
+          <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
+            <button className="rounded-lg border border-border px-3 py-2 text-xs sm:text-sm" onClick={() => setTab("overview")}>Overview</button>
+            <button className="rounded-lg border border-border px-3 py-2 text-xs sm:text-sm" onClick={() => setTab("jobs")}>Browse Jobs</button>
+            <button className="rounded-lg border border-border px-3 py-2 text-xs sm:text-sm" onClick={() => setTab("applications")}>My Applications</button>
+            <button className="rounded-lg border border-border px-3 py-2 text-xs sm:text-sm" onClick={logout}>Logout</button>
           </div>
         </div>
       </header>
@@ -143,7 +143,7 @@ const CandidateDashboard = () => {
         {tab === "overview" && (
           <>
             <div className="rounded-xl border border-border bg-card p-6">
-              <h1 className="font-display text-2xl font-bold mb-2">Welcome, {profile?.fullName || session?.user.email}</h1>
+              <h1 className="font-heading text-2xl font-bold mb-2">Welcome, {profile?.fullName || session?.user.email}</h1>
               <p className="text-sm text-muted-foreground">Preferred Role: {profile?.preferences?.preferredRole || "Not set"}</p>
             </div>
 
@@ -160,7 +160,7 @@ const CandidateDashboard = () => {
           <div className="space-y-4">
             {jobs.map((job) => (
               <div key={job._id} className="rounded-xl border border-border bg-card p-5">
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <h3 className="font-semibold">{job.jobTitle}</h3>
                     <p className="text-sm text-muted-foreground">{job.jobLocation} - {job.employmentType}</p>
@@ -169,8 +169,7 @@ const CandidateDashboard = () => {
                   <button
                     onClick={() => applyToJob(job._id)}
                     disabled={applicationJobIds.has(job._id) || applyLoadingJobId === job._id}
-                    className="rounded-lg px-4 py-2 text-sm text-white disabled:opacity-60"
-                    style={{ background: "linear-gradient(135deg, #264a7f, #69a44f)" }}
+                    className="btn-gradient w-full rounded-lg px-4 py-2 text-sm disabled:opacity-60 sm:w-auto"
                   >
                     {applicationJobIds.has(job._id) ? "Applied" : applyLoadingJobId === job._id ? "Applying..." : "Apply"}
                   </button>
@@ -183,12 +182,12 @@ const CandidateDashboard = () => {
 
         {tab === "applications" && (
           <div className="rounded-xl border border-border bg-card overflow-hidden">
-            <div className="px-6 py-4 border-b border-border">
-              <h2 className="font-display font-semibold">My Applications</h2>
+            <div className="px-4 py-4 border-b border-border sm:px-6">
+              <h2 className="font-heading font-semibold">My Applications</h2>
             </div>
             <div className="divide-y divide-border">
               {(dashboard?.applications || []).map((application) => (
-                <div key={application._id} className="px-6 py-4">
+                <div key={application._id} className="px-4 py-4 sm:px-6">
                   <p className="font-medium">{application.jobId?.jobTitle || "Job"}</p>
                   <p className="text-sm text-muted-foreground">
                     Status: {application.status} - {new Date(application.createdAt).toLocaleDateString()}
@@ -196,7 +195,7 @@ const CandidateDashboard = () => {
                 </div>
               ))}
               {(dashboard?.applications || []).length === 0 && (
-                <div className="px-6 py-4 text-sm text-muted-foreground">No applications yet.</div>
+                <div className="px-4 py-4 text-sm text-muted-foreground sm:px-6">No applications yet.</div>
               )}
             </div>
           </div>

@@ -46,7 +46,7 @@ const Contact = () => {
       <div className="pt-28 pb-20">
         <div className="container mx-auto max-w-2xl px-4">
           <div className="rounded-2xl border border-border bg-card p-6 md:p-8">
-            <h1 className="font-display text-3xl font-bold mb-2">Contact Us</h1>
+            <h1 className="font-heading text-3xl font-bold mb-2">Contact Us</h1>
             <p className="text-sm text-muted-foreground mb-6">Send your requirement or message and our team will reach you.</p>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -73,8 +73,7 @@ const Contact = () => {
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full rounded-xl py-3 text-sm font-bold text-white disabled:opacity-60"
-                style={{ background: "linear-gradient(135deg, #264a7f, #69a44f)" }}
+                className="btn-gradient w-full rounded-xl py-3 text-sm font-bold disabled:opacity-60"
               >
                 {submitting ? "Submitting..." : "Submit Message"}
               </button>

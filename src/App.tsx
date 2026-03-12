@@ -10,6 +10,8 @@ import Process from "./pages/Process";
 import WhyUs from "./pages/WhyUs";
 import Contact from "./pages/Contact";
 import FAQs from "./pages/FAQs";
+import Blog from "./pages/Blog";
+import BlogPost from "./pages/BlogPost";
 import NotFound from "./pages/NotFound";
 import CandidateRegister from "./pages/CandidateRegister";
 import ClientRegister from "./pages/ClientRegister";
@@ -33,6 +35,8 @@ const App = () => (
           <Route path="/why-us" element={<WhyUs />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/faqs" element={<FAQs />} />
+          <Route path="/blog" element={<Blog />} />
+          <Route path="/blog/:slug" element={<BlogPost />} />
           <Route path="/register/candidate" element={<CandidateRegister />} />
           <Route path="/register/client" element={<ClientRegister />} />
           <Route path="/login" element={<Login />} />

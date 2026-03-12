@@ -88,7 +88,7 @@ const CandidateRegister = () => {
       >
         {n}
       </div>
-      <span className="text-lg font-display font-semibold text-foreground">
+      <span className="text-lg font-heading font-semibold text-foreground">
         {icon} {title}
       </span>
     </div>
@@ -315,9 +315,9 @@ const CandidateRegister = () => {
             className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
             style={{ background: "linear-gradient(135deg, #264a7f, #69a44f)" }}
           >
-            <span className="text-4xl">✓</span>
+            <span className="text-3xl sm:text-4xl">✓</span>
           </div>
-          <h2 className="font-display text-3xl font-bold mb-3">Registration Submitted!</h2>
+          <h2 className="font-heading text-3xl font-bold mb-3">Registration Submitted!</h2>
           <p className="text-muted-foreground">Redirecting you to dashboard...</p>
         </div>
       </div>
@@ -333,7 +333,7 @@ const CandidateRegister = () => {
             <div className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-1.5 text-xs text-muted-foreground mb-4">
               <span style={{ color: "#69a44f" }}>●</span> Candidate Registration
             </div>
-            <h1 className="font-display text-4xl font-bold mb-3">Join as a Candidate</h1>
+            <h1 className="font-heading text-3xl font-bold mb-3 sm:text-4xl">Join as a Candidate</h1>
             <p className="text-muted-foreground">ANAAGAT HUMANPOWER PRIVATE LIMITED</p>
           </div>
 
@@ -456,7 +456,7 @@ const CandidateRegister = () => {
             </div>
 
             <div className="rounded-2xl border border-border bg-card p-6 md:p-8">
-              <h3 className="text-lg font-display font-semibold mb-5">🔐 Create Account Password</h3>
+              <h3 className="text-lg font-heading font-semibold mb-5">🔐 Create Account Password</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div><label className={labelClass}>Password *</label><input type="password" required minLength={8} className={inputClass} value={form.password} onChange={onChange("password")} /></div>
                 <div><label className={labelClass}>Confirm Password *</label><input type="password" required minLength={8} className={inputClass} value={form.confirmPassword} onChange={onChange("confirmPassword")} /></div>
@@ -472,8 +472,7 @@ const CandidateRegister = () => {
             <button
               type="submit"
               disabled={!canSubmit || submitting}
-              className="w-full rounded-xl py-4 text-base font-bold text-white transition-all hover:scale-[1.02] hover:shadow-2xl disabled:opacity-60 disabled:cursor-not-allowed"
-              style={{ background: "linear-gradient(135deg, #264a7f 0%, #69a44f 100%)" }}
+              className="btn-gradient w-full rounded-xl py-4 text-base font-bold transition-all hover:scale-[1.02] hover:shadow-2xl disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {submitting ? "Submitting..." : "Submit Candidate Registration"}
             </button>

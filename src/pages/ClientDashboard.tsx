@@ -114,15 +114,15 @@ const ClientDashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card/60">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link to="/" className="font-display text-2xl font-bold">
+        <div className="container mx-auto flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <Link to="/" className="font-heading text-2xl font-bold">
             Recruit<span style={{ color: "#264a7f" }}>kr</span>
           </Link>
-          <div className="flex gap-2">
-            <button className="px-3 py-2 rounded-lg border border-border text-sm" onClick={() => setTab("overview")}>Overview</button>
-            <button className="px-3 py-2 rounded-lg border border-border text-sm" onClick={() => setTab("requirements")}>Requirements</button>
-            <button className="px-3 py-2 rounded-lg border border-border text-sm" onClick={() => setTab("applications")}>Applications</button>
-            <button className="px-3 py-2 rounded-lg border border-border text-sm" onClick={logout}>Logout</button>
+          <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
+            <button className="rounded-lg border border-border px-3 py-2 text-xs sm:text-sm" onClick={() => setTab("overview")}>Overview</button>
+            <button className="rounded-lg border border-border px-3 py-2 text-xs sm:text-sm" onClick={() => setTab("requirements")}>Requirements</button>
+            <button className="rounded-lg border border-border px-3 py-2 text-xs sm:text-sm" onClick={() => setTab("applications")}>Applications</button>
+            <button className="rounded-lg border border-border px-3 py-2 text-xs sm:text-sm" onClick={logout}>Logout</button>
           </div>
         </div>
       </header>
@@ -133,7 +133,7 @@ const ClientDashboard = () => {
         {tab === "overview" && (
           <>
             <div className="rounded-xl border border-border bg-card p-6">
-              <h1 className="font-display text-2xl font-bold mb-2">{profile?.companyName || session?.user.email}</h1>
+              <h1 className="font-heading text-2xl font-bold mb-2 break-words">{profile?.companyName || session?.user.email}</h1>
               <p className="text-sm text-muted-foreground">
                 {profile?.industry || "Industry"} - {profile?.companyType || "Company Type"} - {profile?.companySize || "Company Size"}
               </p>
@@ -152,7 +152,7 @@ const ClientDashboard = () => {
           <div className="space-y-4">
             {(dashboard?.requirements || []).map((requirement) => (
               <div key={requirement._id} className="rounded-xl border border-border bg-card p-5">
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <h3 className="font-semibold">{requirement.jobTitle}</h3>
                     <p className="text-sm text-muted-foreground">
@@ -162,9 +162,9 @@ const ClientDashboard = () => {
                       Urgency: {requirement.urgencyLevel} - Posted {new Date(requirement.createdAt).toLocaleDateString()}
                     </p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex w-full gap-2 sm:w-auto">
                     <select
-                      className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm sm:w-auto"
                       value={requirement.status}
                       onChange={(e) => updateRequirementStatus(requirement._id, e.target.value as "active" | "on-hold" | "closed")}
                     >
@@ -184,20 +184,20 @@ const ClientDashboard = () => {
 
         {tab === "applications" && (
           <div className="rounded-xl border border-border bg-card overflow-hidden">
-            <div className="px-6 py-4 border-b border-border">
-              <h2 className="font-display font-semibold">Candidate Applications</h2>
+            <div className="px-4 py-4 border-b border-border sm:px-6">
+              <h2 className="font-heading font-semibold">Candidate Applications</h2>
             </div>
             <div className="divide-y divide-border">
               {applications.map((application) => (
-                <div key={application._id} className="px-6 py-4">
+                <div key={application._id} className="px-4 py-4 sm:px-6">
                   <p className="font-medium">{application.jobId?.jobTitle || "Job"}</p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-muted-foreground break-all">
                     {application.candidateId?.email || "Candidate"} - {application.status}
                   </p>
                 </div>
               ))}
               {applications.length === 0 && (
-                <div className="px-6 py-4 text-sm text-muted-foreground">No applications yet.</div>
+                <div className="px-4 py-4 text-sm text-muted-foreground sm:px-6">No applications yet.</div>
               )}
             </div>
           </div>
