@@ -1,5 +1,5 @@
-import { useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState, type FormEvent } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { apiPost } from "@/lib/api";
@@ -7,11 +7,19 @@ import { setSession } from "@/lib/auth";
 
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [userType, setUserType] = useState<"candidate" | "client">("candidate");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const role = new URLSearchParams(location.search).get("role");
+    if (role === "client" || role === "candidate") {
+      setUserType(role);
+    }
+  }, [location.search]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();

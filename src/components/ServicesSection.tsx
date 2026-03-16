@@ -1,72 +1,37 @@
-import {
-  Users,
-  Wallet,
-  UserCheck,
-  Briefcase,
-  ShieldCheck,
-  GraduationCap,
-} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { services } from "@/lib/services";
+import { Link } from "react-router-dom";
 
-const services = [
-  {
-    icon: Users,
-    title: "Recruitment",
-    description: "Tailored hiring for startups, SMBs, and corporates across 12+ sectors.",
-  },
-  {
-    icon: Wallet,
-    title: "Payroll Management",
-    description: "Accurate, compliant payroll processing so you focus on growth.",
-  },
-  {
-    icon: UserCheck,
-    title: "Staffing Solutions",
-    description: "Flexible workforce on demand — scale up or down as needed.",
-  },
-  {
-    icon: Briefcase,
-    title: "Gig Worker Placement",
-    description: "Contract and freelance talent pool for project-based needs.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "End-to-End HR",
-    description: "From recruitment to retention to replacement — we cover it all.",
-  },
-  {
-    icon: GraduationCap,
-    title: "Career Counselling",
-    description: "Guidance for job seekers, aspirants, and college students.",
-  },
-];
+type ServicesSectionProps = {
+  showHeading?: boolean;
+  className?: string;
+};
 
-const ServicesSection = () => {
+const ServicesSection = ({ showHeading = true, className }: ServicesSectionProps) => {
   return (
-    <section id="services" className="py-24">
+    <section id="services" className={cn("py-24", className)}>
       <div className="container mx-auto px-4">
-        <div className="mb-16 text-center">
-          <p className="mb-2 text-sm font-semibold uppercase tracking-widest text-primary">
-            What We Do
-          </p>
-          <h2 className="text-4xl font-extrabold tracking-tight md:text-5xl">
-            Our Services
-          </h2>
-        </div>
+        {showHeading && (
+          <div className="mb-16 text-center">
+            <p className="mb-2 text-sm font-semibold uppercase tracking-widest text-primary">What We Do</p>
+            <h2 className="text-4xl font-extrabold tracking-tight md:text-5xl">Our Services</h2>
+          </div>
+        )}
 
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {services.map((service) => (
-            <div
-              key={service.title}
+            <Link
+              key={service.id}
+              to={`/services/${service.id}`}
               className="card-hover group rounded-xl border border-border bg-card p-8 text-center transition-colors hover:border-transparent hover:gradient-teal sm:text-left"
+              aria-label={`View details for ${service.cardTitle}`}
             >
               <div className="mb-5 inline-flex rounded-lg bg-primary/10 p-3 text-primary transition-colors group-hover:bg-white/15 group-hover:text-white">
                 <service.icon size={28} />
               </div>
-              <h3 className="mb-2 text-xl font-bold group-hover:text-white">{service.title}</h3>
-              <p className="text-sm leading-relaxed text-muted-foreground group-hover:text-white/90">
-                {service.description}
-              </p>
-            </div>
+              <h3 className="mb-2 text-xl font-bold group-hover:text-white">{service.cardTitle}</h3>
+              <p className="text-sm leading-relaxed text-muted-foreground group-hover:text-white/90">{service.cardDescription}</p>
+            </Link>
           ))}
         </div>
       </div>

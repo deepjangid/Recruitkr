@@ -29,11 +29,11 @@ const Footer = () => {
         <div className="grid gap-10 text-center md:grid-cols-4 md:text-left">
           <div className="md:col-span-1">
             <a href="/" className="inline-flex items-center justify-center md:justify-start">
-              <span className="block h-14 w-[220px] overflow-hidden sm:w-[240px] md:w-[260px] lg:w-[280px]">
+              <span className="block h-14 w-14 shrink-0 overflow-hidden sm:h-16 sm:w-16">
                 <img
                   src={Logo}
                   alt="RecruitKr"
-                  className="h-full w-full scale-[1.75] object-contain md:object-center"
+                  className="h-full w-full scale-[1.4] object-contain"
                 />
               </span>
             </a>

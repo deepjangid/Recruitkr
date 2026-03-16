@@ -20,11 +20,11 @@ const Navbar = () => {
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-lg">
       <div className="container mx-auto flex items-center justify-between px-4 py-3 md:py-4">
         <Link to="/" className="flex items-center">
-          <span className="block h-10 w-[170px] overflow-hidden sm:h-12 sm:w-[230px] md:h-14 md:w-[250px] lg:w-[270px]">
+          <span className="block h-10 w-10 shrink-0 overflow-hidden sm:h-12 sm:w-12 md:h-14 md:w-14">
             <img
               src={Logo}
               alt="RecruitKr"
-              className="h-full w-full scale-[1.75] object-contain"
+              className="h-full w-full scale-[1.4] object-contain"
             />
           </span>
         </Link>

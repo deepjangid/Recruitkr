@@ -1,4 +1,5 @@
 import { Briefcase, Upload } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const DualCtaSection = () => {
   return (
@@ -14,12 +15,12 @@ const DualCtaSection = () => {
             <p className="mb-6 text-muted-foreground">
               Share your requirements and let us find the perfect fit.
             </p>
-            <a
-              href="mailto:hire@recruitkr.com"
+            <Link
+              to="/login?role=client"
               className="btn-gradient inline-flex w-full items-center justify-center gap-2 rounded-lg px-6 py-3.5 font-bold transition-transform hover:scale-105 sm:w-auto sm:px-8"
             >
               Post a Requirement
-            </a>
+            </Link>
           </div>
 
           {/* Job Seekers */}
@@ -31,12 +32,12 @@ const DualCtaSection = () => {
             <p className="mb-6 text-muted-foreground">
               Upload your resume and let opportunities find you.
             </p>
-            <a
-              href="/register/candidate"
+            <Link
+              to="/register/candidate"
               className="btn-gradient inline-flex w-full items-center justify-center gap-2 rounded-lg px-6 py-3.5 font-bold transition-transform hover:scale-105 sm:w-auto sm:px-8"
             >
               Upload Your Resume
-            </a>
+            </Link>
           </div>
         </div>
       </div>
