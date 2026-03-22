@@ -114,3 +114,16 @@ export const changePasswordSchema = z
     newPassword: password,
   })
   .strict();
+
+export const forgotPasswordSchema = z
+  .object({
+    email,
+  })
+  .strict();
+
+export const resetPasswordSchema = z
+  .object({
+    token: z.string().min(20),
+    newPassword: password,
+  })
+  .strict();

@@ -104,7 +104,15 @@ const Login = () => {
                 />
               </div>
               <div>
-                <label className="block mb-1.5 text-sm font-medium text-foreground">Password</label>
+                <div className="mb-1.5 flex items-center justify-between">
+                  <label className="text-sm font-medium text-foreground">Password</label>
+                  <Link
+                    to="/forgot-password"
+                    className="text-xs font-medium text-muted-foreground hover:underline"
+                  >
+                    Forgot?
+                  </Link>
+                </div>
                 <input
                   type="password"
                   required

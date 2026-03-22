@@ -25,6 +25,8 @@ Use `.env.example` as template:
 - `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET` (64+ chars)
 - `BCRYPT_OR_ARGON2_PEPPER` (random secret)
 - `CORS_ORIGIN` (frontend URL, comma-separated if multiple)
+- `FRONTEND_URL` (used to generate password reset link)
+- SMTP (for password reset emails): `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, optional `SMTP_FROM`
 
 ## 3. Base URL
 
@@ -42,6 +44,8 @@ Use `.env.example` as template:
 - `POST /auth/refresh`
 - `POST /auth/logout`
 - `POST /auth/change-password` (auth required)
+- `POST /auth/forgot-password`
+- `POST /auth/reset-password`
 
 ### Users/Profile
 - `GET /users/me` (auth required)

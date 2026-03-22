@@ -24,105 +24,133 @@ const Footer = () => {
   const contactEmails = ["support@recruitkr.com", "connect@recruitkr.com", "careers@recruitkr.com"];
 
   return (
-    <footer className="border-t border-border bg-navy-deep py-12 sm:py-16">
+    <footer className="border-t border-border bg-navy-deep py-10 text-white sm:py-14">
       <div className="container mx-auto px-4">
-        <div className="grid gap-10 text-center md:grid-cols-4 md:text-left">
-          <div className="md:col-span-1">
-            <a href="/" className="inline-flex items-center justify-center md:justify-start">
-              <span className="block h-14 w-14 shrink-0 overflow-hidden sm:h-16 sm:w-16">
-                <img
-                  src={Logo}
-                  alt="RecruitKr"
-                  className="h-full w-full scale-[1.4] object-contain"
-                />
-              </span>
-            </a>
-            <p className="mx-auto mt-3 max-w-xs text-sm leading-relaxed text-white md:mx-0">
+        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 sm:gap-10 md:grid-cols-12">
+          <div className="flex flex-col items-center text-center sm:col-span-2 sm:items-start sm:text-left md:col-span-4">
+            <div className="flex w-full items-center justify-between gap-4">
+              <a href="/" className="inline-flex items-center">
+                <span className="block h-14 w-14 shrink-0 overflow-hidden sm:h-16 sm:w-16">
+                  <img
+                    src={Logo}
+                    alt="RecruitKr"
+                    className="h-full w-full scale-[1.4] object-contain"
+                  />
+                </span>
+              </a>
+              <div className="flex justify-center gap-3 sm:justify-start">
+                {socialLinks.map(({ icon: Icon, href, label }) => (
+                  <a
+                    key={label}
+                    href={href}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={label}
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white transition hover:border-primary/60 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
+                  >
+                    <Icon size={18} />
+                  </a>
+                ))}
+              </div>
+            </div>
+            <p className="mt-3 max-w-xs text-sm leading-relaxed text-white/85">
               Your End-to-End Hiring and HR Partner from recruitment to retention.
             </p>
-            <div className="mt-5 flex justify-center gap-3 md:justify-start">
-              {socialLinks.map(({ icon: Icon, href, label }) => (
+          </div>
+
+          <div className="sm:col-span-1 md:col-span-3">
+            <h4 className="mb-3 text-xs font-semibold uppercase tracking-widest text-white/70">Services</h4>
+            <nav className="grid gap-2 text-sm">
+              <Link
+                to="/"
+                className="text-white/85 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
+              >
+                Home
+              </Link>
+              <Link
+                to="/why-us"
+                className="text-white/85 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
+              >
+                About Us
+              </Link>
+              {["Recruitment", "Payroll", "Staffing", "Gig Placement", "HR Solutions", "Career Counselling"].map((s) => (
                 <a
-                  key={label}
-                  href={href}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label={label}
-                  className="rounded-lg border border-border p-2 text-white transition-colors hover:border-primary"
+                  key={s}
+                  href="#services"
+                  className="text-white/85 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
                 >
-                  <Icon size={18} />
+                  {s}
                 </a>
               ))}
-            </div>
+              <Link
+                to="/faqs"
+                className="text-white/85 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
+              >
+                FAQs
+              </Link>
+              <Link
+                to="/blog"
+                className="text-white/85 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
+              >
+                Blog
+              </Link>
+            </nav>
           </div>
 
-          <div>
-            <h4 className="mb-4 text-sm font-bold uppercase tracking-widest">Services</h4>
-            <Link to="/" className="mb-2 block text-sm text-white">
-              Home
-            </Link>
-            <Link to="/why-us" className="mb-2 block text-sm text-white">
-              About Us
-            </Link>
-            {["Recruitment", "Payroll", "Staffing", "Gig Placement", "HR Solutions", "Career Counselling"].map((s) => (
-              <a key={s} href="#services" className="mb-2 block text-sm text-white">
-                {s}
-              </a>
-            ))}
-            <Link to="/faqs" className="mb-2 block text-sm text-white">
-              FAQs
-            </Link>
-            <Link to="/blog" className="mb-2 block text-sm text-white">
-              Blog
-            </Link>
+          <div className="sm:col-span-1 md:col-span-2">
+            <h4 className="mb-3 text-xs font-semibold uppercase tracking-widest text-white/70">Sectors</h4>
+            <nav className="grid gap-2 text-sm">
+              {["IT", "Healthcare", "Banking", "Retail", "Manufacturing", "Logistics"].map((s) => (
+                <a
+                  key={s}
+                  href="#sectors"
+                  className="text-white/85 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
+                >
+                  {s}
+                </a>
+              ))}
+            </nav>
           </div>
 
-          <div>
-            <h4 className="mb-4 text-sm font-bold uppercase tracking-widest">Sectors</h4>
-            {["IT", "Healthcare", "Banking", "Retail", "Manufacturing", "Logistics"].map((s) => (
-              <a key={s} href="#sectors" className="mb-2 block text-sm text-white">
-                {s}
-              </a>
-            ))}
-          </div>
-
-          <div>
-            <h4 className="mb-4 text-sm font-bold uppercase tracking-widest">Contact</h4>
-            <div className="mb-3 space-y-2">
+          <div className="sm:col-span-2 md:col-span-3">
+            <h4 className="mb-3 text-xs font-semibold uppercase tracking-widest text-white/70">Contact</h4>
+            <div className="grid gap-2 text-sm">
               {contactEmails.map((email) => (
                 <a
                   key={email}
                   href={`mailto:${email}`}
-                  className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm text-white md:justify-start break-all"
+                  className="flex min-w-0 items-start gap-2 text-white/85 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
                 >
-                  <Mail size={16} className="shrink-0" /> {email}
+                  <Mail size={16} className="mt-0.5 shrink-0 opacity-90" />
+                  <span className="min-w-0 break-words">{email}</span>
                 </a>
               ))}
             </div>
-            <div className="space-y-2">
-              <div>
-                <p className="mb-0.5 text-xs text-white">Recruiters / Employers</p>
+
+            <div className="mt-4 grid gap-3">
+              <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                <p className="text-xs font-medium text-white/80">Recruiters / Employers</p>
                 <a
                   href="tel:+919001965072"
-                  className="flex items-center justify-center gap-2 text-sm text-white md:justify-start"
+                  className="mt-1 inline-flex items-center gap-2 text-sm text-white/90 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
                 >
-                  <Phone size={16} className="shrink-0" /> +91 90019 65072
+                  <Phone size={16} className="shrink-0 opacity-90" /> +91 90019 65072
                 </a>
               </div>
-              <div>
-                <p className="mb-0.5 text-xs text-white">Candidates / Job Seekers</p>
+              <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                <p className="text-xs font-medium text-white/80">Candidates / Job Seekers</p>
                 <a
                   href="tel:+919636315150"
-                  className="flex items-center justify-center gap-2 text-sm text-white md:justify-start"
+                  className="mt-1 inline-flex items-center gap-2 text-sm text-white/90 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
                 >
-                  <Phone size={16} className="shrink-0" /> +91 96363 15150
+                  <Phone size={16} className="shrink-0 opacity-90" /> +91 96363 15150
                 </a>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="mt-12 border-t border-border pt-6 text-center text-xs text-white">
+        <div className="mt-10 border-t border-white/10 pt-6 text-center text-xs text-white/75">
           &copy; {new Date().getFullYear()} RecruitKr. All rights reserved.
         </div>
       </div>

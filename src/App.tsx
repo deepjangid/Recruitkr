@@ -17,6 +17,8 @@ import NotFound from "./pages/NotFound";
 import CandidateRegister from "./pages/CandidateRegister";
 import ClientRegister from "./pages/ClientRegister";
 import Login from "./pages/Login";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import CandidateDashboard from "./pages/CandidateDashboard";
 import ClientDashboard from "./pages/ClientDashboard";
 
@@ -42,6 +44,8 @@ const App = () => (
           <Route path="/register/candidate" element={<CandidateRegister />} />
           <Route path="/register/client" element={<ClientRegister />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/dashboard/candidate" element={<CandidateDashboard />} />
           <Route path="/dashboard/client" element={<ClientDashboard />} />
           <Route path="*" element={<NotFound />} />

@@ -1,10 +1,12 @@
 import { StatusCodes } from 'http-status-codes';
+import crypto from 'node:crypto';
 
 import { env } from '../config/env.js';
 import { CandidateProfile } from '../models/CandidateProfile.js';
 import { ClientProfile } from '../models/ClientProfile.js';
 import { Resume } from '../models/Resume.js';
 import { User } from '../models/User.js';
+import { sendPasswordResetEmail } from '../services/mail.service.js';
 import { generateResumePdfBuffer, extractResumeText } from '../services/resume.service.js';
 import { ApiError } from '../utils/ApiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -53,6 +55,11 @@ const issueTokensAndPersistRefresh = async (user) => {
   await user.save();
 
   return { accessToken, refreshToken };
+};
+
+const buildResetPasswordUrl = (token) => {
+  const base = env.FRONTEND_URL.replace(/\/$/, '');
+  return `${base}/reset-password?token=${encodeURIComponent(token)}`;
 };
 
 export const registerCandidate = asyncHandler(async (req, res) => {
@@ -321,4 +328,56 @@ export const changePassword = asyncHandler(async (req, res) => {
 
   res.clearCookie('refreshToken', { path: '/api/v1/auth/refresh' });
   res.json({ success: true, message: 'Password updated. Please log in again.' });
+});
+
+export const forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  const user = await User.findOne({ email })
+    .select('+resetPasswordTokenHash +resetPasswordExpiresAt')
+    .exec();
+
+  if (user) {
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    user.resetPasswordTokenHash = hashToken(rawToken);
+    user.resetPasswordExpiresAt = new Date(Date.now() + env.PASSWORD_RESET_EXPIRES_MIN * 60 * 1000);
+    await user.save();
+
+    const resetUrl = buildResetPasswordUrl(rawToken);
+    await sendPasswordResetEmail({ to: email, resetUrl });
+  }
+
+  // Always return success to prevent account enumeration.
+  res.json({
+    success: true,
+    message: 'If an account exists for this email, a password reset link has been sent.',
+  });
+});
+
+export const resetPassword = asyncHandler(async (req, res) => {
+  const { token, newPassword } = req.body;
+  const tokenHash = hashToken(token);
+
+  const user = await User.findOne({
+    resetPasswordTokenHash: tokenHash,
+    resetPasswordExpiresAt: { $gt: new Date() },
+  })
+    .select('+passwordHash +resetPasswordTokenHash +resetPasswordExpiresAt +refreshTokenHash +refreshTokenJti +refreshTokenExpiresAt')
+    .exec();
+
+  if (!user) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid or expired reset token');
+  }
+
+  user.passwordHash = await hashPassword(newPassword);
+  user.passwordChangedAt = new Date();
+  user.resetPasswordTokenHash = undefined;
+  user.resetPasswordExpiresAt = undefined;
+  user.refreshTokenHash = undefined;
+  user.refreshTokenJti = undefined;
+  user.refreshTokenExpiresAt = undefined;
+  await user.save();
+
+  res.clearCookie('refreshToken', { path: '/api/v1/auth/refresh' });
+  res.json({ success: true, message: 'Password reset successful. Please log in again.' });
 });
