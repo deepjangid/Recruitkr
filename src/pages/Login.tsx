@@ -75,6 +75,7 @@ const Login = () => {
             </div>
 
             <div className="flex rounded-xl overflow-hidden border border-border mb-8">
+              <div className="custom"></div>
               <button
                 type="button"
                 className={`flex-1 py-3 text-sm font-semibold transition-all ${userType === "candidate" ? "btn-gradient" : "text-muted-foreground"}`}

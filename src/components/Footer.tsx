@@ -28,13 +28,13 @@ const Footer = () => {
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 sm:gap-10 md:grid-cols-12">
           <div className="flex flex-col items-center text-center sm:col-span-2 sm:items-start sm:text-left md:col-span-4">
-            <div className="flex w-full items-center justify-between gap-4">
+            <div className="flex w-full flex-col items-center gap-4 sm:flex-row sm:items-center sm:justify-between">
               <a href="/" className="inline-flex items-center">
-                <span className="block h-14 w-14 shrink-0 overflow-hidden sm:h-16 sm:w-16">
+                <span className="flex h-20 max-w-[260px] shrink-0 items-center sm:h-24">
                   <img
                     src={Logo}
                     alt="RecruitKr"
-                    className="h-full w-full scale-[1.4] object-contain"
+                    className="h-full w-auto origin-left scale-[1.2] object-contain sm:scale-[1.25]"
                   />
                 </span>
               </a>
