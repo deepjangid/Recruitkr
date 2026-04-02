@@ -26,7 +26,7 @@ export const services: Service[] = [
     id: "recruitment",
     icon: Users,
     cardTitle: "Recruitment",
-    cardDescription: "Tailored hiring for startups, SMBs, and corporates across 12+ sectors.",
+    cardDescription: "Tailored hiring for startups, Small Business MSMEs, and corporates across 12+ sectors.",
     title: "Recruitment Services",
     subtitle: "Tailored Hiring Solutions for Startups, SMBs, and Corporates Across 12+ Industries",
     intro: [
