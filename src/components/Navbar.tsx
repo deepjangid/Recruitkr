@@ -29,7 +29,7 @@ const Navbar = () => {
           </span>
         </Link>
 
-        <div className="hidden items-center gap-8 md:flex">
+        <div className="hidden items-center gap-8  lg:flex">
           {navItems.map((item) => (
             <Link
               key={item.label}
@@ -84,8 +84,10 @@ const Navbar = () => {
           </Link>
         </div>
 
+       {/* Menu button */}
+       
         <button
-          className="text-foreground md:hidden"
+          className="text-foreground lg:hidden"
           onClick={() => setOpen(!open)}
           aria-label={open ? "Close menu" : "Open menu"}
           aria-expanded={open}
