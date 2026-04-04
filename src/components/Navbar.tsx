@@ -97,7 +97,7 @@ const Navbar = () => {
       </div>
 
       {open && (
-        <div className="border-t border-border bg-background px-6 py-4 md:hidden">
+        <div className="border-t border-border bg-background px-6 py-4 lg:hidden">
           {navItems.map((item) => (
             <Link
               key={item.label}
