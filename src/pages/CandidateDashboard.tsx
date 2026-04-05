@@ -3,6 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { apiGet, apiPost } from "@/lib/api";
 import { clearSession, getSession } from "@/lib/auth";
 
+const JOBS_PAGE_LIMIT = 20;
+
 type CandidateDashboardResponse = {
   success: boolean;
   data: {
@@ -26,6 +28,21 @@ type CandidateDashboardResponse = {
   };
 };
 
+type CandidateApplicationsResponse = {
+  success: boolean;
+  data: Array<{
+    _id: string;
+    status: string;
+    createdAt: string;
+    jobId?: {
+      _id: string;
+      jobTitle?: string;
+      jobLocation?: string;
+      employmentType?: string;
+    };
+  }>;
+};
+
 type CandidateProfileResponse = {
   success: boolean;
   data: {
@@ -46,6 +63,12 @@ type JobsResponse = {
     minCtcLpa?: number;
     maxCtcLpa?: number;
   }>;
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 };
 
 const CandidateDashboard = () => {
@@ -55,24 +78,43 @@ const CandidateDashboard = () => {
   const [error, setError] = useState("");
   const [dashboard, setDashboard] = useState<CandidateDashboardResponse["data"] | null>(null);
   const [profile, setProfile] = useState<CandidateProfileResponse["data"] | null>(null);
+  const [applications, setApplications] = useState<CandidateApplicationsResponse["data"]>([]);
   const [jobs, setJobs] = useState<JobsResponse["data"]>([]);
+  const [jobsMeta, setJobsMeta] = useState<JobsResponse["meta"] | null>(null);
+  const [jobsLoadingMore, setJobsLoadingMore] = useState(false);
   const [applyLoadingJobId, setApplyLoadingJobId] = useState<string | null>(null);
 
   const session = getSession();
 
-  const loadData = async () => {
+  const refreshDashboard = async () => {
+    const dashboardRes = await apiGet<CandidateDashboardResponse>("/dashboards/candidate", true);
+    setDashboard(dashboardRes.data);
+  };
+
+  const refreshApplications = async () => {
+    const appsRes = await apiGet<CandidateApplicationsResponse>("/jobs/applications/mine", true);
+    setApplications(appsRes.data);
+  };
+
+  const fetchJobsPage = async (page: number, mode: "replace" | "append") => {
+    const jobsRes = await apiGet<JobsResponse>(`/jobs?page=${page}&limit=${JOBS_PAGE_LIMIT}`);
+    setJobsMeta(jobsRes.meta);
+    setJobs((prev) => (mode === "append" ? [...prev, ...jobsRes.data] : jobsRes.data));
+  };
+
+  const loadInitialData = async () => {
     setLoading(true);
     setError("");
     try {
-      const [dashboardRes, profileRes, jobsRes] = await Promise.all([
+      const [dashboardRes, profileRes] = await Promise.all([
         apiGet<CandidateDashboardResponse>("/dashboards/candidate", true),
         apiGet<CandidateProfileResponse>("/users/candidate/me", true),
-        apiGet<JobsResponse>("/jobs"),
       ]);
 
       setDashboard(dashboardRes.data);
       setProfile(profileRes.data);
-      setJobs(jobsRes.data);
+
+      await Promise.all([refreshApplications(), fetchJobsPage(1, "replace")]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load dashboard");
     } finally {
@@ -85,12 +127,12 @@ const CandidateDashboard = () => {
       navigate("/login");
       return;
     }
-    void loadData();
+    void loadInitialData();
   }, []);
 
   const applicationJobIds = useMemo(
-    () => new Set((dashboard?.applications || []).map((a) => a.jobId?._id).filter(Boolean)),
-    [dashboard?.applications],
+    () => new Set((applications || []).map((a) => a.jobId?._id).filter(Boolean)),
+    [applications],
   );
 
   const applyToJob = async (jobId: string) => {
@@ -98,12 +140,28 @@ const CandidateDashboard = () => {
     setError("");
     try {
       await apiPost("/jobs/apply", { jobId }, true);
-      await loadData();
+      await Promise.all([refreshDashboard(), refreshApplications()]);
       setTab("applications");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to apply");
     } finally {
       setApplyLoadingJobId(null);
+    }
+  };
+
+  const loadMoreJobs = async () => {
+    if (!jobsMeta) return;
+    if (jobsLoadingMore) return;
+    if (jobsMeta.page >= jobsMeta.totalPages) return;
+
+    setJobsLoadingMore(true);
+    setError("");
+    try {
+      await fetchJobsPage(jobsMeta.page + 1, "append");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load more jobs");
+    } finally {
+      setJobsLoadingMore(false);
     }
   };
 
@@ -176,7 +234,23 @@ const CandidateDashboard = () => {
                 </div>
               </div>
             ))}
-            {jobs.length === 0 && <p className="text-sm text-muted-foreground">No active jobs available.</p>}
+
+            {jobsMeta && jobsMeta.total > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Showing {jobs.length} of {jobsMeta.total} active jobs
+              </p>
+            )}
+
+            {jobsMeta && jobsMeta.page < jobsMeta.totalPages && (
+              <button
+                onClick={loadMoreJobs}
+                disabled={jobsLoadingMore}
+                className="rounded-lg border border-border bg-card px-4 py-2 text-sm disabled:opacity-60"
+              >
+                {jobsLoadingMore ? "Loading..." : "Load more"}
+              </button>
+            )}
+            {jobs.length === 0 && <p className="text-sm text-muted-foreground">No  active jobs available.</p>}
           </div>
         )}
 
@@ -186,7 +260,7 @@ const CandidateDashboard = () => {
               <h2 className="font-heading font-semibold">My Applications</h2>
             </div>
             <div className="divide-y divide-border">
-              {(dashboard?.applications || []).map((application) => (
+              {(applications || []).map((application) => (
                 <div key={application._id} className="px-4 py-4 sm:px-6">
                   <p className="font-medium">{application.jobId?.jobTitle || "Job"}</p>
                   <p className="text-sm text-muted-foreground">
@@ -194,7 +268,7 @@ const CandidateDashboard = () => {
                   </p>
                 </div>
               ))}
-              {(dashboard?.applications || []).length === 0 && (
+              {(applications || []).length === 0 && (
                 <div className="px-4 py-4 text-sm text-muted-foreground sm:px-6">No applications yet.</div>
               )}
             </div>
