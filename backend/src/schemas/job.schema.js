@@ -33,5 +33,5 @@ export const listJobsQuerySchema = z
     location: z.string().trim().max(80).optional(),
     type: z.string().trim().max(50).optional(),
   })
-  .strict();
+   .strict();
 

@@ -65,7 +65,7 @@ export const apiRequest = async <T>(path: string, options: ApiOptions = {}): Pro
       ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...authHeader,
       ...headers,
-    },
+    }, 
     body: body ? (isFormData ? (body as FormData) : JSON.stringify(body)) : undefined,
   });
 

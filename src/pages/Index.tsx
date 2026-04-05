@@ -8,6 +8,7 @@ import WhyRecruitkrSection from "@/components/WhyRecruitkrSection";
 import DualCtaSection from "@/components/DualCtaSection";
 import Footer from "@/components/Footer";
 
+
 const Index = () => {
   return (
     <div className="min-h-screen bg-background">

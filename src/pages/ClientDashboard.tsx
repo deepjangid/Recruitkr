@@ -154,6 +154,7 @@ const ClientDashboard = () => {
               <div key={requirement._id} className="rounded-xl border border-border bg-card p-5">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div>
+                   
                     <h3 className="font-semibold">{requirement.jobTitle}</h3>
                     <p className="text-sm text-muted-foreground">
                       {requirement.department} - {requirement.openings} openings
