@@ -1,136 +1,176 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8" />
-  <title>Resume</title>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Resume</title>
+    <style>
+      @page {
+        size: A4;
+        margin: 16mm 18mm;
+      }
 
-  <script src="https://cdn.tailwindcss.com"></script>
+      * {
+        box-sizing: border-box;
+      }
 
-  <style>
-    @page {
-      size: A4;
-      margin: 0;
-    }
-  </style>
-</head>
+      body {
+        margin: 0;
+        color: #111827;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
+          'Apple Color Emoji', 'Segoe UI Emoji';
+        font-size: 12px;
+        line-height: 1.45;
+      }
 
-<body class="m-0 p-0 text-gray-800 font-sans">
+      .header {
+        display: flex;
+        gap: 16px;
+        align-items: flex-start;
+        justify-content: space-between;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #e5e7eb;
+      }
 
-  <!-- A4 Container -->
-  <div class="w-[210mm] h-[297mm] px-[20mm] py-[25mm] box-border relative">
+      .header-left {
+        flex: 1 1 auto;
+        min-width: 0;
+      }
 
-    <!-- HEADER -->
-    <div class="flex justify-between items-start">
+      .name {
+        font-size: 24px;
+        font-weight: 800;
+        line-height: 1.15;
+        word-break: break-word;
+      }
 
-      <!-- LEFT HEADER -->
-      <div class="flex items-center gap-4 max-w-[70%]">
+      .title {
+        margin-top: 4px;
+        font-size: 14px;
+        font-weight: 600;
+        color: #374151;
+        word-break: break-word;
+      }
 
-        <!-- IMAGE -->
-        <div class="w-[80px] h-[80px] rounded-full overflow-hidden bg-blue-100 shrink-0">
-          <img src="https://marketplace.canva.com/8Qq5I/MAG-8W8Qq5I/1/tl/canva-photo-icon-MAG-8W8Qq5I.png"
-               class="w-full h-full object-cover" />
-        </div>
+      .summary {
+        margin-top: 6px;
+        color: #4b5563;
+        word-break: break-word;
+      }
 
-        <!-- NAME -->
-        <div>
-          <div class="text-[28px] font-bold break-words">
-            {{fullName}}
-          </div>
-          <div class="text-[16px] mt-1">
-            {{jobTitle}}
-          </div>
-          <div class="text-[12px] text-gray-600 mt-1 leading-[1.4]">
-            {{summary}}
-          </div>
-        </div>
+      .header-right {
+        flex: 0 0 230px;
+        max-width: 230px;
+        color: #111827;
+        word-break: break-word;
+      }
 
+      .contact-line {
+        margin: 0 0 3px 0;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 1.2fr 0.8fr;
+        gap: 18px;
+        margin-top: 14px;
+      }
+
+      .section {
+        margin-bottom: 14px;
+        break-inside: avoid;
+      }
+
+      .section-title {
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        color: #111827;
+        padding-bottom: 4px;
+        border-bottom: 2px solid #9ca3af;
+        margin: 0 0 8px 0;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+
+      li {
+        margin: 0 0 6px 0;
+      }
+
+      .kv {
+        display: grid;
+        grid-template-columns: 110px 1fr;
+        gap: 6px 10px;
+      }
+
+      .k {
+        color: #6b7280;
+      }
+
+      .v {
+        color: #111827;
+        word-break: break-word;
+      }
+
+      .muted {
+        color: #6b7280;
+      }
+
+      .footer {
+        margin-top: 10px;
+        padding-top: 8px;
+        border-top: 1px solid #e5e7eb;
+        color: #6b7280;
+        font-size: 10px;
+        display: flex;
+        justify-content: space-between;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <div class="header-left">
+        <div class="name">{{fullName}}</div>
+        <div class="title">{{jobTitle}}</div>
+        <div class="summary">{{summary}}</div>
       </div>
-
-      <!-- RIGHT HEADER -->
-      <div class="text-left text-[13px] leading-[1.6] max-w-[30%] break-words">
-        <div><span><i class="fa-solid fa-mobile-screen"></i></span>{{mobile}}</div>
-        <div>{{email}}</div>
-        <div>{{location}}</div>
+      <div class="header-right">
+        {{contactLines}}
       </div>
-
     </div>
 
-    <!-- MAIN GRID -->
-    <div class="grid grid-cols-[65%_35%] gap-5 mt-6">
-
-      <!-- LEFT COLUMN -->
+    <div class="grid">
       <div>
-
-        <!-- EDUCATION -->
-        <div class="mb-5 break-inside-avoid">
-          <div class="font-bold text-[14px] border-b-2 border-gray-400 pb-1 mb-2 tracking-wide">
-            EDUCATION
-          </div>
-          {{educationSection}}
-        </div>
-
-        <!-- EXPERIENCE -->
-        <div class="mb-5 break-inside-avoid">
-          <div class="font-bold text-[14px] border-b-2 border-gray-400 pb-1 mb-2 tracking-wide">
-            INTERNSHIP / EXPERIENCE
-          </div>
-          {{experienceSection}}
-        </div>
-
-        <!-- PROJECTS -->
-        <div class="mb-5 break-inside-avoid">
-          <div class="font-bold text-[14px] border-b-2 border-gray-400 pb-1 mb-2 tracking-wide">
-            PROJECTS
-          </div>
-          {{projectsSection}}
-        </div>
-
+        {{leftSections}}
       </div>
-
-      <!-- RIGHT COLUMN -->
-      <div class="border-l border-gray-300 pl-4">
-
-        <!-- CERTIFICATION -->
-        <div class="mb-5 break-inside-avoid">
-          <div class="font-bold text-[14px] border-b-2 border-gray-400 pb-1 mb-2 tracking-wide">
-            CERTIFICATION
-          </div>
-          <ul class="pl-4 text-[13px] list-disc space-y-1">
-            {{certificationList}}
-          </ul>
-        </div>
-
-        <!-- SKILLS -->
-        <div class="mb-5 break-inside-avoid">
-          <div class="font-bold text-[14px] border-b-2 border-gray-400 pb-1 mb-2 tracking-wide">
-            SKILLS
-          </div>
-          <ul class="pl-4 text-[13px] list-disc space-y-1">
-            {{skills}}
-          </ul>
-        </div>
-
-        <!-- REFERRAL -->
-        <div class="mb-5 break-inside-avoid">
-          <div class="font-bold text-[14px] border-b-2 border-gray-400 pb-1 mb-2 tracking-wide">
-            REFERRAL
-          </div>
-          <p class="text-[13px] leading-[1.5]">
-            {{referral}}
-          </p>
-        </div>
-
+      <div>
+        {{rightSections}}
       </div>
-
     </div>
 
-    <!-- FOOTER -->
-    <div class="absolute bottom-[15mm] right-[20mm] text-[12px] text-gray-600 flex items-center gap-2">
-      <span class="text-lg">Powered By </span>
-      <img src="https://www.recruitkr.com/assets/logo-wF9xbWSr.png" class="h-40 object-contain" />
-    </div>
 
+    <div class="footer flex justify-end items-center gap-3 text-xs mt-4 border-t pt-2">
+  
+  <div class="flex items-center gap-2">
+    <span class="text-gray-700 text-sm font-medium">
+      Generated by RecruitKr
+    </span>
+
+    <img 
+      src="https://www.recruitkr.com/assets/logo-wF9xbWSr.png"
+      alt="RecruitKr Logo"
+      class="h-10 w-auto object-contain"
+    />
   </div>
 
-</body>
+  <span class="text-gray-400 text-xs ml-4">
+    {{generatedAt}}
+  </span>
+
+</div>
+  </body>
 </html>

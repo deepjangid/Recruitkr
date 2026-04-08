@@ -1,112 +1,166 @@
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
+﻿import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export const generateResumeHTML = (profile) => {
-  const templatePath = path.join(__dirname, "../../templates/resume.html");
+const escapeHtml = (value) =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 
-  let template = fs.readFileSync(templatePath, "utf-8");
+const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
 
-  // ✅ EDUCATION (UL clean)
-  let educationHTML = "";
-  if (profile.highestQualification) {
-    educationHTML = `
-      <ul class="pl-4 text-[13px] list-disc space-y-1">
-        <li><strong>${profile.highestQualification}</strong></li>
-      </ul>
-    `;
-  }
+const buildSection = (title, innerHtml) => {
+  if (!clean(innerHtml)) return '';
+  return `
+    <div class="section">
+      <h2 class="section-title">${escapeHtml(title)}</h2>
+      ${innerHtml}
+    </div>
+  `;
+};
 
-  // ✅ EXPERIENCE
-  let experienceHTML = "";
-  if (profile.experienceStatus === "experienced" && profile.experienceDetails) {
-    experienceHTML = `
-      <ul class="pl-4 text-[13px] list-disc space-y-1">
-        <li>
-          <strong>${profile.experienceDetails.designation || ""}</strong><br/>
-          ${profile.experienceDetails.industry || ""}<br/>
-          ${profile.experienceDetails.currentCompany || ""} 
-          (${profile.experienceDetails.totalExperience || ""})
-        </li>
-      </ul>
-    `;
-  } else if (profile.experienceStatus === "fresher") {
-    experienceHTML = `
-      <ul class="pl-4 text-[13px] list-disc">
-        <li>Fresher</li>
-      </ul>
-    `;
-  }
+const buildKvSection = (pairs) => {
+  const filtered = pairs
+    .map(([k, v]) => [clean(k), clean(v)])
+    .filter(([, v]) => v);
 
-  // ✅ PROJECTS
-  let projectHTML = "";
-  if (profile.projects?.length) {
-    projectHTML = `
-      <ul class="pl-4 text-[13px] list-disc space-y-1">
-        ${profile.projects.map(p => `
-          <li>
-            <strong>${p.name || ""}</strong><br/>
-            ${p.description || ""}
-          </li>
-        `).join("")}
-      </ul>
-    `;
-  }
+  if (!filtered.length) return '';
 
-  // ✅ CERTIFICATIONS (only <li> because ul already in HTML)
-  let certHTML = "";
-  if (profile.certifications?.length) {
-    certHTML = profile.certifications.map(c => `
-      <li>
-        <strong>${c.name || ""}</strong><br/>
-        ${c.institute || ""}
-      </li>
-    `).join("");
-  }
+  return `
+    <div class="kv">
+      ${filtered
+        .map(
+          ([k, v]) =>
+            `<div class="k">${escapeHtml(k)}</div><div class="v">${escapeHtml(v)}</div>`,
+        )
+        .join('')}
+    </div>
+  `;
+};
 
-  // ✅ SKILLS
-  let skillsHTML = "";
-  if (profile.skills?.length) {
-    skillsHTML = profile.skills.map(s => `<li>${s}</li>`).join("");
-  }
+export const generateResumeHTML = (profile = {}) => {
+  const templatePath = path.join(__dirname, '../../templates/resume.html');
+  const template = fs.readFileSync(templatePath, 'utf-8');
 
-  // ✅ REFERRAL
-  const referralHTML = profile.referral || "";
+  const fullName = clean(profile.fullName) || clean(profile.email) || 'Candidate';
+  const jobTitle = clean(profile.preferences?.preferredRole) || '';
 
-  // 🔥 REMOVE EMPTY SECTIONS (very important)
-  const removeSection = (title) => {
-    const regex = new RegExp(
-      `<div class="mb-5[\\s\\S]*?>\\s*<div class="font-bold[\\s\\S]*?>\\s*${title}[\\s\\S]*?<\\/div>[\\s\\S]*?<\\/div>`,
-      "g"
-    );
-    template = template.replace(regex, "");
-  };
+  const summary = clean(profile.summary)
+    ? clean(profile.summary)
+    : [
+        jobTitle ? `Seeking ${jobTitle} opportunities.` : '',
+        profile.experienceStatus === 'experienced'
+          ? 'Experienced candidate.'
+          : profile.experienceStatus === 'fresher'
+            ? 'Fresher candidate.'
+            : '',
+      ]
+        .filter(Boolean)
+        .join(' ');
 
-  if (!educationHTML) removeSection("EDUCATION");
-  if (!experienceHTML) removeSection("INTERNSHIP / EXPERIENCE");
-  if (!projectHTML) removeSection("PROJECTS");
-  if (!certHTML) removeSection("CERTIFICATION");
-  if (!skillsHTML) removeSection("SKILLS");
-  if (!referralHTML) removeSection("REFERRAL");
+  const contactLines = (() => {
+    const lines = [];
+    const mobile = clean(profile.mobile);
+    const email = clean(profile.email);
+    const address = clean(profile.address);
+    const pincode = clean(profile.pincode);
+    const linkedinUrl = clean(profile.linkedinUrl);
+    const portfolioUrl = clean(profile.portfolioUrl);
 
-  // ✅ FINAL REPLACE
-  const finalHTML = template
-    .replace(/{{fullName}}/g, profile.fullName || "")
-    .replace(/{{jobTitle}}/g, profile.preferences?.preferredRole || "")
-    .replace(/{{summary}}/g, profile.summary || "")
-    .replace(/{{mobile}}/g, profile.mobile || "")
-    .replace(/{{email}}/g, profile.email || "")
-    .replace(/{{location}}/g, profile.address || "")
+    if (mobile) lines.push(`<p class="contact-line"><strong>Mobile:</strong> ${escapeHtml(mobile)}</p>`);
+    if (email) lines.push(`<p class="contact-line"><strong>Email:</strong> ${escapeHtml(email)}</p>`);
+    if (address) lines.push(`<p class="contact-line"><strong>Address:</strong> ${escapeHtml(address)}</p>`);
+    if (pincode) lines.push(`<p class="contact-line"><strong>Pincode:</strong> ${escapeHtml(pincode)}</p>`);
+    if (linkedinUrl)
+      lines.push(`<p class="contact-line"><strong>LinkedIn:</strong> ${escapeHtml(linkedinUrl)}</p>`);
+    if (portfolioUrl)
+      lines.push(`<p class="contact-line"><strong>Portfolio:</strong> ${escapeHtml(portfolioUrl)}</p>`);
 
-    .replace(/{{educationSection}}/g, educationHTML)
-    .replace(/{{experienceSection}}/g, experienceHTML)
-    .replace(/{{projectsSection}}/g, projectHTML)
-    .replace(/{{certificationList}}/g, certHTML)
-    .replace(/{{skills}}/g, skillsHTML)
-    .replace(/{{referral}}/g, referralHTML);
+    return lines.join('\n');
+  })();
 
-  return finalHTML;
+  const educationSection = (() => {
+    const highestQualification = clean(profile.highestQualification);
+    if (!highestQualification) return '';
+    return `<ul><li><strong>${escapeHtml(highestQualification)}</strong></li></ul>`;
+  })();
+
+  const experienceSection = (() => {
+    if (profile.experienceStatus === 'experienced' && profile.experienceDetails) {
+      const designation = clean(profile.experienceDetails.designation);
+      const currentCompany = clean(profile.experienceDetails.currentCompany);
+      const industry = clean(profile.experienceDetails.industry);
+      const totalExperience = clean(profile.experienceDetails.totalExperience);
+
+      const lines = [
+        designation ? `<strong>${escapeHtml(designation)}</strong>` : '',
+        currentCompany ? escapeHtml(currentCompany) : '',
+        industry ? `<span class="muted">${escapeHtml(industry)}</span>` : '',
+        totalExperience ? `<span class="muted">Total: ${escapeHtml(totalExperience)}</span>` : '',
+      ].filter(Boolean);
+
+      if (!lines.length) return '';
+      return `<ul><li>${lines.join('<br/>')}</li></ul>`;
+    }
+
+    if (profile.experienceStatus === 'fresher') {
+      return `<ul><li>Fresher</li></ul>`;
+    }
+
+    return '';
+  })();
+
+  const preferencesSection = (() => {
+    const preferredRole = clean(profile.preferences?.preferredRole);
+    const preferredLocation = clean(profile.preferences?.preferredLocation);
+    const preferredIndustry = clean(profile.preferences?.preferredIndustry);
+    const workModes = Array.isArray(profile.preferences?.workModes)
+      ? profile.preferences.workModes.map((m) => clean(m)).filter(Boolean)
+      : Array.isArray(profile.workModes)
+        ? profile.workModes.map((m) => clean(m)).filter(Boolean)
+        : [];
+
+    return buildKvSection([
+      ['Preferred Role', preferredRole],
+      ['Preferred Location', preferredLocation],
+      ['Preferred Industry', preferredIndustry],
+      ['Work Mode', workModes.length ? workModes.join(', ') : ''],
+    ]);
+  })();
+
+  const personalSection = buildKvSection([
+    ['Date of Birth', clean(profile.dateOfBirth)],
+    ['Gender', clean(profile.gender)],
+  ]);
+
+  const leftSections = [
+    buildSection('INTERNSHIP / EXPERIENCE', experienceSection),
+    buildSection('EDUCATION', educationSection),
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const rightSections = [
+    buildSection('PREFERENCES', preferencesSection),
+    buildSection('PERSONAL DETAILS', personalSection),
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const generatedAt = new Date().toISOString().slice(0, 10);
+
+  return template
+    .replace(/{{fullName}}/g, escapeHtml(fullName))
+    .replace(/{{jobTitle}}/g, escapeHtml(jobTitle))
+    .replace(/{{summary}}/g, escapeHtml(summary))
+    .replace(/{{contactLines}}/g, contactLines)
+    .replace(/{{leftSections}}/g, leftSections)
+    .replace(/{{rightSections}}/g, rightSections)
+    .replace(/{{generatedAt}}/g, escapeHtml(generatedAt));
 };
