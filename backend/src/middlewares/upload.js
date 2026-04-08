@@ -18,3 +18,34 @@ export const resumeUpload = multer({
   },
 });
 
+const allowedPhotoMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+export const profilePhotoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 2 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    if (!allowedPhotoMimeTypes.has(file.mimetype)) {
+      return cb(new ApiError(400, 'Only JPG, PNG, or WEBP images are supported'));
+    }
+    return cb(null, true);
+  },
+});
+
+const allowedCertificateMimeTypes = new Set([
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+]);
+
+export const certificateUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    if (!allowedCertificateMimeTypes.has(file.mimetype)) {
+      return cb(new ApiError(400, 'Only PDF or image certificates are supported'));
+    }
+    return cb(null, true);
+  },
+});
+

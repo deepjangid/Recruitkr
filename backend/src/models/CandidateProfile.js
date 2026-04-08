@@ -29,6 +29,27 @@ const candidateProfileSchema = new mongoose.Schema(
       preferredRole: { type: String, required: true },
       workModes: { type: [String], default: [] },
     },
+    summary: { type: String, trim: true, default: '' },
+    skills: { type: [String], default: [] },
+    projects: {
+      type: [
+        {
+          name: { type: String, trim: true, default: '' },
+          description: { type: String, trim: true, default: '' },
+        },
+      ],
+      default: [],
+    },
+    certifications: {
+      type: [
+        {
+          name: { type: String, trim: true, default: '' },
+          institute: { type: String, trim: true, default: '' },
+        },
+      ],
+      default: [],
+    },
+    referral: { type: String, trim: true, default: '' },
     declarationAccepted: { type: Boolean, required: true },
     representationAuthorized: { type: Boolean, required: true },
   },

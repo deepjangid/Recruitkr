@@ -22,6 +22,60 @@ export const getCandidateProfile = asyncHandler(async (req, res) => {
   res.json({ success: true, data: profile });
 });
 
+export const updateCandidateProfile = asyncHandler(async (req, res) => {
+  const body = req.body;
+
+  const profile = await CandidateProfile.findOne({ userId: req.user.id });
+  if (!profile) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Candidate profile not found');
+  }
+
+  const assignIfDefined = (key, value) => {
+    if (value === undefined) return;
+    profile[key] = value;
+  };
+
+  assignIfDefined('fullName', body.fullName);
+  assignIfDefined('dateOfBirth', body.dateOfBirth);
+  assignIfDefined('gender', body.gender);
+  assignIfDefined('address', body.address);
+  assignIfDefined('pincode', body.pincode);
+  assignIfDefined('linkedinUrl', body.linkedinUrl);
+  assignIfDefined('portfolioUrl', body.portfolioUrl);
+  assignIfDefined('highestQualification', body.highestQualification);
+
+  if (body.experienceStatus !== undefined) {
+    profile.experienceStatus = body.experienceStatus;
+    if (body.experienceStatus === 'fresher') {
+      profile.experienceDetails = undefined;
+    }
+  }
+
+  if (body.experienceDetails !== undefined) {
+    profile.experienceDetails = {
+      ...(profile.experienceDetails?.toObject ? profile.experienceDetails.toObject() : profile.experienceDetails),
+      ...body.experienceDetails,
+    };
+  }
+
+  if (body.preferences !== undefined) {
+    profile.preferences = {
+      ...(profile.preferences?.toObject ? profile.preferences.toObject() : profile.preferences),
+      ...body.preferences,
+    };
+  }
+
+  assignIfDefined('summary', body.summary);
+  if (body.skills !== undefined) profile.skills = body.skills;
+  if (body.projects !== undefined) profile.projects = body.projects;
+  if (body.certifications !== undefined) profile.certifications = body.certifications;
+  assignIfDefined('referral', body.referral);
+
+  await profile.save();
+
+  res.json({ success: true, data: profile });
+});
+
 export const getClientProfile = asyncHandler(async (req, res) => {
   const profile = await ClientProfile.findOne({ userId: req.user.id });
   if (!profile) {

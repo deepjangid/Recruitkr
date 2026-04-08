@@ -104,4 +104,7 @@ export const apiPost = <T>(path: string, body?: unknown, auth = false) =>
 export const apiPatch = <T>(path: string, body?: unknown, auth = false) =>
   apiRequest<T>(path, { method: "PATCH", body, auth });
 
+export const apiDelete = <T>(path: string, auth = false) =>
+  apiRequest<T>(path, { method: "DELETE", auth });
+
 export { API_BASE };

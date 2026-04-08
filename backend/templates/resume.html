@@ -1,176 +1,247 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <script src="https://cdn.tailwindcss.com"></script>
-    <title>Resume</title>
-    <style>
-      @page {
-        size: A4;
-        margin: 16mm 18mm;
-      }
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Resume</title>
 
-      * {
-        box-sizing: border-box;
-      }
+  <style>
+    @page {
+      size: A4;
+      margin: 16mm 18mm;
+    }
 
-      body {
-        margin: 0;
-        color: #111827;
-        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
-          'Apple Color Emoji', 'Segoe UI Emoji';
-        font-size: 12px;
-        line-height: 1.45;
-      }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      font-size: 12.5px;
+      color: #111827;
+    }
 
-      .header {
-        display: flex;
-        gap: 16px;
-        align-items: flex-start;
-        justify-content: space-between;
-        padding-bottom: 10px;
-        border-bottom: 1px solid #e5e7eb;
-      }
+    .page {
+      width: 100%;
+    }
 
-      .header-left {
-        flex: 1 1 auto;
-        min-width: 0;
-      }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding-bottom: 14px;
+      gap: 16px;
+    }
 
-      .name {
-        font-size: 24px;
-        font-weight: 800;
-        line-height: 1.15;
-        word-break: break-word;
-      }
+    .header-left {
+      display: flex;
+      gap: 12px;
+      min-width: 0;
+      flex: 1 1 auto;
+      align-items: flex-start;
+    }
 
-      .title {
-        margin-top: 4px;
-        font-size: 14px;
-        font-weight: 600;
-        color: #374151;
-        word-break: break-word;
-      }
+    .avatar-only {
+      width: 78px;
+      height: 78px;
+      border-radius: 10px;
+      overflow: hidden;
+      flex: 0 0 auto;
+      border: 1px solid #e5e7eb;
+      background: #f3f4f6;
+    }
 
-      .summary {
-        margin-top: 6px;
-        color: #4b5563;
-        word-break: break-word;
-      }
+    .avatar-only img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
 
-      .header-right {
-        flex: 0 0 230px;
-        max-width: 230px;
-        color: #111827;
-        word-break: break-word;
-      }
+    .name {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      margin: 0;
+      line-height: 1.1;
+      word-break: break-word;
+    }
 
-      .contact-line {
-        margin: 0 0 3px 0;
-      }
+    .title {
+      margin: 4px 0 0 0;
+      font-size: 15px;
+      color: #111827;
+      font-weight: 600;
+      word-break: break-word;
+    }
 
-      .grid {
-        display: grid;
-        grid-template-columns: 1.2fr 0.8fr;
-        gap: 18px;
-        margin-top: 14px;
-      }
+    .summary {
+      margin: 6px 0 0 0;
+      color: #374151;
+      font-size: 12px;
+      word-break: break-word;
+    }
 
-      .section {
-        margin-bottom: 14px;
-        break-inside: avoid;
-      }
+    .contact {
+      text-align: right;
+      font-size: 13px;
+      color: #111827;
+      min-width: 220px;
+      max-width: 260px;
+      word-break: break-word;
+    }
 
-      .section-title {
-        font-size: 12px;
-        font-weight: 800;
-        letter-spacing: 0.06em;
-        color: #111827;
-        padding-bottom: 4px;
-        border-bottom: 2px solid #9ca3af;
-        margin: 0 0 8px 0;
-      }
+    .contact .contact-line {
+      margin: 0 0 6px 0;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+    }
 
-      ul {
-        margin: 0;
-        padding-left: 18px;
-      }
+    .contact svg {
+      width: 14px;
+      height: 14px;
+      flex: 0 0 auto;
+      color: #111827;
+    }
 
-      li {
-        margin: 0 0 6px 0;
-      }
+    .grid {
+      display: grid;
+      grid-template-columns: 62% 38%;
+      gap: 18px;
+      margin-top: 14px;
+    }
 
-      .kv {
-        display: grid;
-        grid-template-columns: 110px 1fr;
-        gap: 6px 10px;
-      }
+    .left {
+      padding-right: 16px;
+      border-right: 2px solid #111827;
+    }
 
-      .k {
-        color: #6b7280;
-      }
+    .section {
+      margin-bottom: 18px;
+      break-inside: avoid;
+    }
 
-      .v {
-        color: #111827;
-        word-break: break-word;
-      }
+    .section-title {
+      font-weight: 800;
+      color: #111827;
+      border-bottom: 2px solid #111827;
+      padding-bottom: 4px;
+      margin: 0 0 8px 0;
+      letter-spacing: 0.16em;
+      font-size: 11px;
+    }
 
-      .muted {
-        color: #6b7280;
-      }
+    ul {
+      margin: 0;
+      padding-left: 18px;
+    }
 
-      .footer {
-        margin-top: 10px;
-        padding-top: 8px;
-        border-top: 1px solid #e5e7eb;
-        color: #6b7280;
-        font-size: 10px;
-        display: flex;
-        justify-content: space-between;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="header">
-      <div class="header-left">
-        <div class="name">{{fullName}}</div>
-        <div class="title">{{jobTitle}}</div>
-        <div class="summary">{{summary}}</div>
-      </div>
-      <div class="header-right">
-        {{contactLines}}
+    li {
+      margin: 0 0 6px 0;
+    }
+
+    .muted {
+      color: #6b7280;
+    }
+
+    .footer {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      margin-top: 10px;
+      padding-top: 4px;
+      font-size: 10px;
+      color: #111827;
+      gap: 8px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="page">
+
+  <!-- HEADER -->
+  <div class="header">
+
+    <!-- LEFT -->
+    <div class="header-left">
+      {{heroBlock}}
+      <div>
+        <h1 class="name">{{fullName}}</h1>
+        <p class="title">{{jobTitle}}</p>
+        <p class="summary">{{summary}}</p>
       </div>
     </div>
 
-    <div class="grid">
-      <div>
-        {{leftSections}}
-      </div>
-      <div>
-        {{rightSections}}
-      </div>
+    <!-- RIGHT -->
+    <div class="contact">
+      {{contactLines}}
     </div>
 
-
-    <div class="footer flex justify-end items-center gap-3 text-xs mt-4 border-t pt-2">
-  
-  <div class="flex items-center gap-2">
-    <span class="text-gray-700 text-sm font-medium">
-      Generated by RecruitKr
-    </span>
-
-    <img 
-      src="https://www.recruitkr.com/assets/logo-wF9xbWSr.png"
-      alt="RecruitKr Logo"
-      class="h-10 w-auto object-contain"
-    />
   </div>
 
-  <span class="text-gray-400 text-xs ml-4">
-    {{generatedAt}}
-  </span>
+  <!-- MAIN GRID -->
+  <div class="grid">
 
-</div>
-  </body>
+    <!-- LEFT SIDE -->
+    <div class="left">
+
+      <!-- EDUCATION -->
+      <div class="section">
+        <h2 class="section-title">EDUCATION</h2>
+        {{education}}
+      </div>
+
+      <!-- EXPERIENCE -->
+      <div class="section">
+        <h2 class="section-title">
+          INTERNSHIP / EXPERIENCE
+        </h2>
+        {{experience}}
+      </div>
+
+      <!-- PROJECTS -->
+      <div class="section">
+        <h2 class="section-title">PROJECTS</h2>
+        {{projects}}
+      </div>
+
+    </div>
+
+    <!-- RIGHT SIDE -->
+    <div>
+
+      <!-- CERTIFICATION -->
+      <div class="section">
+        <h2 class="section-title">
+          CERTIFICATION
+        </h2>
+        {{certifications}}
+      </div>
+
+      <!-- SKILLS -->
+      <div class="section">
+        <h2 class="section-title">SKILL</h2>
+        {{skills}}
+      </div>
+
+      <!-- REFERRAL -->
+      <div class="section">
+        <h2 class="section-title">
+          REFERRAL
+        </h2>
+        {{referral}}
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <span>Powered By</span>
+    <span style="font-weight: 700;">RecruitKr</span>
+  </div>
+
+  </div>
+</body>
 </html>

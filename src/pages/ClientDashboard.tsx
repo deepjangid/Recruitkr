@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { apiGet, apiPatch, apiPost } from "@/lib/api";
 import { clearSession, getSession } from "@/lib/auth";
+import { tryAutoLogin } from "@/lib/autoLogin";
 
 type ClientDashboardResponse = {
   success: boolean;
@@ -52,7 +53,7 @@ type ClientApplicationsResponse = {
 
 const ClientDashboard = () => {
   const navigate = useNavigate();
-  const session = getSession();
+  const [sessionState, setSessionState] = useState(() => getSession());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [dashboard, setDashboard] = useState<ClientDashboardResponse["data"] | null>(null);
@@ -80,11 +81,23 @@ const ClientDashboard = () => {
   };
 
   useEffect(() => {
-    if (!session?.accessToken || session.user.role !== "client") {
-      navigate("/login");
-      return;
-    }
-    void loadData();
+    const boot = async () => {
+      let session = getSession();
+      if (!session?.accessToken) {
+        session = await tryAutoLogin();
+      }
+
+      setSessionState(session);
+
+      if (!session?.accessToken || session.user.role !== "client") {
+        navigate("/login?role=client");
+        return;
+      }
+
+      await loadData();
+    };
+
+    void boot();
   }, []);
 
   const updateRequirementStatus = async (jobId: string, status: "active" | "on-hold" | "closed") => {
@@ -104,8 +117,13 @@ const ClientDashboard = () => {
       // No-op
     }
     clearSession();
+    setSessionState(null);
     navigate("/login");
   };
+
+  if (!sessionState?.accessToken) {
+    return <div className="min-h-screen bg-background p-8">Checking your session...</div>;
+  }
 
   if (loading) {
     return <div className="min-h-screen bg-background p-8">Loading employer dashboard...</div>;
@@ -133,7 +151,7 @@ const ClientDashboard = () => {
         {tab === "overview" && (
           <>
             <div className="rounded-xl border border-border bg-card p-6">
-              <h1 className="font-heading text-2xl font-bold mb-2 break-words">{profile?.companyName || session?.user.email}</h1>
+              <h1 className="font-heading text-2xl font-bold mb-2 break-words">{profile?.companyName || sessionState?.user.email}</h1>
               <p className="text-sm text-muted-foreground">
                 {profile?.industry || "Industry"} - {profile?.companyType || "Company Type"} - {profile?.companySize || "Company Size"}
               </p>
