@@ -3,7 +3,7 @@ import { ArrowRight, Briefcase } from "lucide-react";
 const stats = [
   { value: "500+", label: "Placements" },
   { value: "11+", label: "Sectors" },
-  { value: "E2E", label: "HR Solutions" },
+  { value: "End to End", label: "HR Solutions" },
 ];
 
 const HeroSection = () => {

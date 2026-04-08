@@ -2,6 +2,9 @@ import mammoth from 'mammoth';
 import pdfParse from 'pdf-parse';
 import PDFDocument from 'pdfkit';
 import { env } from '../config/env.js';
+import puppeteer from "puppeteer";
+import { generateResumeHTML } from "../utils/resumeBuilder.js";
+
 
 const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[A-Za-z]{2,}/;
 const MOBILE_REGEX = /(?:\+91[-\s]?)?([6-9]\d{9})/;
@@ -581,51 +584,74 @@ export const extractResumeText = async ({ mimeType, buffer }) => {
   throw new Error('Unsupported resume file type');
 };
 
-export const generateResumePdfBuffer = async (profile) =>
-  new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 50 });
-    const chunks = [];
+// export const generateResumePdfBuffer = async (profile) =>
+//   new Promise((resolve, reject) => {
+//     const doc = new PDFDocument({ size: 'A4', margin: 50 });
+//     const chunks = [];
 
-    doc.on('data', (chunk) => chunks.push(chunk));
-    doc.on('end', () => resolve(Buffer.concat(chunks)));
-    doc.on('error', reject);
+//     doc.on('data', (chunk) => chunks.push(chunk));
+//     doc.on('end', () => resolve(Buffer.concat(chunks)));
+//     doc.on('error', reject);
 
-    doc.fontSize(20).text(profile.fullName || 'Candidate Resume', { align: 'center' });
-    doc.moveDown(0.5);
-    doc
-      .fontSize(10)
-      .text(`${profile.email || ''} | ${profile.mobile || ''}`, { align: 'center' });
-    doc.moveDown(1.5);
+//     doc.fontSize(20).text(profile.fullName || 'Candidate Resume', { align: 'center' });
+//     doc.moveDown(0.5);
+//     doc
+//       .fontSize(10)
+//       .text(`${profile.email || ''} | ${profile.mobile || ''}`, { align: 'center' });
+//     doc.moveDown(1.5);
 
-    doc.fontSize(14).text('Profile');
-    doc.moveDown(0.5);
-    doc
-      .fontSize(11)
-      .text(
-        `Qualification: ${profile.highestQualification || 'N/A'}\nPreferred Role: ${profile.preferences?.preferredRole || 'N/A'}\nPreferred Location: ${profile.preferences?.preferredLocation || 'N/A'}\nPreferred Industry: ${profile.preferences?.preferredIndustry || 'N/A'}`,
-      );
+//     doc.fontSize(14).text('Profile');
+//     doc.moveDown(0.5);
+//     doc
+//       .fontSize(11)
+//       .text(
+//         `Qualification: ${profile.highestQualification || 'N/A'}\nPreferred Role: ${profile.preferences?.preferredRole || 'N/A'}\nPreferred Location: ${profile.preferences?.preferredLocation || 'N/A'}\nPreferred Industry: ${profile.preferences?.preferredIndustry || 'N/A'}`,
+//       );
 
-    doc.moveDown(1);
-    doc.fontSize(14).text('Professional Links');
-    doc.moveDown(0.5);
-    doc
-      .fontSize(11)
-      .text(
-        `LinkedIn: ${profile.linkedinUrl || 'N/A'}\nPortfolio: ${profile.portfolioUrl || 'N/A'}`,
-      );
+//     doc.moveDown(1);
+//     doc.fontSize(14).text('Professional Links'); 
+//     doc.moveDown(0.5);
+//     doc
+//       .fontSize(11)
+//       .text(
+//         `LinkedIn: ${profile.linkedinUrl || 'N/A'}\nPortfolio: ${profile.portfolioUrl || 'N/A'}`,
+//       );
 
-    if (profile.experienceStatus === 'experienced' && profile.experienceDetails) {
-      doc.moveDown(1);
-      doc.fontSize(14).text('Experience');
-      doc.moveDown(0.5);
-      doc
-        .fontSize(11)
-        .text(
-          `Company: ${profile.experienceDetails.currentCompany || 'N/A'}\nDesignation: ${profile.experienceDetails.designation || 'N/A'}\nExperience: ${profile.experienceDetails.totalExperience || 'N/A'}\nCurrent CTC: ${profile.experienceDetails.currentCtcLpa || 'N/A'} LPA\nExpected CTC: ${profile.experienceDetails.expectedCtcLpa || 'N/A'} LPA`,
-        );
-    }
+//     if (profile.experienceStatus === 'experienced' && profile.experienceDetails) {
+//       doc.moveDown(1);
+//       doc.fontSize(14).text('Experience');
+//       doc.moveDown(0.5);
+//       doc
+//         .fontSize(11)
+//         .text(
+//           `Company: ${profile.experienceDetails.currentCompany || 'N/A'}\nDesignation: ${profile.experienceDetails.designation || 'N/A'}\nExperience: ${profile.experienceDetails.totalExperience || 'N/A'}\nCurrent CTC: ${profile.experienceDetails.currentCtcLpa || 'N/A'} LPA\nExpected CTC: ${profile.experienceDetails.expectedCtcLpa || 'N/A'} LPA`,
+//         );
+//     }
 
-    doc.moveDown(2);
-    doc.fillColor('gray').fontSize(9).text('Created by RecruitKr', { align: 'center' });
-    doc.end();
+//     doc.moveDown(2);
+//     doc.fillColor('gray').fontSize(9).text('Created by RecruitKr', { align: 'center' });
+//     doc.end();
+//   });
+
+
+
+export const generateResumePdfBuffer = async (profile) => {
+  const html = generateResumeHTML(profile);
+
+  const browser = await puppeteer.launch({
+    headless: "new"
   });
+
+  const page = await browser.newPage();
+
+  await page.setContent(html, { waitUntil: "load" });
+
+  const pdfBuffer = await page.pdf({
+    format: "A4",
+    printBackground: true
+  });
+
+  await browser.close();
+
+  return Buffer.from(pdfBuffer); // ✅ FIX HERE
+};

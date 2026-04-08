@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Resume</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    @page {
+      size: A4;
+      margin: 0;
+    }
+  </style>
+</head>
+
+<body class="m-0 p-0 text-gray-800 font-sans">
+
+  <!-- A4 Container -->
+  <div class="w-[210mm] h-[297mm] px-[20mm] py-[25mm] box-border relative">
+
+    <!-- HEADER -->
+    <div class="flex justify-between items-start">
+
+      <!-- LEFT HEADER -->
+      <div class="flex items-center gap-4 max-w-[70%]">
+
+        <!-- IMAGE -->
+        <div class="w-[80px] h-[80px] rounded-full overflow-hidden bg-blue-100 shrink-0">
+          <img src="https://marketplace.canva.com/8Qq5I/MAG-8W8Qq5I/1/tl/canva-photo-icon-MAG-8W8Qq5I.png"
+               class="w-full h-full object-cover" />
+        </div>
+
+        <!-- NAME -->
+        <div>
+          <div class="text-[28px] font-bold break-words">
+            {{fullName}}
+          </div>
+          <div class="text-[16px] mt-1">
+            {{jobTitle}}
+          </div>
+          <div class="text-[12px] text-gray-600 mt-1 leading-[1.4]">
+            {{summary}}
+          </div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT HEADER -->
+      <div class="text-left text-[13px] leading-[1.6] max-w-[30%] break-words">
+        <div><span><i class="fa-solid fa-mobile-screen"></i></span>{{mobile}}</div>
+        <div>{{email}}</div>
+        <div>{{location}}</div>
+      </div>
+
+    </div>
+
+    <!-- MAIN GRID -->
+    <div class="grid grid-cols-[65%_35%] gap-5 mt-6">
+
+      <!-- LEFT COLUMN -->
+      <div>
+
+        <!-- EDUCATION -->
+        <div class="mb-5 break-inside-avoid">
+          <div class="font-bold text-[14px] border-b-2 border-gray-400 pb-1 mb-2 tracking-wide">
+            EDUCATION
+          </div>
+          {{educationSection}}
+        </div>
+
+        <!-- EXPERIENCE -->
+        <div class="mb-5 break-inside-avoid">
+          <div class="font-bold text-[14px] border-b-2 border-gray-400 pb-1 mb-2 tracking-wide">
+            INTERNSHIP / EXPERIENCE
+          </div>
+          {{experienceSection}}
+        </div>
+
+        <!-- PROJECTS -->
+        <div class="mb-5 break-inside-avoid">
+          <div class="font-bold text-[14px] border-b-2 border-gray-400 pb-1 mb-2 tracking-wide">
+            PROJECTS
+          </div>
+          {{projectsSection}}
+        </div>
+
+      </div>
+
+      <!-- RIGHT COLUMN -->
+      <div class="border-l border-gray-300 pl-4">
+
+        <!-- CERTIFICATION -->
+        <div class="mb-5 break-inside-avoid">
+          <div class="font-bold text-[14px] border-b-2 border-gray-400 pb-1 mb-2 tracking-wide">
+            CERTIFICATION
+          </div>
+          <ul class="pl-4 text-[13px] list-disc space-y-1">
+            {{certificationList}}
+          </ul>
+        </div>
+
+        <!-- SKILLS -->
+        <div class="mb-5 break-inside-avoid">
+          <div class="font-bold text-[14px] border-b-2 border-gray-400 pb-1 mb-2 tracking-wide">
+            SKILLS
+          </div>
+          <ul class="pl-4 text-[13px] list-disc space-y-1">
+            {{skills}}
+          </ul>
+        </div>
+
+        <!-- REFERRAL -->
+        <div class="mb-5 break-inside-avoid">
+          <div class="font-bold text-[14px] border-b-2 border-gray-400 pb-1 mb-2 tracking-wide">
+            REFERRAL
+          </div>
+          <p class="text-[13px] leading-[1.5]">
+            {{referral}}
+          </p>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- FOOTER -->
+    <div class="absolute bottom-[15mm] right-[20mm] text-[12px] text-gray-600 flex items-center gap-2">
+      <span class="text-lg">Powered By </span>
+      <img src="https://www.recruitkr.com/assets/logo-wF9xbWSr.png" class="h-40 object-contain" />
+    </div>
+
+  </div>
+
+</body>
+</html>
