@@ -15,6 +15,38 @@ const escapeHtml = (value) =>
 
 const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
 
+const formatDateDMY = (value) => {
+  if (value == null) return '';
+
+  if (value instanceof Date && Number.isFinite(value.getTime())) {
+    const yyyy = value.getUTCFullYear();
+    const mm = String(value.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(value.getUTCDate()).padStart(2, '0');
+    return `${dd}-${mm}-${yyyy}`;
+  }
+
+  if (typeof value === 'string') {
+    const v = clean(value);
+    if (!v) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+      return `${v.slice(8, 10)}-${v.slice(5, 7)}-${v.slice(0, 4)}`;
+    }
+    if (/^\d{2}-\d{2}-\d{4}$/.test(v)) return v;
+
+    const parsed = new Date(v);
+    if (Number.isFinite(parsed.getTime())) {
+      const yyyy = parsed.getUTCFullYear();
+      const mm = String(parsed.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(parsed.getUTCDate()).padStart(2, '0');
+      return `${dd}-${mm}-${yyyy}`;
+    }
+
+    return v;
+  }
+
+  return clean(value);
+};
+
 const buildSection = (title, innerHtml) => {
   if (!clean(innerHtml)) return '';
   return `
@@ -135,7 +167,7 @@ export const generateResumeHTML = (profile = {}) => {
   })();
 
   const personalSection = buildKvSection([
-    ['Date of Birth', clean(profile.dateOfBirth)],
+    ['Date of Birth', formatDateDMY(profile.dateOfBirth)],
     ['Gender', clean(profile.gender)],
   ]);
 
