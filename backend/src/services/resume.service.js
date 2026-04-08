@@ -1,13 +1,15 @@
 import mammoth from 'mammoth';
 import pdfParse from 'pdf-parse';
 import PDFDocument from 'pdfkit';
+import fs from 'node:fs';
+import path from 'node:path';
 import { env } from '../config/env.js';
-import puppeteer from "puppeteer";
-import { generateResumeHTML } from "../utils/resumeBuilder.js";
+import puppeteer from 'puppeteer';
+import { generateResumeHTML } from '../utils/resumeBuilder.js';
 
 
 const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[A-Za-z]{2,}/;
-const MOBILE_REGEX = /(?:\+91[-\s]?)?([6-9]\d{9})/;
+const MOBILE_REGEX = /(?:\+?91[-\s]?)?([6-9](?:[\s-]?\d){9})/;
 const URL_REGEX = /(?:https?:\/\/)?(?:www\.)?[A-Za-z0-9.-]+\.[A-Za-z]{2,}[^\s)]*/gi;
 const PINCODE_REGEX = /\b\d{6}\b/;
 const EXPERIENCE_REGEX = /\b(\d+(?:\.\d+)?\+?)\s*(?:years?|yrs?|year|yr)\b/i;
@@ -38,10 +40,19 @@ const MONTHS = {
   december: '12',
 };
 
-const clean = (value) => value?.replace(/[ \t]+/g, ' ').trim() || '';
-const normalizeInline = (value) => value?.replace(/\s+/g, ' ').trim() || '';
+const normalizeCommonUnicode = (value = '') =>
+  String(value || '')
+    .replace(/\u00a0/g, ' ')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u2013\u2014]/g, '-')
+    // common mojibake seen in some PDF extractors
+    .replace(/â€™/g, "'")
+    .replace(/â€“|â€”/g, '-');
+
+const clean = (value) => normalizeCommonUnicode(value)?.replace(/[ \t]+/g, ' ').trim() || '';
+const normalizeInline = (value) => normalizeCommonUnicode(value)?.replace(/\s+/g, ' ').trim() || '';
 const normalizeLines = (value) =>
-  (value || '')
+  normalizeCommonUnicode(value || '')
     .replace(/\r/g, '')
     .split('\n')
     .map((line) => clean(line))
@@ -78,7 +89,7 @@ const parseMonthYear = (monthStr = '', yearStr = '') => {
 
 const estimateExperienceFromDateRanges = (text) => {
   const rx =
-    /\b(Jan|January|Feb|February|Mar|March|Apr|April|May|Jun|June|Jul|July|Aug|August|Sep|Sept|September|Oct|October|Nov|November|Dec|December)\.?\s*[’']?(\d{2,4})\s*(?:-|–|to)\s*(Present|Current|Till Date|Now|[A-Za-z]{3,9}\.?\s*[’']?\d{2,4})\b/gi;
+    /\b(Jan|January|Feb|February|Mar|March|Apr|April|May|Jun|June|Jul|July|Aug|August|Sep|Sept|September|Oct|October|Nov|November|Dec|December)\.?\s*['’]?\s*(\d{2,4})\s*(?:-|–|—|to)\s*(Present|Current|Till Date|Now|[A-Za-z]{3,9}\.?\s*['’]?\s*\d{2,4})\b/gi;
   const now = new Date();
   let bestMonths = 0;
   let m;
@@ -90,7 +101,7 @@ const estimateExperienceFromDateRanges = (text) => {
     let endMonth = now.getMonth() + 1;
     if (!/present|current|till date|now/i.test(m[3])) {
       const compact = m[3].replace(/\./g, '').trim();
-      const merged = compact.match(/^([A-Za-z]{3,9})[’']?(\d{2,4})$/);
+      const merged = compact.match(/^([A-Za-z]{3,9})['’]?\s*(\d{2,4})$/);
       if (merged) {
         const parsed = parseMonthYear(merged[1], merged[2]);
         if (!parsed) continue;
@@ -140,11 +151,24 @@ const normalizeDateToInput = (value = '') => {
 
   if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
 
+  const toFourDigitYear = (yy) => {
+    const raw = String(yy || '').replace(/[^\d]/g, '');
+    if (!raw) return '';
+    if (raw.length === 4) return raw;
+    if (raw.length !== 2) return '';
+    const now = new Date();
+    const pivot = now.getFullYear() % 100;
+    const num = Number(raw);
+    if (!Number.isFinite(num)) return '';
+    return `${num <= pivot ? 2000 + num : 1900 + num}`;
+  };
+
   let m = v.match(/\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})\b/);
   if (m) {
     const dd = m[1].padStart(2, '0');
     const mm = m[2].padStart(2, '0');
-    const yy = m[3].length === 2 ? `19${m[3]}` : m[3];
+    const yy = toFourDigitYear(m[3]);
+    if (!yy) return '';
     return `${yy}-${mm}-${dd}`;
   }
 
@@ -161,8 +185,8 @@ const normalizeDateToInput = (value = '') => {
     const dd = m[1].padStart(2, '0');
     const monthKey = m[2].toLowerCase();
     const mm = MONTHS[monthKey];
-    const yy = m[3].length === 2 ? `19${m[3]}` : m[3];
-    if (mm) return `${yy}-${mm}-${dd}`;
+    const yy = toFourDigitYear(m[3]);
+    if (mm && yy) return `${yy}-${mm}-${dd}`;
   }
 
   m = v.match(/\b([A-Za-z]{3,9})\s+(\d{1,2})[,\s]+(\d{2,4})\b/);
@@ -170,8 +194,8 @@ const normalizeDateToInput = (value = '') => {
     const monthKey = m[1].toLowerCase();
     const mm = MONTHS[monthKey];
     const dd = m[2].padStart(2, '0');
-    const yy = m[3].length === 2 ? `19${m[3]}` : m[3];
-    if (mm) return `${yy}-${mm}-${dd}`;
+    const yy = toFourDigitYear(m[3]);
+    if (mm && yy) return `${yy}-${mm}-${dd}`;
   }
 
   return '';
@@ -196,10 +220,26 @@ const extractCandidateName = (text, email = '') => {
   for (const line of lines) {
     const lower = line.toLowerCase();
     if (!line) continue;
-    if (line.length > 60) continue;
-    if (/\d|@|https?:\/\//i.test(line)) continue;
+
+    const candidate = clean(
+      line
+        .replace(EMAIL_REGEX, ' ')
+        .replace(MOBILE_REGEX, ' ')
+        .replace(/\b(?:mobile|mob|phone|contact)\b\s*[:\-]?\s*/gi, ' ')
+        .replace(/\s*\(.*?\)\s*/g, ' ')
+        .trim(),
+    );
+
+    if (!candidate) continue;
+    if (candidate.length > 60) continue;
+
+    let left = candidate;
+    if (left.includes('|')) left = clean(left.split('|')[0]);
+    if (left.includes(' - ')) left = clean(left.split(' - ')[0]);
+
+    if (/\d|@|https?:\/\//i.test(left)) continue;
     if (stopWords.some((w) => lower.includes(w))) continue;
-    if (/^[A-Za-z][A-Za-z\s.'-]{2,60}$/.test(line)) return line;
+    if (/^[A-Za-z][A-Za-z\s.'-]{2,60}$/.test(left)) return left;
   }
 
   if (email) {
@@ -227,9 +267,15 @@ const extractGender = (text) => {
 const extractQualification = (text) => {
   const t = text.toLowerCase();
   if (/\bphd\b|\bdoctorate\b/.test(t)) return 'Doctorate / PhD';
+  if (/\bm\.?\s?e\b|\bmaster of engineering\b/.test(t)) return 'M.E';
+  if (/\bms\b|\bm\.?\s?s\.?\b|\bmaster of science\b/.test(t)) return 'MS';
   if (/\bm\.?\s?tech\b|\bmaster of technology\b/.test(t)) return 'M.Tech';
   if (/\bmba\b|\bpgdm\b/.test(t)) return 'MBA / PGDM';
-  if (/\bm\.?\s?a\.?\b|\bm\.?\s?com\.?\b|\bm\.?\s?sc\.?\b|\bpost ?graduate\b/.test(t)) {
+  if (
+    /\bmca\b|\bm\.?\s?ca\.?\b|\bm\.?\s?a\.?\b|\bm\.?\s?com\.?\b|\bm\.?\s?sc\.?\b|\bpost ?graduate\b/.test(
+      t,
+    )
+  ) {
     return 'Postgraduate (MA/MCom/MSc etc.)';
   }
   if (
@@ -470,6 +516,7 @@ const parseResumeToCandidateHintsHeuristic = (text) => {
   const plain = normalizeInline(text);
   const emailMatch = plain.match(EMAIL_REGEX);
   const mobileMatch = plain.match(MOBILE_REGEX);
+  const mobile = mobileMatch ? mobileMatch[1].replace(/\D/g, '').slice(-10) : '';
   const normalizeUrl = (u) => (u.startsWith('http://') || u.startsWith('https://') ? u : `https://${u}`);
   const linkedinMatch = plain.match(/\b(?:https?:\/\/)?(?:www\.)?linkedin\.com\/[^\s)]+/i);
   const linkedin = linkedinMatch ? normalizeUrl(linkedinMatch[0]) : '';
@@ -489,7 +536,7 @@ const parseResumeToCandidateHintsHeuristic = (text) => {
     address: extractAddressHeuristic(text),
     pincode,
     email: emailMatch ? emailMatch[0].toLowerCase() : '',
-    mobile: mobileMatch ? mobileMatch[1] : '',
+    mobile,
     linkedinUrl: linkedin,
     portfolioUrl: portfolio ? normalizeUrl(portfolio) : '',
     highestQualification: extractQualification(plain),
@@ -570,7 +617,13 @@ export const parseResumeToCandidateHints = async (text) => {
 export const extractResumeText = async ({ mimeType, buffer }) => {
   if (mimeType === 'application/pdf') {
     const parsed = await pdfParse(buffer);
-    return normalizeLines(parsed.text);
+    const out = normalizeLines(parsed.text);
+    if (out.length < 40) {
+      throw new Error(
+        'Could not extract text from this PDF. If this is a scanned/image-based resume, please upload a text-based PDF or a DOCX.',
+      );
+    }
+    return out;
   }
 
   if (
@@ -578,7 +631,11 @@ export const extractResumeText = async ({ mimeType, buffer }) => {
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
   ) {
     const parsed = await mammoth.extractRawText({ buffer });
-    return normalizeLines(parsed.value);
+    const out = normalizeLines(parsed.value);
+    if (out.length < 40) {
+      throw new Error('Could not extract text from this DOCX. Please try another file.');
+    }
+    return out;
   }
 
   throw new Error('Unsupported resume file type');
@@ -638,20 +695,43 @@ export const extractResumeText = async ({ mimeType, buffer }) => {
 export const generateResumePdfBuffer = async (profile) => {
   const html = generateResumeHTML(profile);
 
-  const browser = await puppeteer.launch({
-    headless: "new"
-  });
+  const isRootUser = typeof process.getuid === 'function' && process.getuid() === 0;
+  const shouldDisableSandbox =
+    isRootUser ||
+    process.env.PUPPETEER_NO_SANDBOX === 'true' ||
+    process.env.DISABLE_CHROME_SANDBOX === 'true';
 
-  const page = await browser.newPage();
+  const launchOptions = {
+    headless: 'new',
+    ...(process.env.PUPPETEER_USER_DATA_DIR
+      ? { userDataDir: process.env.PUPPETEER_USER_DATA_DIR }
+      : { userDataDir: path.join(process.cwd(), '.puppeteer-user-data') }),
+    ...(shouldDisableSandbox
+      ? { args: ['--no-sandbox', '--disable-setuid-sandbox'] }
+      : null),
+    ...(process.env.PUPPETEER_EXECUTABLE_PATH
+      ? { executablePath: process.env.PUPPETEER_EXECUTABLE_PATH }
+      : null),
+  };
 
-  await page.setContent(html, { waitUntil: "load" });
+  if (launchOptions.userDataDir) {
+    fs.mkdirSync(launchOptions.userDataDir, { recursive: true });
+  }
 
-  const pdfBuffer = await page.pdf({
-    format: "A4",
-    printBackground: true
-  });
+  const browser = await puppeteer.launch(launchOptions);
 
-  await browser.close();
+  try {
+    const page = await browser.newPage();
 
-  return Buffer.from(pdfBuffer); // ✅ FIX HERE
+    await page.setContent(html, { waitUntil: 'load' });
+
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+    });
+
+    return Buffer.from(pdfBuffer); // FIX HERE
+  } finally {
+    await browser.close();
+  }
 };

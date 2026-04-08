@@ -1,1 +1,3 @@
 node_modules
+backend/_render_pdf_screenshot.mjs
+backend/_tmp_*
