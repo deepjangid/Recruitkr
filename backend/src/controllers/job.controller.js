@@ -18,7 +18,7 @@ export const listPublicJobs = asyncHandler(async (req, res) => {
   const { q, page = 1, limit = 10, location, type } = req.query;
   const skip = (Number(page) - 1) * Number(limit);
 
-  const filter = { status: 'active' };
+  const filter = { status: 'active', clientId: { $exists: true, $ne: null } };
   if (q) filter.jobTitle = { $regex: q, $options: 'i' };
   if (location) filter.jobLocation = { $regex: location, $options: 'i' };
   if (type) filter.employmentType = type;
@@ -67,6 +67,12 @@ export const applyToJob = asyncHandler(async (req, res) => {
   const job = await JobRequirement.findOne({ _id: jobId, status: 'active' }).select('_id clientId');
   if (!job) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Job not found');
+  }
+  if (!job.clientId) {
+    throw new ApiError(
+      StatusCodes.CONFLICT,
+      'This job cannot accept applications right now because the employer record is missing.',
+    );
   }
 
   const exists = await Application.findOne({ candidateId: req.user.id, jobId });
