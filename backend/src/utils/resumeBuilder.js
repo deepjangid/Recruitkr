@@ -15,6 +15,26 @@ const escapeHtml = (value) =>
 
 const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
 
+const injectFontSizeOverrides = (html) => {
+  const overrides = `
+  <style>
+    body { font-size: 13.5px; }
+    .name { font-size: 31px; }
+    .title { font-size: 16px; }
+    .summary { font-size: 13px; }
+    .contact { font-size: 14px; }
+    .section-title { font-size: 12px; }
+    .footer { font-size: 11px; }
+  </style>
+`;
+
+  if (html.includes('</head>')) {
+    return html.replace('</head>', `${overrides}</head>`);
+  }
+
+  return `${html}${overrides}`;
+};
+
 const formatDateDMY = (value) => {
   if (value == null) return '';
 
@@ -78,7 +98,7 @@ const buildKvSection = (pairs) => {
 
 export const generateResumeHTML = (profile = {}) => {
   const templatePath = path.join(__dirname, '../../templates/resume.html');
-  let template = fs.readFileSync(templatePath, 'utf-8');
+  let template = injectFontSizeOverrides(fs.readFileSync(templatePath, 'utf-8'));
 
   const fullName = clean(profile.fullName) || clean(profile.email) || 'Candidate';
   const jobTitle = clean(profile.preferences?.preferredRole) || '';
