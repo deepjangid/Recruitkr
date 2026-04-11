@@ -8,244 +8,63 @@
   <style>
     @page {
       size: A4;
-      margin: 14mm 16mm;
+      margin: 10mm 14mm 10mm 14mm;
     }
-
-    body {
-      margin: 0;
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
-      font-size: 12.5px;
-      color: #111827;
-      background: #fff;
-    }
-
-    .page {
-      width: 100%;
-      min-height: calc(297mm - 32mm);
-      display: flex;
-      flex-direction: column;
-    }
-
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      padding-bottom: 10px;
-      gap: 16px;
-    }
-
-    .header-left {
-      display: flex;
-      gap: 12px;
-      min-width: 0;
-      flex: 1 1 auto;
-      align-items: flex-start;
-      
-    }
-
-    .avatar-only {
-      width: 78px;
-      height: 78px;
-      border-radius: 10px;
-      overflow: hidden;
-      flex: 0 0 auto;
-      border: 1px solid #e5e7eb;
-      background: #f3f4f6;
-    }
-
-    .avatar-only img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
-
-    .name {
-      font-size: 30px;
-      font-weight: 800;
-      letter-spacing: 0.02em;
-      margin: 0;
-      line-height: 1.1;
-      word-break: break-word;
-    }
-
-    .title {
-      margin: 4px 0 0 0;
-      font-size: 16px;
-      color: #111827;
-      font-weight: 600;
-      word-break: break-word;
-      
-    }
-
-    .summary {
-      margin: 5px 0 0 0;
-      color: #374151;
-      font-size: 11.5px;
-      word-break: break-word;
-    }
-
-    .contact {
-      text-align: right;
-      font-size: 13px;
-      color: #111827;
-      min-width: 220px;
-      max-width: 260px;
-      word-break: break-word;
-    }
-
-    .contact .contact-line {
-      margin: 0 0 6px 0;
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      gap: 8px;
-    }
-
-    .contact svg {
-      width: 14px;
-      height: 14px;
-      flex: 0 0 auto;
-      color: #111827;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: 62% 38%;
-      gap: 16px;
-      margin-top: 10px;
-      flex: 1 1 auto;
-    }
-
-    .left {
-      padding-right: 16px;
-      border-right: 2px solid #111827;
-      
-    }
-
-    .section {
-      margin-bottom: 14px;
-      break-inside: avoid;
-    }
-
-    .section-title {
-      font-weight: 800;
-      color: #111827;
-      border-bottom: 2px solid #111827;
-      padding-bottom: 3px;
-      margin: 0 0 6px 0;
-      letter-spacing: 0.16em;
-      font-size: 12.5px;
-    }
-
-    ul {
-      margin: 0;
-      padding-left: 18px;
-    }
-
-    li {
-      margin: 0 0 4px 0;
-    }
-
-    .muted {
-      color: #6b7280;
-    }
-
-    .kv-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 6px;
-    }
-
-    .kv-item {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-
-    .kv-label {
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      color: #6b7280;
-      text-transform: uppercase;
-    }
-
-    .kv-value {
-      font-size: 12px;
-      color: #111827;
-      word-break: break-word;
-    }
-
-    .footer {
-      display: flex;
-      justify-content: flex-end;
-      align-items: center;
-      margin-top: auto;
-      padding-top: 4px;
-      font-size: 10px;
-      color: #111827;
-      gap: 8px;
-    }
-
-    .footer-logo {
-      height: 22px;
-      width: auto;
-    }
+    body { margin: 0; }
   </style>
 </head>
 
-<body>
-  <div class="page">
+<body class="m-0 bg-white font-sans text-[12.5px] text-slate-900">
+  <div class="flex min-h-[calc(297mm-20mm)] w-full flex-col justify-start">
 
   <!-- HEADER -->
-  <div class="header">
+  <div class="flex items-stretch justify-between gap-3 border-b border-transparent mt-10 pb-1.5">
 
     <!-- LEFT -->
-    <div class="header-left">
+    <div class="flex min-w-0 flex-1 items-start gap-3">
       {{heroBlock}}
-      <div>
-        <h1 class="name">{{fullName}}</h1>
-        <p class="title">{{jobTitle}}</p>
-        <p class="summary">{{summary}}</p>
+      <div class=" flex flex-col gap-2 ">
+        <h1 class="m-0 break-words text-[30px] leading-[1.1] font-extrabold tracking-[0.02em]">{{fullName}}</h1>
+        <p class="mt-1 break-words text-base font-semibold text-slate-900">{{jobTitle}}</p>
+        <p class="mt-1.5 break-words text-[11.5px] leading-[1.35] text-slate-700">{{summary}}</p>
       </div>
     </div>
 
     <!-- RIGHT -->
-    <div class="contact">
+    <div class="flex w-[248px] min-w-[210px] max-w-[248px] flex-col items-start gap-3 pt-0.5 text-left text-[13px] mt-5 text-slate-900">
       {{contactLines}}
     </div>
 
   </div>
 
   <!-- MAIN GRID -->
-  <div class="grid ">
+  <div class="mt-1 grid flex-1 grid-cols-[63.5%_36.5%] gap-2.5">
 
     <!-- LEFT SIDE -->
-    <div class="left flex flex-col gap-25">
+    <div class="flex flex-col gap-40 border-r border-slate-800 pr-3">
 
       <!-- EDUCATION -->
-      <div class="section">
-        <h2 class="section-title">EDUCATION</h2>
+      <div class="mb-2.5 break-inside-avoid">
+        <h2 class="mb-1.5 border-b-2 border-slate-900 pb-0.5 text-[12.5px] font-extrabold tracking-[0.16em] text-slate-900">EDUCATION</h2>
         {{education}}
       </div>
 
       <!-- EXPERIENCE -->
-      <div class="section">
-        <h2 class="section-title">
+      <div class="mb-2.5 break-inside-avoid">
+        <h2 class="mb-1.5 border-b-2 border-slate-900 pb-0.5 text-[12.5px] font-extrabold tracking-[0.16em] text-slate-900">
           INTERNSHIP / EXPERIENCE
         </h2>
         {{experience}}
       </div>
 
       <!-- PROJECTS -->
-      <div class="section">
-        <h2 class="section-title">PROJECTS</h2>
+      <div class="mb-2.5 break-inside-avoid">
+        <h2 class="mb-1.5 border-b-2 border-slate-900 pb-0.5 text-[12.5px] font-extrabold tracking-[0.16em] text-slate-900">PROJECTS</h2>
         {{projects}}
       </div>
     <!-- REFERRAL -->
-      <div class="section">
-        <h2 class="section-title">
+      <div class="mb-2.5 break-inside-avoid">
+        <h2 class="mb-1.5 border-b-2 border-slate-900 pb-0.5 text-[12.5px] font-extrabold tracking-[0.16em] text-slate-900">
           REFERRAL
         </h2>
         {{referral}}
@@ -253,25 +72,25 @@
     </div>
 
     <!-- RIGHT SIDE -->
-    <div class="flex flex-col gap-25">
+    <div class="flex flex-col gap-40">
 
       <!-- CERTIFICATION -->
-      <div class="section">
-        <h2 class="section-title">
+      <div class="mb-2.5 break-inside-avoid">
+        <h2 class="mb-1.5 border-b-2 border-slate-900 pb-0.5 text-[12.5px] font-extrabold tracking-[0.16em] text-slate-900">
           CERTIFICATION
         </h2>
         {{certifications}}
       </div>
 
       <!-- PREFERENCES -->
-      <div class="section">
-        <h2 class="section-title">PREFERENCES</h2>
+      <div class="mb-2.5 break-inside-avoid">
+        <h2 class="mb-1.5 border-b-2 border-slate-900 pb-0.5 text-[12.5px] font-extrabold tracking-[0.16em] text-slate-900">PREFERENCES</h2>
         {{preferences}}
       </div>
 
       <!-- SKILLS -->
-      <div class="section">
-        <h2 class="section-title">SKILL</h2>
+      <div class="mb-2.5 break-inside-avoid">
+        <h2 class="mb-1.5 border-b-2 border-slate-900 pb-0.5 text-[12.5px] font-extrabold tracking-[0.16em] text-slate-900">SKILL</h2>
         {{skills}}
       </div>
 
@@ -282,13 +101,26 @@
   </div>
 
   <!-- FOOTER -->
-  <div class="flex justify-end items-center  text-lg  mt-2 gap-2 ">
+   <div class="flex justify-end items-center  text-lg  mt-2 gap-2 ">
     <span>Powered By</span>
     <img class="h-28 pb-3"
       src="https://www.recruitkr.com/assets/logo-wF9xbWSr.png" />
   </div>
 
 </div>
-</div>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
