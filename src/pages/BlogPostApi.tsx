@@ -1,11 +1,38 @@
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { getBlogPost } from "@/lib/blog";
 
-const BlogPost = () => {
+import Footer from "@/components/Footer";
+import Navbar from "@/components/Navbar";
+import { fetchBlogPost, type BlogPost } from "@/lib/blog";
+
+const BlogPostApi = () => {
   const { slug } = useParams();
-  const post = slug ? getBlogPost(slug) : undefined;
+  const [post, setPost] = useState<BlogPost | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const loadPost = async () => {
+      if (!slug) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError("");
+        const data = await fetchBlogPost(slug);
+        setPost(data);
+      } catch (err) {
+        setPost(null);
+        setError(err instanceof Error ? err.message : "Failed to load blog post");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void loadPost();
+  }, [slug]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -13,12 +40,14 @@ const BlogPost = () => {
 
       <main className="pt-28 pb-20">
         <div className="container mx-auto px-4">
-          {!post ? (
+          {loading ? (
+            <div className="mx-auto max-w-2xl rounded-2xl border border-border bg-card p-8 text-center">
+              <p className="text-sm text-muted-foreground">Loading blog post...</p>
+            </div>
+          ) : !post ? (
             <div className="mx-auto max-w-2xl rounded-2xl border border-border bg-card p-8 text-center">
               <h1 className="text-3xl font-bold">Post not found</h1>
-              <p className="mt-2 text-sm text-muted-foreground">
-                The post you’re looking for doesn’t exist.
-              </p>
+              <p className="mt-2 text-sm text-muted-foreground">{error || "Post not found."}</p>
               <Link
                 to="/blog"
                 className="btn-gradient mt-6 inline-flex items-center justify-center rounded-lg px-5 py-2.5 text-sm font-semibold transition-transform hover:scale-105"
@@ -36,10 +65,10 @@ const BlogPost = () => {
                   {post.title}
                 </h1>
                 <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-xs text-muted-foreground">
-                  <time dateTime={post.publishedAt}>
-                    {new Date(post.publishedAt).toLocaleDateString()}
+                  <time dateTime={post.publishedAt ?? ""}>
+                    {post.publishedAt ? new Date(post.publishedAt).toLocaleDateString() : "Unpublished"}
                   </time>
-                  <span>•</span>
+                  <span>&bull;</span>
                   <span>{post.readingTime}</span>
                 </div>
               </div>
@@ -70,5 +99,4 @@ const BlogPost = () => {
   );
 };
 
-export default BlogPost;
-
+export default BlogPostApi;

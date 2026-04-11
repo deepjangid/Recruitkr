@@ -12,7 +12,7 @@ import WhyUs from "./pages/WhyUs";
 import Contact from "./pages/Contact";
 import FAQs from "./pages/FAQs";
 import Blog from "./pages/Blog";
-import BlogPost from "./pages/BlogPost";
+import BlogPostApi from "./pages/BlogPostApi";
 import NotFound from "./pages/NotFound";
 import CandidateRegister from "./pages/CandidateRegister";
 import ClientRegister from "./pages/ClientRegister";
@@ -40,7 +40,7 @@ const App = () => (
           <Route path="/contact" element={<Contact />} />
           <Route path="/faqs" element={<FAQs />} />
           <Route path="/blog" element={<Blog />} />
-          <Route path="/blog/:slug" element={<BlogPost />} />
+          <Route path="/blog/:slug" element={<BlogPostApi />} />
           <Route path="/register/candidate" element={<CandidateRegister />} />
           <Route path="/register/client" element={<ClientRegister />} />
           <Route path="/login" element={<Login />} />

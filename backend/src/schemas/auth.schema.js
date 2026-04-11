@@ -15,7 +15,7 @@ export const loginSchema = z
   .object({
     email,
     password: z.string().min(1),
-    role: z.enum(['candidate', 'client']),
+    role: z.enum(['candidate', 'client', 'admin']),
   })
   .strict();
 

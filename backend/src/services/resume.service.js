@@ -693,7 +693,139 @@ export const extractResumeText = async ({ mimeType, buffer }) => {
 
 
 export const generateResumePdfBuffer = async (profile) => {
-  const html = generateResumeHTML(profile);
+  const enhanceArrayStrings = (value) =>
+    Array.isArray(value)
+      ? value.map((item) => clean(item)).filter(Boolean)
+      : [];
+
+  const isWeakSummary = (value) => {
+    const text = clean(value);
+    if (!text) return true;
+    if (text.length < 45) return true;
+
+    const weakPatterns = [
+      /\bi am\b/i,
+      /\bhard ?work(?:er|ing)?\b/i,
+      /\bquick learner\b/i,
+      /\bteam player\b/i,
+      /\bgood communication\b/i,
+    ];
+
+    return weakPatterns.some((rx) => rx.test(text));
+  };
+
+  const normalizeProjects = (projects) =>
+    Array.isArray(projects)
+      ? projects
+          .map((project) => ({
+            name: clean(project?.name),
+            description: clean(project?.description),
+          }))
+          .filter((project) => project.name || project.description)
+      : [];
+
+  const enhanceResumeProfileWithOpenAi = async (inputProfile) => {
+    if (!env.OPENAI_API_KEY) return inputProfile;
+
+    const sourceSummary = clean(inputProfile?.summary);
+    const sourceProjects = normalizeProjects(inputProfile?.projects);
+    const shouldEnhanceProjects = sourceProjects.some((project) => !project.description);
+
+    if (!isWeakSummary(sourceSummary) && !shouldEnhanceProjects) {
+      return inputProfile;
+    }
+
+    const prompt = `Improve resume text from provided candidate data.
+Return JSON with exactly these keys:
+summary, projects
+
+Rules:
+- summary: professional, ATS-friendly, 70-110 words, third person, no first-person pronouns, no fake claims, no placeholders
+- projects: array of objects with keys name and description
+- keep project names unchanged
+- for each project with missing/weak description, write 1 concise impact-oriented line (max 28 words)
+- if a project already has a strong description, keep it close to original intent
+- never invent company names, degrees, or years
+- output valid JSON only`;
+
+    const candidateFacts = {
+      fullName: clean(inputProfile?.fullName),
+      experienceStatus: clean(inputProfile?.experienceStatus),
+      highestQualification: clean(inputProfile?.highestQualification),
+      summary: sourceSummary,
+      skills: enhanceArrayStrings(inputProfile?.skills),
+      preferences: {
+        preferredRole: clean(inputProfile?.preferences?.preferredRole),
+        preferredIndustry: clean(inputProfile?.preferences?.preferredIndustry),
+        preferredLocation: clean(inputProfile?.preferences?.preferredLocation),
+      },
+      experienceDetails: {
+        currentCompany: clean(inputProfile?.experienceDetails?.currentCompany),
+        designation: clean(inputProfile?.experienceDetails?.designation),
+        totalExperience: clean(inputProfile?.experienceDetails?.totalExperience),
+        industry: clean(inputProfile?.experienceDetails?.industry),
+      },
+      projects: sourceProjects,
+    };
+
+    try {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: env.OPENAI_MODEL,
+          temperature: 0.2,
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: 'You are an expert resume writer. Return strict JSON only.' },
+            {
+              role: 'user',
+              content: `${prompt}\n\nCandidate data:\n${JSON.stringify(candidateFacts)}`,
+            },
+          ],
+        }),
+      });
+
+      if (!res.ok) return inputProfile;
+
+      const data = await res.json();
+      const content = data?.choices?.[0]?.message?.content;
+      if (!content) return inputProfile;
+
+      const parsed = JSON.parse(content);
+      const generatedSummary = clean(parsed?.summary);
+      const generatedProjects = normalizeProjects(parsed?.projects);
+
+      const projectDescriptionsByName = new Map(
+        generatedProjects
+          .filter((project) => project.name && project.description)
+          .map((project) => [project.name.toLowerCase(), project.description]),
+      );
+
+      const mergedProjects = sourceProjects.map((project) => {
+        if (project.description) return project;
+        const generated = projectDescriptionsByName.get(project.name.toLowerCase()) || '';
+        return {
+          ...project,
+          description: clean(generated),
+        };
+      });
+
+      return {
+        ...inputProfile,
+        summary: generatedSummary || inputProfile.summary,
+        projects: mergedProjects.length ? mergedProjects : inputProfile.projects,
+      };
+    } catch {
+      return inputProfile;
+    }
+  };
+
+  const enhancedProfile = await enhanceResumeProfileWithOpenAi(profile);
+  const html = generateResumeHTML(enhancedProfile);
 
   const isRootUser = typeof process.getuid === 'function' && process.getuid() === 0;
   const shouldDisableSandbox =

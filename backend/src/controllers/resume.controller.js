@@ -77,6 +77,24 @@ export const downloadMyGeneratedResume = asyncHandler(async (req, res) => {
   const safeName = String(profile.fullName || 'Resume').replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_');
   const fileName = `${safeName || 'Resume'}_RecruitKr.pdf`;
 
+  await Resume.findOneAndUpdate(
+    { candidateUserId: req.user.id },
+    {
+      candidateUserId: req.user.id,
+      fileName,
+      mimeType: 'application/pdf',
+      source: 'generated',
+      textExtract: '',
+      data: pdfBuffer,
+    },
+    {
+      upsert: true,
+      new: true,
+      setDefaultsOnInsert: true,
+      runValidators: true,
+    },
+  );
+
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
   res.send(pdfBuffer);

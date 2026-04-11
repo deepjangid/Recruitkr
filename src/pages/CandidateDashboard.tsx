@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { API_BASE, apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
 import { clearSession, getSession } from "@/lib/auth";
 import { tryAutoLogin } from "@/lib/autoLogin";
+import Logo from "@/assets/logo.png";
 
 const JOBS_PAGE_LIMIT = 20;
 
@@ -519,9 +520,19 @@ const CandidateDashboard = () => {
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card/60">
         <div className="container mx-auto flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <Link to="/" className="font-heading text-2xl font-bold">
-            Recruit<span style={{ color: "#264a7f" }}>kr</span>
-          </Link>
+          <div className="flex items-center gap-3">
+            <div  className="flex items-center">
+              <span className="flex h-12 max-w-[180px] shrink-0 items-center sm:h-14">
+                <img
+                  src={Logo}
+                  alt="RecruitKr"
+                  className="h-full w-auto origin-left scale-[1.7] object-contain"
+                />
+              </span>
+            </div>
+          
+          </div>
+
           <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
             <button className="rounded-lg border border-border px-3 py-2 text-xs sm:text-sm" onClick={() => setTab("overview")}>Overview</button>
             <button className="rounded-lg border border-border px-3 py-2 text-xs sm:text-sm" onClick={() => setTab("jobs")}>Browse Jobs</button>

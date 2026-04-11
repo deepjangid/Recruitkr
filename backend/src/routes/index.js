@@ -1,6 +1,7 @@
 import { Router } from 'express';
 
 import authRoutes from './auth.routes.js';
+import blogRoutes from './blog.routes.js';
 import contactRoutes from './contact.routes.js';
 import dashboardRoutes from './dashboard.routes.js';
 import jobsRoutes from './jobs.routes.js';
@@ -14,6 +15,7 @@ router.get('/health', (_req, res) => {
 });
 
 router.use('/auth', authRoutes);
+router.use('/blogs', blogRoutes);
 router.use('/users', userRoutes);
 router.use('/jobs', jobsRoutes);
 router.use('/resumes', resumeRoutes);
