@@ -18,13 +18,13 @@ const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
 const injectFontSizeOverrides = (html) => {
   const overrides = `
   <style>
-    body { font-size: 13.5px; }
-    .name { font-size: 31px; }
-    .title { font-size: 16px; }
-    .summary { font-size: 13px; }
-    .contact { font-size: 14px; }
-    .section-title { font-size: 12px; }
-    .footer { font-size: 11px; }
+    body { font-size: 13px; }
+    .name { font-size: 33px; }
+    .title { font-size: 17px; }
+    .summary { font-size: 12px; }
+    .contact { font-size: 13.5px; }
+    .section-title { font-size: 13px; }
+    .footer { font-size: 10.5px; }
   </style>
 `;
 
