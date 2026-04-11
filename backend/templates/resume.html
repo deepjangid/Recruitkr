@@ -151,6 +151,32 @@
       color: #6b7280;
     }
 
+    .kv-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+
+    .kv-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .kv-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: #6b7280;
+      text-transform: uppercase;
+    }
+
+    .kv-value {
+      font-size: 12px;
+      color: #111827;
+      word-break: break-word;
+    }
+
     .footer {
       display: flex;
       justify-content: flex-end;
@@ -229,6 +255,12 @@
           CERTIFICATION
         </h2>
         {{certifications}}
+      </div>
+
+      <!-- PREFERENCES -->
+      <div class="section">
+        <h2 class="section-title">PREFERENCES</h2>
+        {{preferences}}
       </div>
 
       <!-- SKILLS -->

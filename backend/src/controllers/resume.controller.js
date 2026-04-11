@@ -45,9 +45,13 @@ export const getMyResume = asyncHandler(async (req, res) => {
 });
 
 export const downloadMyGeneratedResume = asyncHandler(async (req, res) => {
-  const [user, profile] = await Promise.all([
+  const [user, profile, certificateFiles] = await Promise.all([
     User.findById(req.user.id).select('_id email mobile').exec(),
     CandidateProfile.findOne({ userId: req.user.id }).exec(),
+    CandidateFile.find({ candidateUserId: req.user.id, kind: 'certificate' })
+      .select('title fileName createdAt')
+      .sort({ createdAt: -1 })
+      .exec(),
   ]);
 
   if (!user) {
@@ -67,11 +71,30 @@ export const downloadMyGeneratedResume = asyncHandler(async (req, res) => {
   const profilePhotoDataUrl =
     photo?.data && photo?.mimeType ? `data:${photo.mimeType};base64,${photo.data.toString('base64')}` : '';
 
+  const uploadedCertifications = (certificateFiles || []).map((file) => ({
+    name: file.title?.trim() || file.fileName?.trim() || 'Certificate',
+    institute: '',
+  }));
+
+  const mergedCertifications = [
+    ...(((profile.certifications || []).map((item) => ({
+      name: item?.name?.trim() || '',
+      institute: item?.institute?.trim() || '',
+    })))),
+    ...uploadedCertifications,
+  ].filter((item) => item.name || item.institute);
+
+  const uniqueCertifications = mergedCertifications.filter((item, index, array) => {
+    const key = `${item.name.toLowerCase()}|${item.institute.toLowerCase()}`;
+    return array.findIndex((candidate) => `${candidate.name.toLowerCase()}|${candidate.institute.toLowerCase()}` === key) === index;
+  });
+
   const pdfBuffer = await generateResumePdfBuffer({
     ...profile.toObject(),
     email: user.email,
     mobile: user.mobile,
     profilePhotoDataUrl,
+    certifications: uniqueCertifications,
   });
 
   const safeName = String(profile.fullName || 'Resume').replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_');

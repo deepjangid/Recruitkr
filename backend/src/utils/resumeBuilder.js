@@ -124,11 +124,11 @@ export const generateResumeHTML = (profile = {}) => {
     const lines = [];
     const mobile = clean(profile.mobile);
     const email = clean(profile.email);
-    const preferredLocation = clean(profile.preferences?.preferredLocation) || clean(profile.address);
+    const address = clean(profile.address);
 
     if (mobile) lines.push(`<p class="contact-line">${escapeHtml(mobile)} ${phoneIcon}</p>`);
     if (email) lines.push(`<p class="contact-line">${escapeHtml(email)} ${mailIcon}</p>`);
-    if (preferredLocation) lines.push(`<p class="contact-line">${escapeHtml(preferredLocation)} ${pinIcon}</p>`);
+    if (address) lines.push(`<p class="contact-line">${escapeHtml(address)} ${pinIcon}</p>`);
 
     return lines.join('\n');
   })();
@@ -253,6 +253,41 @@ export const generateResumeHTML = (profile = {}) => {
     return `<ul class="pl-4 text-sm list-disc space-y-1">${items.join('')}</ul>`;
   })();
 
+  const preferencesSection = (() => {
+    const preferredRole = clean(profile.preferences?.preferredRole);
+    const preferredLocation = clean(profile.preferences?.preferredLocation);
+    const preferredIndustry = clean(profile.preferences?.preferredIndustry);
+    const workModes = Array.isArray(profile.preferences?.workModes)
+      ? profile.preferences.workModes.map((mode) => clean(mode)).filter(Boolean)
+      : Array.isArray(profile.workModes)
+        ? profile.workModes.map((mode) => clean(mode)).filter(Boolean)
+        : [];
+
+    const items = [
+      ['Preferred Role', preferredRole],
+      ['Preferred Location', preferredLocation],
+      ['Preferred Industry', preferredIndustry],
+      ['Work Mode', workModes.join(', ')],
+    ].filter(([, value]) => clean(value));
+
+    if (!items.length) return '';
+
+    return `
+      <div class="kv-grid">
+        ${items
+          .map(
+            ([label, value]) => `
+              <div class="kv-item">
+                <div class="kv-label">${escapeHtml(label)}</div>
+                <div class="kv-value">${escapeHtml(value)}</div>
+              </div>
+            `,
+          )
+          .join('')}
+      </div>
+    `;
+  })();
+
   const skillsSection = (() => {
     if (!Array.isArray(profile.skills) || !profile.skills.length) return '';
     const items = profile.skills
@@ -279,6 +314,7 @@ export const generateResumeHTML = (profile = {}) => {
     template.includes('{{experience}}') ||
     template.includes('{{projects}}') ||
     template.includes('{{certifications}}') ||
+    template.includes('{{preferences}}') ||
     template.includes('{{skills}}') ||
     template.includes('{{referral}}');
 
@@ -292,6 +328,7 @@ export const generateResumeHTML = (profile = {}) => {
     if (!experienceSection) removeSectionByPlaceholder('EXPERIENCE', 'experience');
     if (!projectsSection) removeSectionByPlaceholder('PROJECTS', 'projects');
     if (!certificationsSection) removeSectionByPlaceholder('CERTIFICATION', 'certifications');
+    if (!preferencesSection) removeSectionByPlaceholder('PREFERENCES', 'preferences');
     if (!skillsSection) removeSectionByPlaceholder('SKILLS', 'skills');
     if (!referralSection) removeSectionByPlaceholder('REFERRAL', 'referral');
 
@@ -305,6 +342,7 @@ export const generateResumeHTML = (profile = {}) => {
     replaceAll('experience', experienceSection);
     replaceAll('projects', projectsSection);
     replaceAll('certifications', certificationsSection);
+    replaceAll('preferences', preferencesSection);
     replaceAll('skills', skillsSection);
     replaceAll('referral', referralSection);
 
@@ -312,7 +350,7 @@ export const generateResumeHTML = (profile = {}) => {
   }
 
   // Older template path (kept for compatibility)
-  const preferencesSection = (() => {
+  const preferencesSectionLegacy = (() => {
     const preferredRole = clean(profile.preferences?.preferredRole);
     const preferredLocation = clean(profile.preferences?.preferredLocation);
     const preferredIndustry = clean(profile.preferences?.preferredIndustry);
@@ -343,7 +381,7 @@ export const generateResumeHTML = (profile = {}) => {
     .join('\n');
 
   const rightSections = [
-    buildSection('PREFERENCES', preferencesSection),
+    buildSection('PREFERENCES', preferencesSectionLegacy),
     buildSection('PERSONAL DETAILS', personalSection),
   ]
     .filter(Boolean)
