@@ -641,54 +641,94 @@ export const extractResumeText = async ({ mimeType, buffer }) => {
   throw new Error('Unsupported resume file type');
 };
 
-// export const generateResumePdfBuffer = async (profile) =>
-//   new Promise((resolve, reject) => {
-//     const doc = new PDFDocument({ size: 'A4', margin: 50 });
-//     const chunks = [];
+const generateBasicResumePdfBuffer = (profile = {}) =>
+  new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ size: 'A4', margin: 42 });
+    const chunks = [];
 
-//     doc.on('data', (chunk) => chunks.push(chunk));
-//     doc.on('end', () => resolve(Buffer.concat(chunks)));
-//     doc.on('error', reject);
+    const pushSection = (title, lines = []) => {
+      const safeLines = lines.map((line) => clean(line)).filter(Boolean);
+      if (!safeLines.length) return;
 
-//     doc.fontSize(20).text(profile.fullName || 'Candidate Resume', { align: 'center' });
-//     doc.moveDown(0.5);
-//     doc
-//       .fontSize(10)
-//       .text(`${profile.email || ''} | ${profile.mobile || ''}`, { align: 'center' });
-//     doc.moveDown(1.5);
+      doc.moveDown(0.7);
+      doc.font('Helvetica-Bold').fontSize(13).fillColor('#0f172a').text(title);
+      doc.moveDown(0.25);
+      doc.font('Helvetica').fontSize(10.5).fillColor('#334155');
+      safeLines.forEach((line) => {
+        doc.text(line, { lineGap: 2 });
+      });
+    };
 
-//     doc.fontSize(14).text('Profile');
-//     doc.moveDown(0.5);
-//     doc
-//       .fontSize(11)
-//       .text(
-//         `Qualification: ${profile.highestQualification || 'N/A'}\nPreferred Role: ${profile.preferences?.preferredRole || 'N/A'}\nPreferred Location: ${profile.preferences?.preferredLocation || 'N/A'}\nPreferred Industry: ${profile.preferences?.preferredIndustry || 'N/A'}`,
-//       );
+    doc.on('data', (chunk) => chunks.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
 
-//     doc.moveDown(1);
-//     doc.fontSize(14).text('Professional Links'); 
-//     doc.moveDown(0.5);
-//     doc
-//       .fontSize(11)
-//       .text(
-//         `LinkedIn: ${profile.linkedinUrl || 'N/A'}\nPortfolio: ${profile.portfolioUrl || 'N/A'}`,
-//       );
+    const fullName = clean(profile.fullName) || 'Candidate Resume';
+    const summary = clean(profile.summary);
+    const skills = Array.isArray(profile.skills) ? profile.skills.map((item) => clean(item)).filter(Boolean) : [];
+    const projects = Array.isArray(profile.projects)
+      ? profile.projects
+          .map((item) => [clean(item?.name), clean(item?.description)].filter(Boolean).join(' - '))
+          .filter(Boolean)
+      : [];
+    const certifications = Array.isArray(profile.certifications)
+      ? profile.certifications
+          .map((item) => [clean(item?.name), clean(item?.institute)].filter(Boolean).join(' - '))
+          .filter(Boolean)
+      : [];
+    const workModes = Array.isArray(profile.preferences?.workModes)
+      ? profile.preferences.workModes.map((mode) => clean(mode)).filter(Boolean)
+      : Array.isArray(profile.workModes)
+        ? profile.workModes.map((mode) => clean(mode)).filter(Boolean)
+        : [];
 
-//     if (profile.experienceStatus === 'experienced' && profile.experienceDetails) {
-//       doc.moveDown(1);
-//       doc.fontSize(14).text('Experience');
-//       doc.moveDown(0.5);
-//       doc
-//         .fontSize(11)
-//         .text(
-//           `Company: ${profile.experienceDetails.currentCompany || 'N/A'}\nDesignation: ${profile.experienceDetails.designation || 'N/A'}\nExperience: ${profile.experienceDetails.totalExperience || 'N/A'}\nCurrent CTC: ${profile.experienceDetails.currentCtcLpa || 'N/A'} LPA\nExpected CTC: ${profile.experienceDetails.expectedCtcLpa || 'N/A'} LPA`,
-//         );
-//     }
+    doc.font('Helvetica-Bold').fontSize(20).fillColor('#0f172a').text(fullName, { align: 'center' });
 
-//     doc.moveDown(2);
-//     doc.fillColor('gray').fontSize(9).text('Created by RecruitKr', { align: 'center' });
-//     doc.end();
-//   });
+    const contactLine = [clean(profile.email), clean(profile.mobile), clean(profile.address)]
+      .filter(Boolean)
+      .join(' | ');
+    if (contactLine) {
+      doc.moveDown(0.3);
+      doc.font('Helvetica').fontSize(10.5).fillColor('#475569').text(contactLine, { align: 'center' });
+    }
+
+    pushSection('Profile', [
+      clean(profile.highestQualification) && `Qualification: ${profile.highestQualification}`,
+      clean(profile.preferences?.preferredRole) && `Preferred Role: ${profile.preferences.preferredRole}`,
+      clean(profile.preferences?.preferredLocation) &&
+        `Preferred Location: ${profile.preferences.preferredLocation}`,
+      clean(profile.preferences?.preferredIndustry) &&
+        `Preferred Industry: ${profile.preferences.preferredIndustry}`,
+      workModes.length && `Work Mode: ${workModes.join(', ')}`,
+    ]);
+
+    if (summary) {
+      pushSection('Summary', [summary]);
+    }
+
+    if (profile.experienceStatus === 'experienced') {
+      pushSection('Experience', [
+        clean(profile.experienceDetails?.designation) &&
+          `Designation: ${profile.experienceDetails.designation}`,
+        clean(profile.experienceDetails?.currentCompany) &&
+          `Company: ${profile.experienceDetails.currentCompany}`,
+        clean(profile.experienceDetails?.totalExperience) &&
+          `Total Experience: ${profile.experienceDetails.totalExperience}`,
+        clean(profile.experienceDetails?.industry) && `Industry: ${profile.experienceDetails.industry}`,
+      ]);
+    }
+
+    pushSection('Skills', skills);
+    pushSection('Projects', projects);
+    pushSection('Certifications', certifications);
+    pushSection('Referral', [clean(profile.referral)]);
+
+    doc.moveDown(1.5);
+    doc.font('Helvetica-Oblique').fontSize(9).fillColor('#64748b').text('Powered by RecruitKr', {
+      align: 'center',
+    });
+    doc.end();
+  });
 
 
 
@@ -850,9 +890,10 @@ Rules:
     fs.mkdirSync(launchOptions.userDataDir, { recursive: true });
   }
 
-  const browser = await puppeteer.launch(launchOptions);
+  let browser;
 
   try {
+    browser = await puppeteer.launch(launchOptions);
     const page = await browser.newPage();
 
     await page.setContent(html, { waitUntil: 'load' });
@@ -862,8 +903,13 @@ Rules:
       printBackground: true,
     });
 
-    return Buffer.from(pdfBuffer); // FIX HERE
+    return Buffer.from(pdfBuffer);
+  } catch (error) {
+    console.warn('Falling back to PDFKit resume generation:', error?.message || error);
+    return generateBasicResumePdfBuffer(enhancedProfile);
   } finally {
-    await browser.close();
+    if (browser) {
+      await browser.close();
+    }
   }
 };

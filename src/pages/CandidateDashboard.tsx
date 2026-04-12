@@ -121,6 +121,7 @@ const CandidateDashboard = () => {
   const [applyLoadingJobId, setApplyLoadingJobId] = useState<string | null>(null);
   const [resumeSaving, setResumeSaving] = useState(false);
   const [resumeDownloading, setResumeDownloading] = useState(false);
+  const [resumeNotice, setResumeNotice] = useState("");
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [profilePhotoLoading, setProfilePhotoLoading] = useState(false);
   const [certificates, setCertificates] = useState<CandidateCertificatesResponse["data"]>([]);
@@ -266,6 +267,7 @@ const CandidateDashboard = () => {
   const saveResume = async () => {
     setResumeSaving(true);
     setError("");
+    setResumeNotice("");
     try {
       const skills = resumeForm.skillsText
         .split(",")
@@ -290,15 +292,8 @@ const CandidateDashboard = () => {
       };
 
       const highestQualification = resumeForm.highestQualification.trim();
-      if (highestQualification) payload.highestQualification = highestQualification;
-
-      if (resumeForm.experienceStatus === "experienced") {
-        payload.experienceDetails = {
-          currentCompany: resumeForm.experienceDetails.currentCompany.trim(),
-          designation: resumeForm.experienceDetails.designation.trim(),
-          totalExperience: resumeForm.experienceDetails.totalExperience.trim(),
-          industry: resumeForm.experienceDetails.industry.trim(),
-        };
+      if (highestQualification) {
+        payload.highestQualification = highestQualification;
       }
 
       const preferredRole = resumeForm.preferences.preferredRole.trim();
@@ -314,13 +309,46 @@ const CandidateDashboard = () => {
         };
       }
 
+      if (resumeForm.experienceStatus === "experienced") {
+        payload.experienceDetails = {
+          currentCompany: resumeForm.experienceDetails.currentCompany.trim(),
+          designation: resumeForm.experienceDetails.designation.trim(),
+          totalExperience: resumeForm.experienceDetails.totalExperience.trim(),
+          industry: resumeForm.experienceDetails.industry.trim(),
+        };
+      }
+
       const res = await apiPatch<CandidateProfileResponse>("/users/candidate/me", payload, true);
 
       setProfile(res.data);
-      setResumeForm((prev) => ({
-        ...prev,
-        skillsText: (res.data.skills || skills).join(", "),
-      }));
+      setResumeForm({
+        highestQualification: res.data?.highestQualification || "",
+        experienceStatus: res.data?.experienceStatus || "fresher",
+        experienceDetails: {
+          currentCompany: res.data?.experienceDetails?.currentCompany || "",
+          designation: res.data?.experienceDetails?.designation || "",
+          totalExperience: res.data?.experienceDetails?.totalExperience || "",
+          industry: res.data?.experienceDetails?.industry || "",
+        },
+        preferences: {
+          preferredRole: res.data?.preferences?.preferredRole || "",
+          preferredLocation: res.data?.preferences?.preferredLocation || "",
+          preferredIndustry: res.data?.preferences?.preferredIndustry || "",
+          workModes: res.data?.preferences?.workModes || [],
+        },
+        summary: res.data?.summary || "",
+        skillsText: (res.data?.skills || []).join(", "),
+        projects: (res.data?.projects || []).map((p) => ({
+          name: p?.name || "",
+          description: p?.description || "",
+        })),
+        certifications: (res.data?.certifications || []).map((c) => ({
+          name: c?.name || "",
+          institute: c?.institute || "",
+        })),
+        referral: res.data?.referral || "",
+      });
+      setResumeNotice("Resume saved successfully.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save resume");
     } finally {
@@ -632,6 +660,7 @@ const CandidateDashboard = () => {
                   <p className="text-sm text-muted-foreground">
                     Fill only what you have; empty sections will be hidden in the PDF.
                   </p>
+                  {resumeNotice && <p className="mt-2 text-sm text-green-600">{resumeNotice}</p>}
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <button

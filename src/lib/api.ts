@@ -7,6 +7,10 @@ type ApiErrorPayload = {
   error?: {
     message?: string;
   };
+  details?: Array<{
+    path?: Array<string | number>;
+    message?: string;
+  }>;
 };
 
 type ApiOptions = {
@@ -85,7 +89,15 @@ export const apiRequest = async <T>(path: string, options: ApiOptions = {}): Pro
 
   const json = await parseJsonSafe<T & ApiErrorPayload>(res);
   if (!res.ok) {
+    const detailsMessage = (json as ApiErrorPayload | null)?.details
+      ?.map((detail) => {
+        const path = detail.path?.length ? `${detail.path.join(".")}: ` : "";
+        return `${path}${detail.message || "Invalid value"}`;
+      })
+      .filter(Boolean)
+      .join("; ");
     const message =
+      detailsMessage ||
       (json as ApiErrorPayload | null)?.message ||
       (json as ApiErrorPayload | null)?.error?.message ||
       "Request failed";
