@@ -4,110 +4,311 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Resume</title>
-  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
   <style>
     @page {
       size: A4;
-      margin: 10mm 14mm 10mm 14mm;
+      margin: 8mm 12mm 8mm 12mm;
     }
-    body { margin: 0; }
+
+    :root {
+      --text-900: #0f172a;
+      --text-700: #334155;
+      --text-500: #64748b;
+      --border-900: #0f172a;
+      --border-200: #e2e8f0;
+      --bg-muted: #f8fafc;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: #ffffff;
+      color: var(--text-900);
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 12.5px;
+    }
+
+    .page {
+      width: 100%;
+      min-height: calc(297mm - 16mm);
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+    }
+
+    .header {
+      margin-top: 20px;
+      padding-bottom: 4px;
+      display: flex;
+      align-items: stretch;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px solid transparent;
+    }
+
+    .header-left {
+      min-width: 0;
+      flex: 1;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .hero-photo {
+      width: 72px;
+      height: 72px;
+      flex-shrink: 0;
+      overflow: hidden;
+      border: 1px solid var(--border-200);
+      border-radius: ;
+      background: var(--bg-muted);
+    }
+
+    .hero-photo img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .header-copy {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .full-name {
+      margin: 0;
+      word-break: break-word;
+      color: var(--text-900);
+      font-size: 26px;
+      line-height: 1.1;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+    }
+
+    .job-title {
+      margin: 2px 0 0;
+      word-break: break-word;
+      color: var(--text-900);
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .summary {
+      margin: 4px 0 0;
+      word-break: break-word;
+      color: var(--text-700);
+      font-size: 11px;
+      line-height: 1.28;
+    }
+
+    .header-right {
+      width: 232px;
+      min-width: 210px;
+      max-width: 232px;
+      margin-top: 40px;
+      padding-top: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+      color: var(--text-900);
+      font-size: 12px;
+      text-align: left;
+    }
+
+    .main-grid {
+      margin-top: 2px;
+      flex: 1;
+      display: grid;
+      grid-template-columns: 63.5% 36.5%;
+      gap: 8px;
+    }
+
+    .left-column {
+      padding-right: 10px;
+      display: flex;
+      flex-direction: column;
+       gap:20%;
+      border-right: 1px solid var(--border-900);
+    }
+
+    .right-column {
+      display: flex;
+      flex-direction: column;
+     gap: 15%;
+    }
+
+    .section {
+      margin-bottom: 0;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .section-title {
+      margin: 0 0 4px;
+      padding-bottom: 2px;
+      border-bottom: 2px solid var(--border-900);
+      color: var(--text-900);
+      font-size: 11.5px;
+      font-weight: 800;
+      letter-spacing: 0.16em;
+    }
+
+    .section ul {
+      margin: 0;
+      padding-left: 14px;
+      color: var(--text-700);
+      font-size: 11px;
+      line-height: 1.25;
+    }
+
+    .section li {
+      margin: 0 0 3px;
+    }
+
+    .section p {
+      margin: 0;
+      color: var(--text-700);
+      font-size: 11px;
+      line-height: 1.25;
+    }
+
+    .muted {
+      color: var(--text-500);
+    }
+
+    .pref-grid {
+      display: grid;
+      gap: 5px;
+    }
+
+    .pref-item {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .pref-label {
+      color: var(--text-500);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .pref-value {
+      color: var(--text-900);
+      font-size: 11px;
+      line-height: 1.2;
+      word-break: break-word;
+    }
+
+    .contact-line {
+      margin: 0;
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+      color: var(--text-900);
+      font-size: 11px;
+      line-height: 1.2;
+      word-break: break-word;
+    }
+
+    .contact-line svg {
+      width: 10px;
+      height: 10px;
+      margin-top: 1px;
+      flex-shrink: 0;
+      color: var(--text-900);
+    }
+
+    .footer {
+      margin-top: 6px;
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 6px;
+      font-size: 15px;
+   
+    }
+
+    .logo {
+      height: 150px;
+      
+     
+    }
   </style>
 </head>
+<body>
+  <div class="page">
+    <div class="header">
+      <div class="header-left">
+        {{heroBlock}}
+        <div class="header-copy">
+          <h1 class="full-name">{{fullName}}</h1>
+          <p class="job-title">{{jobTitle}}</p>
+          <p class="summary">{{summary}}</p>
+        </div>
+      </div>
 
-<body class="m-0 bg-white font-sans text-[12.5px] text-slate-900  ">
-  <div class="flex min-h-[calc(297mm-20mm)] w-full flex-col justify-start ">
-
-  <!-- HEADER -->
-  <div class="flex items-stretch justify-between gap-3 border-b border-transparent mt-10 pb-1.5">
-
-    <!-- LEFT -->
-    <div class="flex min-w-0 flex-1 items-start gap-3">
-      {{heroBlock}}
-      <div class=" flex flex-col gap-2 ">
-        <h1 class="m-0 break-words text-[30px] leading-[1.1] font-extrabold tracking-[0.02em]">{{fullName}}</h1>
-        <p class="mt-1 break-words text-base font-semibold text-slate-900">{{jobTitle}}</p>
-        <p class="mt-1.5 break-words text-[11.5px] leading-[1.35] text-slate-700">{{summary}}</p>
+      <div class="header-right">
+        {{contactLines}}
       </div>
     </div>
 
-    <!-- RIGHT -->
-    <div class="flex w-[248px] min-w-[210px] max-w-[248px] flex-col items-start gap-3 pt-0.5 text-left text-[13px] mt-5 text-slate-900">
-      {{contactLines}}
+    <div class="main-grid">
+      <div class="left-column">
+        <div class="section">
+          <h2 class="section-title">EDUCATION</h2>
+          {{education}}
+        </div>
+
+        <div class="section">
+          <h2 class="section-title">INTERNSHIP / EXPERIENCE</h2>
+          {{experience}}
+        </div>
+
+        <div class="section">
+          <h2 class="section-title">PROJECTS</h2>
+          {{projects}}
+        </div>
+
+        <div class="section">
+          <h2 class="section-title">REFERRAL</h2>
+          {{referral}}
+        </div>
+      </div>
+
+      <div class="right-column">
+        <div class="section">
+          <h2 class="section-title">CERTIFICATION</h2>
+          {{certifications}}
+        </div>
+
+        <div class="section">
+          <h2 class="section-title">PREFERENCES</h2>
+          {{preferences}}
+        </div>
+
+        <div class="section">
+          <h2 class="section-title">SKILL</h2>
+          {{skills}}
+        </div>
+      </div>
     </div>
 
-  </div>
-
-  <!-- MAIN GRID -->
-  <div class="mt-1 grid flex-1 grid-cols-[63.5%_36.5%] gap-2.5">
-
-    <!-- LEFT SIDE -->
-    <div class="flex flex-col gap-20 border-r border-slate-800 pr-3">
-
-      <!-- EDUCATION -->
-      <div class="mb-2.5 break-inside-avoid">
-        <h2 class="mb-1.5 border-b-2 border-slate-900 pb-0.5 text-[12.5px] font-extrabold tracking-[0.16em] text-slate-900">EDUCATION</h2>
-        {{education}}
-      </div>
-
-      <!-- EXPERIENCE -->
-      <div class="mb-2.5 break-inside-avoid">
-        <h2 class="mb-1.5 border-b-2 border-slate-900 pb-0.5 text-[12.5px] font-extrabold tracking-[0.16em] text-slate-900">
-          INTERNSHIP / EXPERIENCE
-        </h2>
-        {{experience}}
-      </div>
-
-      <!-- PROJECTS -->
-      <div class="mb-2.5 break-inside-avoid">
-        <h2 class="mb-1.5 border-b-2 border-slate-900 pb-0.5 text-[12.5px] font-extrabold tracking-[0.16em] text-slate-900">PROJECTS</h2>
-        {{projects}}
-      </div>
-    <!-- REFERRAL -->
-      <div class="mb-2.5 break-inside-avoid">
-        <h2 class="mb-1.5 border-b-2 border-slate-900 pb-0.5 text-[12.5px] font-extrabold tracking-[0.16em] text-slate-900">
-          REFERRAL
-        </h2>
-        {{referral}}
-      </div>
-    </div>
-
-    <!-- RIGHT SIDE -->
-    <div class="flex flex-col gap-30">
-
-      <!-- CERTIFICATION -->
-      <div class="mb-2.5 break-inside-avoid">
-        <h2 class="mb-1.5 border-b-2 border-slate-900 pb-0.5 text-[12.5px] font-extrabold tracking-[0.16em] text-slate-900">
-          CERTIFICATION
-        </h2>
-        {{certifications}}
-      </div>
-
-      <!-- PREFERENCES -->
-      <div class="mb-2.5 break-inside-avoid">
-        <h2 class="mb-1.5 border-b-2 border-slate-900 pb-0.5 text-[12.5px] font-extrabold tracking-[0.16em] text-slate-900">PREFERENCES</h2>
-        {{preferences}}
-      </div>
-
-      <!-- SKILLS -->
-      <div class="mb-2.5 break-inside-avoid">
-        <h2 class="mb-1.5 border-b-2 border-slate-900 pb-0.5 text-[12.5px] font-extrabold tracking-[0.16em] text-slate-900">SKILL</h2>
-        {{skills}}
-      </div>
-
-  
-
-    </div>
-
-  </div>
-
-  <!-- FOOTER -->
-   <div class="flex justify-end items-center  text-lg  mt-2 gap-2 ">
+     <div class="footer">
     <span>Powered By</span>
-    <img class="h-28 pb-3"
+    <img class="logo"
       src="https://www.recruitkr.com/assets/logo-wF9xbWSr.png" />
   </div>
-
-</div>
+  </div>
 </body>
 </html>
 

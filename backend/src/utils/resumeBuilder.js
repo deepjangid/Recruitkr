@@ -18,7 +18,7 @@ const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
 const injectFontSizeOverrides = (html) => {
   const overrides = `
   <style>
-    body { font-size: 13px; }
+    body { font-size: 12px; }
   </style>
 `;
 
@@ -120,9 +120,8 @@ export const generateResumeHTML = (profile = {}) => {
     const email = clean(profile.email);
     const address = clean(profile.address);
 
-    const baseLineClass =
-      'm-0 flex items-start gap-2 text-[12.5px] leading-[1.35] text-slate-900 break-words';
-    const iconClass = 'mt-0.5 h-[14px] w-[14px] shrink-0 text-slate-900';
+    const baseLineClass = 'contact-line';
+    const iconClass = 'contact-icon';
 
     const withIconClass = (svg) => svg.replace('<svg ', `<svg class="${iconClass}" `);
 
@@ -182,7 +181,7 @@ export const generateResumeHTML = (profile = {}) => {
     const highestQualification = clean(profile.highestQualification);
     if (!highestQualification) return '';
     return `
-      <ul class="m-0 list-disc space-y-1 pl-4 text-[12px] leading-[1.35] text-slate-800">
+      <ul>
         <li><strong>${escapeHtml(highestQualification)}</strong></li>
       </ul>
     `;
@@ -198,13 +197,13 @@ export const generateResumeHTML = (profile = {}) => {
       const lines = [
         designation ? `<strong>${escapeHtml(designation)}</strong>` : '',
         currentCompany ? escapeHtml(currentCompany) : '',
-        industry ? `<span class="text-slate-500">${escapeHtml(industry)}</span>` : '',
-        totalExperience ? `<span class="text-slate-500">Total: ${escapeHtml(totalExperience)}</span>` : '',
+        industry ? `<span class="muted">${escapeHtml(industry)}</span>` : '',
+        totalExperience ? `<span class="muted">Total: ${escapeHtml(totalExperience)}</span>` : '',
       ].filter(Boolean);
 
       if (!lines.length) return '';
       return `
-        <ul class="m-0 list-disc space-y-1 pl-4 text-[12px] leading-[1.35] text-slate-800">
+        <ul>
           <li>${lines.join('<br/>')}</li>
         </ul>
       `;
@@ -212,7 +211,7 @@ export const generateResumeHTML = (profile = {}) => {
 
     if (profile.experienceStatus === 'fresher') {
       return `
-        <ul class="m-0 list-disc space-y-1 pl-4 text-[12px] leading-[1.35] text-slate-800">
+        <ul>
           <li>Fresher</li>
         </ul>
       `;
@@ -234,7 +233,7 @@ export const generateResumeHTML = (profile = {}) => {
           `<li>${p.name ? `<strong>${escapeHtml(p.name)}</strong>` : ''}${p.description ? `<br/>${escapeHtml(p.description)}` : ''}</li>`,
       );
     if (!items.length) return '';
-    return `<ul class="m-0 list-disc space-y-1 pl-4 text-[12px] leading-[1.35] text-slate-800">${items.join('')}</ul>`;
+    return `<ul>${items.join('')}</ul>`;
   })();
 
   const certificationsSection = (() => {
@@ -250,7 +249,7 @@ export const generateResumeHTML = (profile = {}) => {
           `<li>${c.name ? `<strong>${escapeHtml(c.name)}</strong>` : ''}${c.institute ? `<br/>${escapeHtml(c.institute)}` : ''}</li>`,
       );
     if (!items.length) return '';
-    return `<ul class="m-0 list-disc space-y-1 pl-4 text-[12px] leading-[1.35] text-slate-800">${items.join('')}</ul>`;
+    return `<ul>${items.join('')}</ul>`;
   })();
 
   const preferencesSection = (() => {
@@ -273,13 +272,13 @@ export const generateResumeHTML = (profile = {}) => {
     if (!items.length) return '';
 
     return `
-      <div class="grid grid-cols-1 gap-1.5">
+      <div class="pref-grid">
         ${items
           .map(
             ([label, value]) => `
-              <div class="flex flex-col gap-0.5">
-                <div class="text-[10px] font-bold uppercase tracking-[0.08em] text-slate-500">${escapeHtml(label)}</div>
-                <div class="break-words text-xs text-slate-900">${escapeHtml(value)}</div>
+              <div class="pref-item">
+                <div class="pref-label">${escapeHtml(label)}</div>
+                <div class="pref-value">${escapeHtml(value)}</div>
               </div>
             `,
           )
@@ -295,13 +294,13 @@ export const generateResumeHTML = (profile = {}) => {
       .filter(Boolean)
       .map((s) => `<li>${escapeHtml(s)}</li>`);
     if (!items.length) return '';
-    return `<ul class="m-0 list-disc space-y-1 pl-4 text-[12px] leading-[1.35] text-slate-800">${items.join('')}</ul>`;
+    return `<ul>${items.join('')}</ul>`;
   })();
 
   const referralSection = (() => {
     const referral = clean(profile.referral);
     if (!referral) return '';
-    return `<p class="text-[12px] leading-[1.35] text-slate-700">${escapeHtml(referral)}</p>`;
+    return `<p>${escapeHtml(referral)}</p>`;
   })();
 
   const generatedAt = new Date().toISOString().slice(0, 10);
@@ -321,7 +320,7 @@ export const generateResumeHTML = (profile = {}) => {
   if (usesTokenSections) {
     const profilePhotoDataUrl = clean(profile.profilePhotoDataUrl);
     const heroBlock = profilePhotoDataUrl
-      ? `<div class="h-[78px] w-[78px] shrink-0 overflow-hidden rounded-[10px] border border-slate-200 bg-slate-100"><img src="${escapeHtml(profilePhotoDataUrl)}" alt="Profile photo" class="block h-full w-full object-cover" /></div>`
+      ? `<div class="hero-photo"><img src="${escapeHtml(profilePhotoDataUrl)}" alt="Profile photo" /></div>`
       : '';
 
     if (!educationSection) removeSectionByPlaceholder('EDUCATION', 'education');
