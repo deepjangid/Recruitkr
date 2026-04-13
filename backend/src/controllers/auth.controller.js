@@ -19,9 +19,6 @@ import {
 } from '../utils/jwt.js';
 import { hashPassword, verifyPassword } from '../utils/security.js';
 
-const MAX_LOGIN_ATTEMPTS = 5;
-const LOCK_TIME_MS = 15 * 60 * 1000;
-
 const parseDurationToMs = (input) => {
   const match = /^(\d+)([smhd])$/.exec(input);
   if (!match) return 30 * 24 * 60 * 60 * 1000;
@@ -209,30 +206,17 @@ export const login = asyncHandler(async (req, res) => {
   const { email, password, role } = req.body;
 
   const user = await User.findOne({ email })
-    .select('+passwordHash +loginAttempts +lockUntil +refreshTokenHash +refreshTokenJti +refreshTokenExpiresAt')
+    .select('+passwordHash +refreshTokenHash +refreshTokenJti +refreshTokenExpiresAt')
     .exec();
 
   if (!user || user.role !== role) {
     throw new ApiError(StatusCodes.UNAUTHORIZED, 'Invalid credentials');
   }
 
-  if (user.lockUntil && user.lockUntil.getTime() > Date.now()) {
-    throw new ApiError(StatusCodes.TOO_MANY_REQUESTS, 'Account temporarily locked');
-  }
-
   const passwordOk = await verifyPassword(user.passwordHash, password);
   if (!passwordOk) {
-    user.loginAttempts += 1;
-    if (user.loginAttempts >= MAX_LOGIN_ATTEMPTS) {
-      user.lockUntil = new Date(Date.now() + LOCK_TIME_MS);
-      user.loginAttempts = 0;
-    }
-    await user.save();
     throw new ApiError(StatusCodes.UNAUTHORIZED, 'Invalid credentials');
   }
-
-  user.loginAttempts = 0;
-  user.lockUntil = undefined;
 
   const tokens = await issueTokensAndPersistRefresh(user);
   setRefreshCookie(res, tokens.refreshToken);

@@ -7,7 +7,7 @@ import { apiPost } from "@/lib/api";
 const ForgotPassword = () => {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [emailError, setEmailError] = useState("");
   const [done, setDone] = useState(false);
 
   const inputClass =
@@ -15,9 +15,15 @@ const ForgotPassword = () => {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setError("");
+    setEmailError("");
     setLoading(true);
     setDone(false);
+
+    if (!email.trim()) {
+      setEmailError("Email is required.");
+      setLoading(false);
+      return;
+    }
 
     try {
       await apiPost<{ success: boolean; message?: string }>("/auth/forgot-password", {
@@ -25,7 +31,7 @@ const ForgotPassword = () => {
       });
       setDone(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Request failed");
+      setEmailError(err instanceof Error ? err.message : "Request failed");
     } finally {
       setLoading(false);
     }
@@ -61,14 +67,16 @@ const ForgotPassword = () => {
                     type="email"
                     required
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setEmailError("");
+                    }}
                     className={inputClass}
                     placeholder="your@email.com"
                     autoComplete="email"
                   />
+                  {emailError && <p className="mt-1.5 text-xs text-red-500">{emailError}</p>}
                 </div>
-
-                {error && <p className="text-sm text-red-500">{error}</p>}
 
                 <button
                   type="submit"

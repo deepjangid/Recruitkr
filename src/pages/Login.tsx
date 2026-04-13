@@ -12,7 +12,9 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     const role = new URLSearchParams(location.search).get("role");
@@ -23,7 +25,19 @@ const Login = () => {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setError("");
+    setEmailError("");
+    setPasswordError("");
+
+    if (!email.trim()) {
+      setEmailError("Email is required.");
+      return;
+    }
+
+    if (!password) {
+      setPasswordError("Password is required.");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -52,7 +66,12 @@ const Login = () => {
 
       navigate(userType === "candidate" ? "/dashboard/candidate" : "/dashboard/client");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      const message = err instanceof Error ? err.message : "Login failed";
+      if (/email/i.test(message)) {
+        setEmailError(message);
+      } else {
+        setPasswordError(message);
+      }
     } finally {
       setLoading(false);
     }
@@ -99,10 +118,14 @@ const Login = () => {
                   type="email"
                   required
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setEmailError("");
+                  }}
                   className={inputClass}
                   placeholder="your@email.com"
                 />
+                {emailError && <p className="mt-1.5 text-xs text-red-500">{emailError}</p>}
               </div>
               <div>
                 <div className="mb-1.5 flex items-center justify-between">
@@ -114,17 +137,28 @@ const Login = () => {
                     Forgot?
                   </Link>
                 </div>
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={inputClass}
-                  placeholder="Enter your password"
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setPasswordError("");
+                    }}
+                    className={`${inputClass} pr-20`}
+                    placeholder="Enter your password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground"
+                  >
+                    {showPassword ? "Hide" : "Show"}
+                  </button>
+                </div>
+                {passwordError && <p className="mt-1.5 text-xs text-red-500">{passwordError}</p>}
               </div>
-
-              {error && <p className="text-sm text-red-500">{error}</p>}
 
               <button
                 type="submit"

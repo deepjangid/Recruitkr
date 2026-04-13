@@ -3,6 +3,8 @@ import { Router } from 'express';
 import {
   applyToJob,
   createJob,
+  downloadClientApplicationResume,
+  getClientApplicationDetails,
   listCandidateApplications,
   listClientApplications,
   listMyJobs,
@@ -40,6 +42,18 @@ router.get(
   listCandidateApplications,
 );
 router.get('/applications', requireAuth, requireRole('client'), listClientApplications);
+router.get(
+  '/applications/:applicationId',
+  requireAuth,
+  requireRole('client'),
+  getClientApplicationDetails,
+);
+router.get(
+  '/applications/:applicationId/resume',
+  requireAuth,
+  requireRole('client'),
+  downloadClientApplicationResume,
+);
 router.patch(
   '/applications/:applicationId/status',
   requireAuth,

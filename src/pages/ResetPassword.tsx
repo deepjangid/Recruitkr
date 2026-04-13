@@ -10,8 +10,11 @@ const ResetPassword = () => {
   const [newPassword, setNewPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [confirmError, setConfirmError] = useState("");
   const [done, setDone] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const token = useMemo(() => new URLSearchParams(location.search).get("token") || "", [location.search]);
 
@@ -20,15 +23,16 @@ const ResetPassword = () => {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setError("");
+    setPasswordError("");
+    setConfirmError("");
 
     if (!token) {
-      setError("Missing reset token. Please use the link from your email.");
+      setPasswordError("Missing reset token. Please use the link from your email.");
       return;
     }
 
     if (newPassword !== confirm) {
-      setError("Passwords do not match.");
+      setConfirmError("Passwords do not match.");
       return;
     }
 
@@ -41,7 +45,12 @@ const ResetPassword = () => {
       setDone(true);
       setTimeout(() => navigate("/login"), 1200);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Reset failed");
+      const message = err instanceof Error ? err.message : "Reset failed";
+      if (/match/i.test(message)) {
+        setConfirmError(message);
+      } else {
+        setPasswordError(message);
+      }
     } finally {
       setLoading(false);
     }
@@ -71,30 +80,54 @@ const ResetPassword = () => {
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div>
                   <label className="block mb-1.5 text-sm font-medium text-foreground">New Password</label>
-                  <input
-                    type="password"
-                    required
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className={inputClass}
-                    placeholder="Enter a strong password"
-                    autoComplete="new-password"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showNewPassword ? "text" : "password"}
+                      required
+                      value={newPassword}
+                      onChange={(e) => {
+                        setNewPassword(e.target.value);
+                        setPasswordError("");
+                      }}
+                      className={`${inputClass} pr-20`}
+                      placeholder="Enter a strong password"
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword((prev) => !prev)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground"
+                    >
+                      {showNewPassword ? "Hide" : "Show"}
+                    </button>
+                  </div>
+                  {passwordError && <p className="mt-1.5 text-xs text-red-500">{passwordError}</p>}
                 </div>
                 <div>
                   <label className="block mb-1.5 text-sm font-medium text-foreground">Confirm Password</label>
-                  <input
-                    type="password"
-                    required
-                    value={confirm}
-                    onChange={(e) => setConfirm(e.target.value)}
-                    className={inputClass}
-                    placeholder="Re-enter password"
-                    autoComplete="new-password"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? "text" : "password"}
+                      required
+                      value={confirm}
+                      onChange={(e) => {
+                        setConfirm(e.target.value);
+                        setConfirmError("");
+                      }}
+                      className={`${inputClass} pr-20`}
+                      placeholder="Re-enter password"
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword((prev) => !prev)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground"
+                    >
+                      {showConfirmPassword ? "Hide" : "Show"}
+                    </button>
+                  </div>
+                  {confirmError && <p className="mt-1.5 text-xs text-red-500">{confirmError}</p>}
                 </div>
-
-                {error && <p className="text-sm text-red-500">{error}</p>}
 
                 <button
                   type="submit"

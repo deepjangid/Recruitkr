@@ -2,9 +2,32 @@ import mongoose from 'mongoose';
 import { StatusCodes } from 'http-status-codes';
 
 import { Application } from '../models/Application.js';
+import { CandidateProfile } from '../models/CandidateProfile.js';
 import { JobRequirement } from '../models/JobRequirement.js';
+import { Resume } from '../models/Resume.js';
 import { ApiError } from '../utils/ApiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+
+const sanitizeInterviewDetails = (details) => {
+  if (!details) return undefined;
+
+  const sanitized = Object.fromEntries(
+    Object.entries({
+      ...(details.scheduledAt ? { scheduledAt: new Date(details.scheduledAt) } : {}),
+      ...(details.timezone ? { timezone: details.timezone } : {}),
+      ...(details.mode ? { mode: details.mode } : {}),
+      ...(details.locationText ? { locationText: details.locationText } : {}),
+      ...(details.googleMapsUrl ? { googleMapsUrl: details.googleMapsUrl } : {}),
+      ...(details.meetingLink ? { meetingLink: details.meetingLink } : {}),
+      ...(details.contactPerson ? { contactPerson: details.contactPerson } : {}),
+      ...(details.contactEmail ? { contactEmail: details.contactEmail } : {}),
+      ...(details.contactPhone ? { contactPhone: details.contactPhone } : {}),
+      ...(details.notes ? { notes: details.notes } : {}),
+    }).filter(([, value]) => value !== undefined && value !== ''),
+  );
+
+  return Object.keys(sanitized).length ? sanitized : undefined;
+};
 
 export const createJob = asyncHandler(async (req, res) => {
   const job = await JobRequirement.create({
@@ -84,6 +107,15 @@ export const applyToJob = asyncHandler(async (req, res) => {
     candidateId: req.user.id,
     clientId: job.clientId,
     jobId,
+    statusUpdatedAt: new Date(),
+    timeline: [
+      {
+        status: 'applied',
+        note: 'Application submitted successfully.',
+        changedByRole: 'candidate',
+        changedAt: new Date(),
+      },
+    ],
   });
   res.status(StatusCodes.CREATED).json({ success: true, data: application });
 });
@@ -106,21 +138,102 @@ export const listClientApplications = asyncHandler(async (req, res) => {
   res.json({ success: true, data: applications });
 });
 
+export const getClientApplicationDetails = asyncHandler(async (req, res) => {
+  const { applicationId } = req.params;
+  if (!mongoose.isValidObjectId(applicationId)) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid application id');
+  }
+
+  const application = await Application.findOne({ _id: applicationId, clientId: req.user.id })
+    .populate('jobId')
+    .populate({
+      path: 'candidateId',
+      select: 'email mobile',
+    });
+
+  if (!application) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Application not found');
+  }
+
+  const [candidateProfile, resume] = await Promise.all([
+    CandidateProfile.findOne({ userId: application.candidateId?._id || application.candidateId }),
+    Resume.findOne({ candidateUserId: application.candidateId?._id || application.candidateId }).select(
+      '_id fileName mimeType source updatedAt',
+    ),
+  ]);
+
+  res.json({
+    success: true,
+    data: {
+      application,
+      candidateProfile,
+      resume,
+    },
+  });
+});
+
+export const downloadClientApplicationResume = asyncHandler(async (req, res) => {
+  const { applicationId } = req.params;
+  if (!mongoose.isValidObjectId(applicationId)) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid application id');
+  }
+
+  const application = await Application.findOne({ _id: applicationId, clientId: req.user.id })
+    .select('candidateId')
+    .lean();
+
+  if (!application) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Application not found');
+  }
+
+  const resume = await Resume.findOne({ candidateUserId: application.candidateId }).select('+data').exec();
+  if (!resume) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Resume not found');
+  }
+
+  res.setHeader('Content-Type', resume.mimeType);
+  res.setHeader('Content-Disposition', `attachment; filename="${resume.fileName}"`);
+  res.send(resume.data);
+});
+
 export const updateApplicationStatus = asyncHandler(async (req, res) => {
   const { applicationId } = req.params;
   if (!mongoose.isValidObjectId(applicationId)) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid application id');
   }
 
-  const application = await Application.findOneAndUpdate(
-    { _id: applicationId, clientId: req.user.id },
-    { status: req.body.status },
-    { new: true },
-  );
-
-  if (!application) {
+  const existingApplication = await Application.findOne({ _id: applicationId, clientId: req.user.id });
+  if (!existingApplication) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Application not found');
   }
+
+  const interviewDetails = sanitizeInterviewDetails(req.body.interviewDetails);
+  if (req.body.status === 'interview' && !interviewDetails && !existingApplication.interviewDetails) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'Interview schedule details are required before moving an application to interview.',
+    );
+  }
+
+  existingApplication.status = req.body.status;
+  existingApplication.statusNote = req.body.note || '';
+  existingApplication.statusUpdatedAt = new Date();
+
+  if (interviewDetails) {
+    existingApplication.interviewDetails = interviewDetails;
+  }
+
+  existingApplication.timeline = [
+    ...(existingApplication.timeline || []),
+    {
+      status: req.body.status,
+      note: req.body.note || (req.body.status === 'interview' ? 'Interview scheduled by client.' : ''),
+      changedByRole: 'client',
+      changedAt: new Date(),
+    },
+  ];
+
+  const application = await existingApplication.save();
 
   res.json({ success: true, data: application });
 });

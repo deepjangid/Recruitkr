@@ -11,7 +11,6 @@ import {
   resetPassword,
 } from '../controllers/auth.controller.js';
 import { requireAuth } from '../middlewares/auth.js';
-import { authLimiter } from '../middlewares/rateLimiter.js';
 import {
   candidateRegisterSchema,
   changePasswordSchema,
@@ -25,14 +24,14 @@ import { validate } from '../middlewares/validate.js';
 
 const router = Router();
 
-router.post('/register/candidate', authLimiter, validate(candidateRegisterSchema), registerCandidate);
-router.post('/register/client', authLimiter, validate(clientRegisterSchema), registerClient);
-router.post('/login', authLimiter, validate(loginSchema), login);
-router.post('/refresh', authLimiter, validate(refreshSchema), refresh);
-router.post('/logout', authLimiter, logout);
-router.post('/change-password', requireAuth, authLimiter, validate(changePasswordSchema), changePassword);
-router.post('/forgot-password', authLimiter, validate(forgotPasswordSchema), forgotPassword);
-router.post('/reset-password', authLimiter, validate(resetPasswordSchema), resetPassword);
+router.post('/register/candidate', validate(candidateRegisterSchema), registerCandidate);
+router.post('/register/client', validate(clientRegisterSchema), registerClient);
+router.post('/login', validate(loginSchema), login);
+router.post('/refresh', validate(refreshSchema), refresh);
+router.post('/logout', logout);
+router.post('/change-password', requireAuth, validate(changePasswordSchema), changePassword);
+router.post('/forgot-password', validate(forgotPasswordSchema), forgotPassword);
+router.post('/reset-password', validate(resetPasswordSchema), resetPassword);
 
 export default router;
 

@@ -72,6 +72,9 @@ const CandidateRegister = () => {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [serverError, setServerError] = useState("");
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const servingNotice = form.noticePeriod === "Serving Notice Period";
   const isExperienced = form.experienceStatus === "experienced";
@@ -79,6 +82,71 @@ const CandidateRegister = () => {
   const inputClass =
     "w-full rounded-lg border border-border bg-secondary/50 px-4 py-3 text-sm text-foreground placeholder-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors";
   const labelClass = "block mb-1.5 text-sm font-medium text-foreground";
+  const errorInputClass = "border-red-500 focus:border-red-500 focus:ring-red-500";
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9]).{8,}$/;
+
+  const getFieldError = (
+    field:
+      | keyof CandidateForm
+      | "workModes"
+      | "declarationAccepted"
+      | "representationAuthorized",
+  ) => {
+    if (!submitAttempted) return "";
+
+    switch (field) {
+      case "fullName":
+      case "dateOfBirth":
+      case "gender":
+      case "address":
+      case "highestQualification":
+      case "preferredLocation":
+      case "preferredIndustry":
+      case "preferredRole":
+        return form[field].trim() ? "" : "This field is required.";
+      case "pincode":
+        if (!form.pincode.trim()) return "Pincode is required.";
+        return /^\d{6}$/.test(form.pincode.trim()) ? "" : "Enter a valid 6 digit pincode.";
+      case "mobile":
+        if (!form.mobile.trim()) return "Mobile number is required.";
+        return /^\d{10}$/.test(form.mobile.trim()) ? "" : "Enter a valid 10 digit mobile number.";
+      case "email":
+        if (!form.email.trim()) return "Email is required.";
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()) ? "" : "Enter a valid email address.";
+      case "currentCompany":
+      case "designation":
+      case "totalExperience":
+      case "industry":
+      case "currentCtcLpa":
+      case "expectedCtcLpa":
+      case "minimumCtcLpa":
+      case "noticePeriod":
+        if (!isExperienced) return "";
+        return form[field].trim() ? "" : "This field is required for experienced candidates.";
+      case "lastWorkingDay":
+        if (!isExperienced || !servingNotice) return "";
+        return form.lastWorkingDay ? "" : "Please select your last working day.";
+      case "workModes":
+        return workModes.length > 0 ? "" : "Select at least one work mode.";
+      case "declarationAccepted":
+        return declarationAccepted ? "" : "Please accept the declaration.";
+      case "representationAuthorized":
+        return representationAuthorized ? "" : "Please authorize representation.";
+      case "password":
+        if (!form.password) return "Password is required.";
+        return passwordRegex.test(form.password)
+          ? ""
+          : "Use 8+ characters with uppercase, lowercase, number, and special character.";
+      case "confirmPassword":
+        if (!form.confirmPassword) return "Please confirm your password.";
+        return form.password === form.confirmPassword ? "" : "Passwords must match and include special characters (@ # $ %).";
+      default:
+        return "";
+    }
+  };
+
+  const getInputClasses = (field: Parameters<typeof getFieldError>[0]) =>
+    `${inputClass} ${getFieldError(field) ? errorInputClass : ""}`.trim();
 
   const sectionHeader = (n: number, title: string, icon: string) => (
     <div className="flex items-center gap-3 mb-6 pb-3 border-b border-border">
@@ -99,7 +167,7 @@ const CandidateRegister = () => {
       declarationAccepted &&
       representationAuthorized &&
       workModes.length > 0 &&
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9]).{8,}$/.test(form.password) &&
+      passwordRegex.test(form.password) &&
       form.password === form.confirmPassword,
     [declarationAccepted, representationAuthorized, workModes.length, form.password, form.confirmPassword],
   );
@@ -223,6 +291,7 @@ const CandidateRegister = () => {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    setSubmitAttempted(true);
     setServerError("");
     if (!canSubmit) return;
 
@@ -359,13 +428,13 @@ const CandidateRegister = () => {
             <div className="rounded-2xl border border-border bg-card p-6 md:p-8">
               {sectionHeader(1, "Basic Details", "👤")}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div className="md:col-span-2"><label className={labelClass}>Full Name *</label><input required className={inputClass} value={form.fullName} onChange={onChange("fullName")} /></div>
-                <div><label className={labelClass}>Date of Birth *</label><input type="date" required className={inputClass} value={form.dateOfBirth} onChange={onChange("dateOfBirth")} /></div>
-                <div><label className={labelClass}>Gender *</label><select required className={inputClass} value={form.gender} onChange={onChange("gender")}><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option><option>Prefer Not to Say</option></select></div>
-                <div className="md:col-span-2"><label className={labelClass}>Current Address *</label><textarea required rows={3} className={inputClass} value={form.address} onChange={onChange("address")} /></div>
-                <div><label className={labelClass}>PINCODE *</label><input required className={inputClass} value={form.pincode} onChange={onChange("pincode")} /></div>
-                <div><label className={labelClass}>Mobile Number *</label><input required className={inputClass} value={form.mobile} onChange={onChange("mobile")} /></div>
-                <div className="md:col-span-2"><label className={labelClass}>Email ID *</label><input type="email" required className={inputClass} value={form.email} onChange={onChange("email")} /></div>
+                <div className="md:col-span-2"><label className={labelClass}>Full Name *</label><input required className={getInputClasses("fullName")} value={form.fullName} onChange={onChange("fullName")} />{getFieldError("fullName") && <p className="mt-2 text-xs text-red-500">{getFieldError("fullName")}</p>}</div>
+                <div><label className={labelClass}>Date of Birth *</label><input type="date" required className={getInputClasses("dateOfBirth")} value={form.dateOfBirth} onChange={onChange("dateOfBirth")} />{getFieldError("dateOfBirth") && <p className="mt-2 text-xs text-red-500">{getFieldError("dateOfBirth")}</p>}</div>
+                <div><label className={labelClass}>Gender *</label><select required className={getInputClasses("gender")} value={form.gender} onChange={onChange("gender")}><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option><option>Prefer Not to Say</option></select>{getFieldError("gender") && <p className="mt-2 text-xs text-red-500">{getFieldError("gender")}</p>}</div>
+                <div className="md:col-span-2"><label className={labelClass}>Current Address *</label><textarea required rows={3} className={getInputClasses("address")} value={form.address} onChange={onChange("address")} />{getFieldError("address") && <p className="mt-2 text-xs text-red-500">{getFieldError("address")}</p>}</div>
+                <div><label className={labelClass}>PINCODE *</label><input required className={getInputClasses("pincode")} value={form.pincode} onChange={onChange("pincode")} />{getFieldError("pincode") && <p className="mt-2 text-xs text-red-500">{getFieldError("pincode")}</p>}</div>
+                <div><label className={labelClass}>Mobile Number *</label><input required className={getInputClasses("mobile")} value={form.mobile} onChange={onChange("mobile")} />{getFieldError("mobile") && <p className="mt-2 text-xs text-red-500">{getFieldError("mobile")}</p>}</div>
+                <div className="md:col-span-2"><label className={labelClass}>Email ID *</label><input type="email" required className={getInputClasses("email")} value={form.email} onChange={onChange("email")} />{getFieldError("email") && <p className="mt-2 text-xs text-red-500">{getFieldError("email")}</p>}</div>
               </div>
             </div>
 
@@ -380,12 +449,13 @@ const CandidateRegister = () => {
             <div className="rounded-2xl border border-border bg-card p-6 md:p-8">
               {sectionHeader(3, "Education", "🎓")}
               <label className={labelClass}>Highest Qualification *</label>
-              <select required className={inputClass} value={form.highestQualification} onChange={onChange("highestQualification")}>
+              <select required className={getInputClasses("highestQualification")} value={form.highestQualification} onChange={onChange("highestQualification")}>
                 <option value="">Select qualification</option>
                 <option>10th Pass</option><option>12th Pass</option><option>Diploma</option><option>ITI</option>
                 <option>Graduate (BA/BCom/BSc/BBA/BCA etc.)</option><option>B.Tech / BE</option><option>MBA / PGDM</option>
                 <option>Postgraduate (MA/MCom/MSc etc.)</option><option>M.Tech</option><option>Doctorate / PhD</option><option>Other</option>
               </select>
+              {getFieldError("highestQualification") && <p className="mt-2 text-xs text-red-500">{getFieldError("highestQualification")}</p>}
             </div>
 
             <div className="rounded-2xl border border-border bg-card p-6 md:p-8">
@@ -404,21 +474,22 @@ const CandidateRegister = () => {
               <div className="rounded-2xl border bg-card p-6 md:p-8" style={{ borderColor: "#264a7f50" }}>
                 {sectionHeader(5, "Experience Details", "📋")}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div><label className={labelClass}>Current Company *</label><input required={isExperienced} className={inputClass} value={form.currentCompany} onChange={onChange("currentCompany")} /></div>
-                  <div><label className={labelClass}>Current Designation *</label><input required={isExperienced} className={inputClass} value={form.designation} onChange={onChange("designation")} /></div>
-                  <div><label className={labelClass}>Total Experience *</label><input required={isExperienced} className={inputClass} value={form.totalExperience} onChange={onChange("totalExperience")} /></div>
-                  <div><label className={labelClass}>Industry *</label><input required={isExperienced} className={inputClass} value={form.industry} onChange={onChange("industry")} /></div>
+                  <div><label className={labelClass}>Current Company *</label><input required={isExperienced} className={getInputClasses("currentCompany")} value={form.currentCompany} onChange={onChange("currentCompany")} />{getFieldError("currentCompany") && <p className="mt-2 text-xs text-red-500">{getFieldError("currentCompany")}</p>}</div>
+                  <div><label className={labelClass}>Current Designation *</label><input required={isExperienced} className={getInputClasses("designation")} value={form.designation} onChange={onChange("designation")} />{getFieldError("designation") && <p className="mt-2 text-xs text-red-500">{getFieldError("designation")}</p>}</div>
+                  <div><label className={labelClass}>Total Experience *</label><input required={isExperienced} className={getInputClasses("totalExperience")} value={form.totalExperience} onChange={onChange("totalExperience")} />{getFieldError("totalExperience") && <p className="mt-2 text-xs text-red-500">{getFieldError("totalExperience")}</p>}</div>
+                  <div><label className={labelClass}>Industry *</label><input required={isExperienced} className={getInputClasses("industry")} value={form.industry} onChange={onChange("industry")} />{getFieldError("industry") && <p className="mt-2 text-xs text-red-500">{getFieldError("industry")}</p>}</div>
                   <div><label className={labelClass}>Current CTC *</label><input type="number" required={isExperienced} className={inputClass} value={form.currentCtcLpa} onChange={onChange("currentCtcLpa")} /></div>
                   <div><label className={labelClass}>Expected CTC *</label><input type="number" required={isExperienced} className={inputClass} value={form.expectedCtcLpa} onChange={onChange("expectedCtcLpa")} /></div>
                   <div><label className={labelClass}>Minimum Acceptable CTC *</label><input type="number" required={isExperienced} className={inputClass} value={form.minimumCtcLpa} onChange={onChange("minimumCtcLpa")} /></div>
                   <div>
                     <label className={labelClass}>Notice Period *</label>
-                    <select required={isExperienced} className={inputClass} value={form.noticePeriod} onChange={onChange("noticePeriod")}>
+                    <select required={isExperienced} className={getInputClasses("noticePeriod")} value={form.noticePeriod} onChange={onChange("noticePeriod")}>
                       <option value="">Select notice period</option>
                       <option>Immediate Joiner</option><option>15 Days</option><option>30 Days</option><option>60 Days</option><option>90 Days</option><option>Serving Notice Period</option>
                     </select>
+                    {getFieldError("noticePeriod") && <p className="mt-2 text-xs text-red-500">{getFieldError("noticePeriod")}</p>}
                   </div>
-                  {servingNotice && <div><label className={labelClass}>Last Working Day *</label><input type="date" required className={inputClass} value={form.lastWorkingDay} onChange={onChange("lastWorkingDay")} /></div>}
+                  {servingNotice && <div><label className={labelClass}>Last Working Day *</label><input type="date" required className={getInputClasses("lastWorkingDay")} value={form.lastWorkingDay} onChange={onChange("lastWorkingDay")} />{getFieldError("lastWorkingDay") && <p className="mt-2 text-xs text-red-500">{getFieldError("lastWorkingDay")}</p>}</div>}
                 </div>
               </div>
             )}
@@ -426,9 +497,9 @@ const CandidateRegister = () => {
             <div className="rounded-2xl border border-border bg-card p-6 md:p-8">
               {sectionHeader(6, "Job Preferences", "🎯")}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div><label className={labelClass}>Preferred Location *</label><input required className={inputClass} value={form.preferredLocation} onChange={onChange("preferredLocation")} /></div>
-                <div><label className={labelClass}>Preferred Industry *</label><input required className={inputClass} value={form.preferredIndustry} onChange={onChange("preferredIndustry")} /></div>
-                <div className="md:col-span-2"><label className={labelClass}>Preferred Role *</label><input required className={inputClass} value={form.preferredRole} onChange={onChange("preferredRole")} /></div>
+                <div><label className={labelClass}>Preferred Location *</label><input required className={getInputClasses("preferredLocation")} value={form.preferredLocation} onChange={onChange("preferredLocation")} />{getFieldError("preferredLocation") && <p className="mt-2 text-xs text-red-500">{getFieldError("preferredLocation")}</p>}</div>
+                <div><label className={labelClass}>Preferred Industry *</label><input required className={getInputClasses("preferredIndustry")} value={form.preferredIndustry} onChange={onChange("preferredIndustry")} />{getFieldError("preferredIndustry") && <p className="mt-2 text-xs text-red-500">{getFieldError("preferredIndustry")}</p>}</div>
+                <div className="md:col-span-2"><label className={labelClass}>Preferred Role *</label><input required className={getInputClasses("preferredRole")} value={form.preferredRole} onChange={onChange("preferredRole")} />{getFieldError("preferredRole") && <p className="mt-2 text-xs text-red-500">{getFieldError("preferredRole")}</p>}</div>
                 <div className="md:col-span-2">
                   <label className={labelClass}>Work Mode * (Select at least one)</label>
                   <div className="flex flex-wrap gap-3 mt-2">
@@ -439,6 +510,7 @@ const CandidateRegister = () => {
                       </label>
                     ))}
                   </div>
+                  {getFieldError("workModes") && <p className="mt-2 text-xs text-red-500">{getFieldError("workModes")}</p>}
                 </div>
               </div>
             </div>
@@ -449,29 +521,67 @@ const CandidateRegister = () => {
                 <input type="checkbox" checked={declarationAccepted} onChange={(e) => setDeclarationAccepted(e.target.checked)} className="mt-1 w-4 h-4" />
                 <span className="text-sm font-medium">I Agree to the declaration *</span>
               </label>
+              {getFieldError("declarationAccepted") && <p className="mb-3 text-xs text-red-500">{getFieldError("declarationAccepted")}</p>}
               <label className="flex items-start gap-3 cursor-pointer">
                 <input type="checkbox" checked={representationAuthorized} onChange={(e) => setRepresentationAuthorized(e.target.checked)} className="mt-1 w-4 h-4" />
                 <span className="text-sm font-medium">I Authorize representation *</span>
               </label>
+              {getFieldError("representationAuthorized") && <p className="mt-3 text-xs text-red-500">{getFieldError("representationAuthorized")}</p>}
             </div>
 
             <div className="rounded-2xl border border-border bg-card p-6 md:p-8">
               <h3 className="text-lg font-heading font-semibold mb-5">🔐 Create Account Password</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div><label className={labelClass}>Password *</label><input type="password" required minLength={8} className={inputClass} value={form.password} onChange={onChange("password")} /></div>
-                <div><label className={labelClass}>Confirm Password *</label><input type="password" required minLength={8} className={inputClass} value={form.confirmPassword} onChange={onChange("confirmPassword")} /></div>
+                <div>
+                  <label className={labelClass}>Password *</label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      required
+                      minLength={8}
+                      className={`${getInputClasses("password")} pr-20`}
+                      value={form.password}
+                      onChange={onChange("password")}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground"
+                    >
+                      {showPassword ? "Hide" : "Show"}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className={labelClass}>Confirm Password *</label>
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? "text" : "password"}
+                      required
+                      minLength={8}
+                      className={`${getInputClasses("confirmPassword")} pr-20`}
+                      value={form.confirmPassword}
+                      onChange={onChange("confirmPassword")}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword((prev) => !prev)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground"
+                    >
+                      {showConfirmPassword ? "Hide" : "Show"}
+                    </button>
+                  </div>
+                </div>
               </div>
               <p className="mt-2 text-xs text-muted-foreground">Use at least 8 chars with uppercase, lowercase, number, and special character.</p>
-              {form.password && form.confirmPassword && form.password !== form.confirmPassword && (
-                <p className="mt-3 text-sm text-red-500">Passwords do not match.</p>
-              )}
+              {getFieldError("password") && <p className="mt-3 text-sm text-red-500">{getFieldError("password")}</p>}
+              {getFieldError("confirmPassword") && <p className="mt-3 text-sm text-red-500">{getFieldError("confirmPassword")}</p>}
+              {serverError && <p className="mt-3 text-sm text-red-500">{serverError}</p>}
             </div>
-
-            {serverError && <p className="text-sm text-red-500 text-center">{serverError}</p>}
 
             <button
               type="submit"
-              disabled={!canSubmit || submitting}
+              disabled={submitting}
               className="btn-gradient w-full rounded-xl py-4 text-base font-bold transition-all hover:scale-[1.02] hover:shadow-2xl disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {submitting ? "Submitting..." : "Submit Candidate Registration"}
