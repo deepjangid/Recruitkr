@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { API_BASE, apiGet, apiPatch, apiPost } from "@/lib/api";
 import { clearSession, getSession } from "@/lib/auth";
@@ -157,6 +157,38 @@ type ClientApplicationDetailsResponse = {
   };
 };
 
+type JobRequirementForm = {
+  jobTitle: string;
+  openings: string;
+  department: string;
+  jobLocation: string;
+  employmentType: string;
+  experienceRequired: string;
+  minCtcLpa: string;
+  maxCtcLpa: string;
+  preferredIndustryBackground: string;
+  genderPreference: string;
+  jobDescription: string;
+  urgencyLevel: string;
+  expectedJoiningDate: string;
+};
+
+const initialJobRequirementForm: JobRequirementForm = {
+  jobTitle: "",
+  openings: "1",
+  department: "",
+  jobLocation: "",
+  employmentType: "",
+  experienceRequired: "",
+  minCtcLpa: "",
+  maxCtcLpa: "",
+  preferredIndustryBackground: "",
+  genderPreference: "",
+  jobDescription: "",
+  urgencyLevel: "",
+  expectedJoiningDate: "",
+};
+
 const ClientDashboard = () => {
   const navigate = useNavigate();
   const [sessionState, setSessionState] = useState(() => getSession());
@@ -172,6 +204,10 @@ const ClientDashboard = () => {
   const [detailsFormVisible, setDetailsFormVisible] = useState(false);
   const [savingApplicationId, setSavingApplicationId] = useState<string | null>(null);
   const [tab, setTab] = useState<"overview" | "requirements" | "applications" | "profile">("overview");
+  const [showCreateRequirementForm, setShowCreateRequirementForm] = useState(false);
+  const [creatingRequirement, setCreatingRequirement] = useState(false);
+  const [newRequirementForm, setNewRequirementForm] = useState<JobRequirementForm>(initialJobRequirementForm);
+  const [newRequirementWorkModes, setNewRequirementWorkModes] = useState<Array<"On-site" | "Hybrid" | "Remote">>([]);
   const companyInitial = (profile?.companyName || sessionState?.user.email || "C").trim().charAt(0).toUpperCase();
 
   const loadData = async () => {
@@ -220,6 +256,76 @@ const ClientDashboard = () => {
       await loadData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update status");
+    }
+  };
+
+  const updateNewRequirementField =
+    (field: keyof JobRequirementForm) =>
+    (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+      setNewRequirementForm((prev) => ({ ...prev, [field]: event.target.value }));
+    };
+
+  const toggleNewRequirementWorkMode = (mode: "On-site" | "Hybrid" | "Remote") => {
+    setNewRequirementWorkModes((prev) =>
+      prev.includes(mode) ? prev.filter((item) => item !== mode) : [...prev, mode],
+    );
+  };
+
+  const createRequirement = async () => {
+    setError("");
+
+    if (
+      !newRequirementForm.jobTitle.trim() ||
+      !newRequirementForm.department.trim() ||
+      !newRequirementForm.jobLocation.trim() ||
+      !newRequirementForm.employmentType ||
+      !newRequirementForm.experienceRequired.trim() ||
+      !newRequirementForm.minCtcLpa.trim() ||
+      !newRequirementForm.maxCtcLpa.trim() ||
+      !newRequirementForm.jobDescription.trim() ||
+      !newRequirementForm.urgencyLevel ||
+      Number(newRequirementForm.openings) < 1 ||
+      newRequirementWorkModes.length === 0
+    ) {
+      setError("Please complete all required hiring fields before posting the job.");
+      return;
+    }
+
+    setCreatingRequirement(true);
+    try {
+      await apiPost(
+        "/jobs",
+        {
+          jobTitle: newRequirementForm.jobTitle.trim(),
+          openings: Number(newRequirementForm.openings),
+          department: newRequirementForm.department.trim(),
+          jobLocation: newRequirementForm.jobLocation.trim(),
+          employmentType: newRequirementForm.employmentType,
+          experienceRequired: newRequirementForm.experienceRequired.trim(),
+          minCtcLpa: Number(newRequirementForm.minCtcLpa),
+          maxCtcLpa: Number(newRequirementForm.maxCtcLpa),
+          preferredIndustryBackground: newRequirementForm.preferredIndustryBackground.trim() || undefined,
+          genderPreference:
+            newRequirementForm.genderPreference &&
+            newRequirementForm.genderPreference !== "No Preference"
+              ? newRequirementForm.genderPreference
+              : undefined,
+          workModes: newRequirementWorkModes,
+          jobDescription: newRequirementForm.jobDescription.trim(),
+          urgencyLevel: newRequirementForm.urgencyLevel,
+          expectedJoiningDate: newRequirementForm.expectedJoiningDate || undefined,
+        },
+        true,
+      );
+
+      setNewRequirementForm(initialJobRequirementForm);
+      setNewRequirementWorkModes([]);
+      setShowCreateRequirementForm(false);
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to post hiring requirement");
+    } finally {
+      setCreatingRequirement(false);
     }
   };
 
@@ -930,12 +1036,123 @@ const ClientDashboard = () => {
               </div>
               <button
                 type="button"
-                onClick={() => navigate("/register/client")}
+                onClick={() => setShowCreateRequirementForm((prev) => !prev)}
                 className="rounded-lg bg-[#264a7f] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#1f3b66]"
               >
-                Add More Job
+                {showCreateRequirementForm ? "Close Form" : "Post More Hiring"}
               </button>
             </div>
+
+            {showCreateRequirementForm && (
+              <div className="rounded-xl border border-border bg-card p-6 space-y-5">
+                <div>
+                  <h3 className="font-heading text-lg font-semibold">Post New Hiring Requirement</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Create another job requirement here without leaving the dashboard.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Job Title</label>
+                    <input value={newRequirementForm.jobTitle} onChange={updateNewRequirementField("jobTitle")} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" placeholder="e.g. Sales Executive" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Openings</label>
+                    <input type="number" min={1} value={newRequirementForm.openings} onChange={updateNewRequirementField("openings")} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Department</label>
+                    <input value={newRequirementForm.department} onChange={updateNewRequirementField("department")} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" placeholder="e.g. Sales" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Job Location</label>
+                    <input value={newRequirementForm.jobLocation} onChange={updateNewRequirementField("jobLocation")} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" placeholder="e.g. Jaipur" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Employment Type</label>
+                    <select value={newRequirementForm.employmentType} onChange={updateNewRequirementField("employmentType")} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                      <option value="">Select</option>
+                      <option>Full-Time</option>
+                      <option>Contract</option>
+                      <option>Internship</option>
+                      <option>Consultant</option>
+                      <option>Temporary</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Experience Required</label>
+                    <input value={newRequirementForm.experienceRequired} onChange={updateNewRequirementField("experienceRequired")} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" placeholder="e.g. 3 years" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Min CTC (LPA)</label>
+                    <input type="number" min={0} value={newRequirementForm.minCtcLpa} onChange={updateNewRequirementField("minCtcLpa")} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Max CTC (LPA)</label>
+                    <input type="number" min={0} value={newRequirementForm.maxCtcLpa} onChange={updateNewRequirementField("maxCtcLpa")} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Preferred Industry Background</label>
+                    <input value={newRequirementForm.preferredIndustryBackground} onChange={updateNewRequirementField("preferredIndustryBackground")} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" placeholder="Optional" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Gender Preference</label>
+                    <select value={newRequirementForm.genderPreference} onChange={updateNewRequirementField("genderPreference")} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                      <option value="">Select</option>
+                      <option>No Preference</option>
+                      <option>Male</option>
+                      <option>Female</option>
+                      <option>Other</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Urgency Level</label>
+                    <select value={newRequirementForm.urgencyLevel} onChange={updateNewRequirementField("urgencyLevel")} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                      <option value="">Select</option>
+                      <option>Immediate (Within 7 Days)</option>
+                      <option>15 Days</option>
+                      <option>30 Days</option>
+                      <option>45+ Days</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Expected Joining Date</label>
+                    <input type="date" value={newRequirementForm.expectedJoiningDate} onChange={updateNewRequirementField("expectedJoiningDate")} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-sm font-medium">Work Mode</label>
+                    <div className="flex flex-wrap gap-3 pt-1">
+                      {(["On-site", "Hybrid", "Remote"] as const).map((mode) => (
+                        <label key={mode} className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={newRequirementWorkModes.includes(mode)}
+                            onChange={() => toggleNewRequirementWorkMode(mode)}
+                          />
+                          {mode}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-sm font-medium">Job Description</label>
+                    <textarea value={newRequirementForm.jobDescription} onChange={updateNewRequirementField("jobDescription")} rows={5} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" placeholder="Add role details, responsibilities, and must-have skills" />
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => void createRequirement()}
+                    disabled={creatingRequirement}
+                    className="rounded-lg bg-[#264a7f] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+                  >
+                    {creatingRequirement ? "Posting..." : "Post Requirement"}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {(dashboard?.requirements || []).map((requirement) => (
               <div key={requirement._id} className="rounded-xl border border-border bg-card p-5">
@@ -969,7 +1186,7 @@ const ClientDashboard = () => {
                 <p className="text-sm text-muted-foreground">No job requirements yet.</p>
                 <button
                   type="button"
-                  onClick={() => navigate("/register/client")}
+                  onClick={() => setShowCreateRequirementForm(true)}
                   className="mt-4 rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium"
                 >
                   Add Your First Job
