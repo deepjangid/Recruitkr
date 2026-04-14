@@ -1,8 +1,13 @@
 import { z } from 'zod';
+import { normalizeOptionalHttpUrl, normalizeOptionalLinkedinUrl } from '../utils/url.js';
 
 const trimString = () => z.string().trim();
 
-const optionalUrl = z.string().trim().url().or(z.literal('')).optional();
+const optionalUrl = z.preprocess(normalizeOptionalHttpUrl, z.string().trim().url().or(z.literal('')).optional());
+const optionalLinkedinUrl = z.preprocess(
+  normalizeOptionalLinkedinUrl,
+  z.string().trim().url().or(z.literal('')).optional(),
+);
 
 const resumeProjectSchema = z
   .object({
@@ -25,7 +30,7 @@ export const updateCandidateProfileSchema = z
     gender: z.enum(['Male', 'Female', 'Other', 'Prefer Not to Say']).optional(),
     address: trimString().min(5).max(500).optional(),
     pincode: z.string().regex(/^\d{6}$/).optional(),
-    linkedinUrl: optionalUrl,
+    linkedinUrl: optionalLinkedinUrl,
     portfolioUrl: optionalUrl,
     highestQualification: trimString().min(2).max(100).optional(),
     experienceStatus: z.enum(['fresher', 'experienced']).optional(),

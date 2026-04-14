@@ -1,6 +1,7 @@
-import { Linkedin, Facebook, Instagram, Mail, Phone } from "lucide-react";
+import { ArrowRight, Linkedin, Facebook, Instagram, Mail, Phone } from "lucide-react";
 import { Link } from "react-router-dom";
 import Logo from "../assets/logo.png";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 const Footer = () => {
   const socialLinks = [
@@ -22,15 +23,33 @@ const Footer = () => {
   ];
 
   const contactEmails = ["support@recruitkr.com", "connect@recruitkr.com", "careers@recruitkr.com"];
+  const serviceLinks = [
+    { label: "Home", to: "/", type: "route" as const },
+    { label: "About Us", to: "/why-us", type: "route" as const },
+    { label: "Recruitment", to: "/services", type: "route" as const },
+    { label: "Payroll", to: "/services", type: "route" as const },
+    { label: "Staffing", to: "/services", type: "route" as const },
+    { label: "Gig Placement", to: "/services", type: "route" as const },
+    { label: "HR Solutions", to: "/services", type: "route" as const },
+    { label: "Career Counselling", to: "/services", type: "route" as const },
+    { label: "FAQs", to: "/faqs", type: "route" as const },
+    { label: "Blog", to: "/blog", type: "route" as const },
+  ];
+  const sectorLinks = ["IT", "Healthcare", "Banking", "Retail", "Manufacturing", "Logistics"];
+
+  const footerLinkClass =
+    "group flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/90 transition hover:border-primary/60 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep";
+  const mobileSectionTriggerClass =
+    "rounded-2xl border border-white/10 bg-white/5 px-4 text-left text-sm font-semibold uppercase tracking-[0.16em] text-white/80 no-underline hover:no-underline";
 
   return (
     <footer className="border-t border-border bg-navy-deep py-10 text-white sm:py-14">
       <div className="container mx-auto px-4">
-        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 sm:gap-10 md:grid-cols-12">
-          <div className="flex flex-col items-center text-center sm:col-span-2 sm:items-start sm:text-left md:col-span-4">
-            <div className="flex w-full flex-col items-center gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8 md:grid-cols-12 md:gap-10">
+          <div className="flex flex-col items-center rounded-3xl border border-white/10 bg-white/5 p-5 text-center sm:col-span-2 sm:items-start sm:p-6 sm:text-left md:col-span-4">
+            <div className="flex w-full flex-col items-center gap-5 sm:flex-row sm:items-center sm:justify-between">
               <a href="/" className="inline-flex items-center">
-                <span className="flex h-20 max-w-[260px] shrink-0 items-center sm:h-24">
+                <span className="flex h-20 max-w-[250px] shrink-0 items-center sm:h-24">
                   <img
                     src={Logo}
                     alt="RecruitKr"
@@ -53,73 +72,122 @@ const Footer = () => {
                 ))}
               </div>
             </div>
-            <p className="mt-3 max-w-xs text-sm leading-relaxed text-white/85">
+            <p className="mt-4 max-w-sm text-sm leading-relaxed text-white/85">
               Your End-to-End Hiring and HR Partner from recruitment to retention.
             </p>
           </div>
 
-          <div className="sm:col-span-1 md:col-span-3">
+          <div className="md:hidden sm:col-span-2">
+            <Accordion type="single" collapsible className="grid gap-3">
+              <AccordionItem value="services" className="overflow-hidden rounded-2xl border border-white/10 bg-white/5 px-0">
+                <AccordionTrigger className={mobileSectionTriggerClass}>Services</AccordionTrigger>
+                <AccordionContent className="px-4 pb-4 pt-1">
+                  <nav className="grid gap-2">
+                    {serviceLinks.map((item) =>
+                      item.type === "route" ? (
+                        <Link key={item.label} to={item.to} className={footerLinkClass}>
+                          <span>{item.label}</span>
+                          <ArrowRight size={16} className="shrink-0 opacity-70 transition group-hover:translate-x-0.5 group-hover:opacity-100" />
+                        </Link>
+                      ) : null,
+                    )}
+                  </nav>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="sectors" className="overflow-hidden rounded-2xl border border-white/10 bg-white/5 px-0">
+                <AccordionTrigger className={mobileSectionTriggerClass}>Sectors</AccordionTrigger>
+                <AccordionContent className="px-4 pb-4 pt-1">
+                  <nav className="grid gap-2">
+                    {sectorLinks.map((s) => (
+                      <a key={s} href="/sectors" className={footerLinkClass}>
+                        <span>{s}</span>
+                        <ArrowRight size={16} className="shrink-0 opacity-70 transition group-hover:translate-x-0.5 group-hover:opacity-100" />
+                      </a>
+                    ))}
+                  </nav>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="contact" className="overflow-hidden rounded-2xl border border-white/10 bg-white/5 px-0">
+                <AccordionTrigger className={mobileSectionTriggerClass}>Contact</AccordionTrigger>
+                <AccordionContent className="px-4 pb-4 pt-1">
+                  <div className="grid gap-3 text-sm">
+                    {contactEmails.map((email) => (
+                      <a
+                        key={email}
+                        href={`mailto:${email}`}
+                        className="flex min-w-0 items-start gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white/90 transition hover:border-primary/60 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
+                      >
+                        <Mail size={16} className="mt-0.5 shrink-0 opacity-90" />
+                        <span className="min-w-0 break-words">{email}</span>
+                      </a>
+                    ))}
+                  </div>
+
+                  <div className="mt-4 grid gap-3">
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                      <p className="text-xs font-medium text-white/80">Recruiters / Employers</p>
+                      <a
+                        href="tel:+919001965072"
+                        className="mt-2 inline-flex items-center gap-2 text-sm text-white/90 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
+                      >
+                        <Phone size={16} className="shrink-0 opacity-90" /> +91 90019 65072
+                      </a>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                      <p className="text-xs font-medium text-white/80">Candidates / Job Seekers</p>
+                      <a
+                        href="tel:+919636315150"
+                        className="mt-2 inline-flex items-center gap-2 text-sm text-white/90 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
+                      >
+                        <Phone size={16} className="shrink-0 opacity-90" /> +91 96363 15150
+                      </a>
+                    </div>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          </div>
+
+          <div className="hidden md:block md:col-span-3">
             <h4 className="mb-3 text-xs font-semibold uppercase tracking-widest text-white/70">Services</h4>
-            <nav className="grid gap-2 text-sm">
-              <Link
-                to="/"
-                className="text-white/85 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
-              >
-                Home
-              </Link>
-              <Link
-                to="/why-us"
-                className="text-white/85 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
-              >
-                About Us
-              </Link>
-              {["Recruitment", "Payroll", "Staffing", "Gig Placement", "HR Solutions", "Career Counselling"].map((s) => (
-                <a
-                  key={s}
-                  href="#services"
-                  className="text-white/85 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
-                >
-                  {s}
-                </a>
-              ))}
-              <Link
-                to="/faqs"
-                className="text-white/85 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
-              >
-                FAQs
-              </Link>
-              <Link
-                to="/blog"
-                className="text-white/85 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
-              >
-                Blog
-              </Link>
+            <nav className="grid gap-2">
+              {serviceLinks.map((item) =>
+                item.type === "route" ? (
+                  <Link key={item.label} to={item.to} className={footerLinkClass}>
+                    <span>{item.label}</span>
+                    <ArrowRight size={16} className="shrink-0 opacity-70 transition group-hover:translate-x-0.5 group-hover:opacity-100" />
+                  </Link>
+                ) : null,
+              )}
             </nav>
           </div>
 
-          <div className="sm:col-span-1 md:col-span-2">
+          <div className="hidden md:block md:col-span-2">
             <h4 className="mb-3 text-xs font-semibold uppercase tracking-widest text-white/70">Sectors</h4>
-            <nav className="grid gap-2 text-sm">
-              {["IT", "Healthcare", "Banking", "Retail", "Manufacturing", "Logistics"].map((s) => (
+            <nav className="grid gap-2">
+              {sectorLinks.map((s) => (
                 <a
                   key={s}
-                  href="#sectors"
-                  className="text-white/85 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
+                  href="/sectors"
+                  className={footerLinkClass}
                 >
-                  {s}
+                  <span>{s}</span>
+                  <ArrowRight size={16} className="shrink-0 opacity-70 transition group-hover:translate-x-0.5 group-hover:opacity-100" />
                 </a>
               ))}
             </nav>
           </div>
 
-          <div className="sm:col-span-2 md:col-span-3">
+          <div className="hidden md:block md:col-span-3">
             <h4 className="mb-3 text-xs font-semibold uppercase tracking-widest text-white/70">Contact</h4>
-            <div className="grid gap-2 text-sm">
+            <div className="grid gap-3 text-sm">
               {contactEmails.map((email) => (
                 <a
                   key={email}
                   href={`mailto:${email}`}
-                  className="flex min-w-0 items-start gap-2 text-white/85 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
+                  className="flex min-w-0 items-start gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white/90 transition hover:border-primary/60 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
                 >
                   <Mail size={16} className="mt-0.5 shrink-0 opacity-90" />
                   <span className="min-w-0 break-words">{email}</span>
@@ -128,20 +196,20 @@ const Footer = () => {
             </div>
 
             <div className="mt-4 grid gap-3">
-              <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                 <p className="text-xs font-medium text-white/80">Recruiters / Employers</p>
                 <a
                   href="tel:+919001965072"
-                  className="mt-1 inline-flex items-center gap-2 text-sm text-white/90 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
+                  className="mt-2 inline-flex items-center gap-2 text-sm text-white/90 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
                 >
                   <Phone size={16} className="shrink-0 opacity-90" /> +91 90019 65072
                 </a>
               </div>
-              <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                 <p className="text-xs font-medium text-white/80">Candidates / Job Seekers</p>
                 <a
                   href="tel:+919636315150"
-                  className="mt-1 inline-flex items-center gap-2 text-sm text-white/90 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
+                  className="mt-2 inline-flex items-center gap-2 text-sm text-white/90 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
                 >
                   <Phone size={16} className="shrink-0 opacity-90" /> +91 96363 15150
                 </a>

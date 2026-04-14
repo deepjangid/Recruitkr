@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { normalizeOptionalHttpUrl, normalizeOptionalLinkedinUrl } from '../utils/url.js';
 
 const email = z.string().email().toLowerCase().trim();
 const mobile = z.string().trim().regex(/^\d{10}$/);
@@ -10,6 +11,16 @@ const password = z
   .regex(/[A-Z]/, 'Password must include an uppercase letter')
   .regex(/[0-9]/, 'Password must include a number')
   .regex(/[^a-zA-Z0-9]/, 'Password must include a special character');
+
+const optionalHttpUrl = z.preprocess(
+  normalizeOptionalHttpUrl,
+  z.string().url().optional().or(z.literal('')),
+);
+
+const optionalLinkedinUrl = z.preprocess(
+  normalizeOptionalLinkedinUrl,
+  z.string().url().optional().or(z.literal('')),
+);
 
 export const loginSchema = z
   .object({
@@ -29,8 +40,8 @@ export const candidateRegisterSchema = z
     gender: z.enum(['Male', 'Female', 'Other', 'Prefer Not to Say']),
     address: z.string().trim().min(5).max(500),
     pincode: z.string().regex(/^\d{6}$/),
-    linkedinUrl: z.url().optional().or(z.literal('')),
-    portfolioUrl: z.url().optional().or(z.literal('')),
+    linkedinUrl: optionalLinkedinUrl,
+    portfolioUrl: optionalHttpUrl,
     highestQualification: z.string().trim().min(2).max(100),
     experienceStatus: z.enum(['fresher', 'experienced']),
     experienceDetails: z
@@ -76,7 +87,7 @@ export const clientRegisterSchema = z
     password,
     companyName: z.string().trim().min(2).max(180),
     industry: z.string().trim().min(2).max(100),
-    companyWebsite: z.url().optional().or(z.literal('')),
+    companyWebsite: optionalHttpUrl,
     companySize: z.string().trim().min(1).max(80),
     companyType: z.string().trim().min(1).max(80),
     spoc: z

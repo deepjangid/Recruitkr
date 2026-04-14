@@ -4,6 +4,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { apiPost } from "@/lib/api";
 import { setSession } from "@/lib/auth";
+import { normalizeOptionalHttpUrl, normalizeOptionalLinkedinUrl } from "@/lib/url";
 
 type CandidateForm = {
   fullName: string;
@@ -113,6 +114,12 @@ const CandidateRegister = () => {
       case "email":
         if (!form.email.trim()) return "Email is required.";
         return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()) ? "" : "Enter a valid email address.";
+      case "linkedinUrl":
+        if (!form.linkedinUrl.trim()) return "";
+        return normalizeOptionalLinkedinUrl(form.linkedinUrl) ? "" : "Enter a valid LinkedIn URL.";
+      case "portfolioUrl":
+        if (!form.portfolioUrl.trim()) return "";
+        return normalizeOptionalHttpUrl(form.portfolioUrl) ? "" : "Enter a valid portfolio URL.";
       case "currentCompany":
       case "designation":
       case "totalExperience":
@@ -174,6 +181,17 @@ const CandidateRegister = () => {
 
   const onChange = (key: keyof CandidateForm) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setForm((prev) => ({ ...prev, [key]: e.target.value }));
+  };
+
+  const normalizeProfileLink = (key: "linkedinUrl" | "portfolioUrl") => () => {
+    const normalizer = key === "linkedinUrl" ? normalizeOptionalLinkedinUrl : normalizeOptionalHttpUrl;
+    const normalized = normalizer(form[key]);
+    if (normalized === null) return;
+
+    setForm((prev) => ({
+      ...prev,
+      [key]: normalized,
+    }));
   };
 
   const toggleWorkMode = (mode: string) => {
@@ -297,6 +315,13 @@ const CandidateRegister = () => {
 
     setSubmitting(true);
     try {
+      const linkedinUrl = normalizeOptionalLinkedinUrl(form.linkedinUrl);
+      const portfolioUrl = normalizeOptionalHttpUrl(form.portfolioUrl);
+
+      if (linkedinUrl === null || portfolioUrl === null) {
+        return;
+      }
+
       const payload: Record<string, unknown> = {
         email: form.email.trim().toLowerCase(),
         mobile: form.mobile.trim(),
@@ -306,8 +331,8 @@ const CandidateRegister = () => {
         gender: form.gender,
         address: form.address.trim(),
         pincode: form.pincode.trim(),
-        linkedinUrl: form.linkedinUrl.trim(),
-        portfolioUrl: form.portfolioUrl.trim(),
+        linkedinUrl,
+        portfolioUrl,
         highestQualification: form.highestQualification,
         experienceStatus: form.experienceStatus,
         preferences: {
@@ -441,8 +466,32 @@ const CandidateRegister = () => {
             <div className="rounded-2xl border border-border bg-card p-6 md:p-8">
               {sectionHeader(2, "Professional Profile Links", "🔗")}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div><label className={labelClass}>LinkedIn</label><input type="url" className={inputClass} value={form.linkedinUrl} onChange={onChange("linkedinUrl")} /></div>
-                <div><label className={labelClass}>Portfolio</label><input type="url" className={inputClass} value={form.portfolioUrl} onChange={onChange("portfolioUrl")} /></div>
+                <div>
+                  <label className={labelClass}>LinkedIn</label>
+                  <input
+                    type="text"
+                    inputMode="url"
+                    placeholder="linkedin.com/in/your-profile"
+                    className={getInputClasses("linkedinUrl")}
+                    value={form.linkedinUrl}
+                    onChange={onChange("linkedinUrl")}
+                    onBlur={normalizeProfileLink("linkedinUrl")}
+                  />
+                  {getFieldError("linkedinUrl") && <p className="mt-2 text-xs text-red-500">{getFieldError("linkedinUrl")}</p>}
+                </div>
+                <div>
+                  <label className={labelClass}>Portfolio</label>
+                  <input
+                    type="text"
+                    inputMode="url"
+                    placeholder="yourportfolio.com"
+                    className={getInputClasses("portfolioUrl")}
+                    value={form.portfolioUrl}
+                    onChange={onChange("portfolioUrl")}
+                    onBlur={normalizeProfileLink("portfolioUrl")}
+                  />
+                  {getFieldError("portfolioUrl") && <p className="mt-2 text-xs text-red-500">{getFieldError("portfolioUrl")}</p>}
+                </div>
               </div>
             </div>
 

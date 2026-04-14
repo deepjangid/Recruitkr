@@ -1,9 +1,12 @@
 import { Router } from 'express';
 
 import {
+  deleteClientProfileImage,
   getCandidateProfile,
+  getClientProfileImage,
   getClientProfile,
   getMe,
+  uploadClientProfileImage,
   updateCandidateProfile,
 } from '../controllers/user.controller.js';
 import { requireAuth, requireRole } from '../middlewares/auth.js';
@@ -63,6 +66,15 @@ router.delete(
   deleteMyCertificate,
 );
 router.get('/client/me', requireAuth, requireRole('client'), getClientProfile);
+router.post(
+  '/client/profile-image',
+  requireAuth,
+  requireRole('client'),
+  profilePhotoUpload.single('photo'),
+  uploadClientProfileImage,
+);
+router.get('/client/profile-image', requireAuth, requireRole('client'), getClientProfileImage);
+router.delete('/client/profile-image', requireAuth, requireRole('client'), deleteClientProfileImage);
 
 export default router;
 

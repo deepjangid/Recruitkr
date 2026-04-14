@@ -84,3 +84,54 @@ export const getClientProfile = asyncHandler(async (req, res) => {
   res.json({ success: true, data: profile });
 });
 
+export const uploadClientProfileImage = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Profile image file is required');
+  }
+
+  const profile = await ClientProfile.findOne({ userId: req.user.id }).select('+profileImage.data');
+  if (!profile) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Client profile not found');
+  }
+
+  profile.profileImage = {
+    fileName: req.file.originalname,
+    mimeType: req.file.mimetype,
+    size: req.file.size,
+    data: req.file.buffer,
+  };
+
+  await profile.save();
+
+  res.json({ success: true, message: 'Profile image uploaded' });
+});
+
+export const getClientProfileImage = asyncHandler(async (req, res) => {
+  const profile = await ClientProfile.findOne({ userId: req.user.id }).select('+profileImage.data');
+  if (!profile?.profileImage?.data || !profile.profileImage?.mimeType) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Profile image not found');
+  }
+
+  res.setHeader('Content-Type', profile.profileImage.mimeType);
+  res.setHeader('Content-Disposition', `inline; filename="${profile.profileImage.fileName || 'profile-image'}"`);
+  res.send(profile.profileImage.data);
+});
+
+export const deleteClientProfileImage = asyncHandler(async (req, res) => {
+  const profile = await ClientProfile.findOne({ userId: req.user.id }).select('+profileImage.data');
+  if (!profile) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Client profile not found');
+  }
+
+  profile.profileImage = {
+    fileName: '',
+    mimeType: '',
+    size: 0,
+    data: undefined,
+  };
+
+  await profile.save();
+
+  res.json({ success: true, message: 'Profile image removed' });
+});
+

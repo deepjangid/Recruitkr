@@ -25,6 +25,12 @@ const clientProfileSchema = new mongoose.Schema(
       billingAddress: { type: String, required: true, trim: true },
       billingEmail: { type: String, required: true, lowercase: true, trim: true },
     },
+    profileImage: {
+      fileName: { type: String, trim: true, default: '' },
+      mimeType: { type: String, trim: true, default: '' },
+      size: { type: Number, default: 0 },
+      data: { type: Buffer, select: false },
+    },
     declarationAccepted: { type: Boolean, required: true },
   },
   { timestamps: true },

@@ -29,14 +29,26 @@ const parseDurationToMs = (input) => {
   return value * factor;
 };
 
+const getRefreshCookieOptions = () => {
+  const isProduction = env.NODE_ENV === 'production';
+
+  return {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
+    path: '/api/v1/auth/refresh',
+  };
+};
+
 const setRefreshCookie = (res, refreshToken) => {
   res.cookie('refreshToken', refreshToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    path: '/api/v1/auth/refresh',
+    ...getRefreshCookieOptions(),
     maxAge: parseDurationToMs(env.JWT_REFRESH_EXPIRES),
   });
+};
+
+const clearRefreshCookie = (res) => {
+  res.clearCookie('refreshToken', getRefreshCookieOptions());
 };
 
 const issueTokensAndPersistRefresh = async (user) => {
@@ -290,7 +302,7 @@ export const logout = asyncHandler(async (req, res) => {
     }
   }
 
-  res.clearCookie('refreshToken', { path: '/api/v1/auth/refresh' });
+  clearRefreshCookie(res);
   res.json({ success: true, message: 'Logged out' });
 });
 
@@ -314,7 +326,7 @@ export const changePassword = asyncHandler(async (req, res) => {
   user.refreshTokenExpiresAt = undefined;
   await user.save();
 
-  res.clearCookie('refreshToken', { path: '/api/v1/auth/refresh' });
+  clearRefreshCookie(res);
   res.json({ success: true, message: 'Password updated. Please log in again.' });
 });
 
@@ -366,6 +378,6 @@ export const resetPassword = asyncHandler(async (req, res) => {
   user.refreshTokenExpiresAt = undefined;
   await user.save();
 
-  res.clearCookie('refreshToken', { path: '/api/v1/auth/refresh' });
+  clearRefreshCookie(res);
   res.json({ success: true, message: 'Password reset successful. Please log in again.' });
 });

@@ -1,8 +1,9 @@
-import { useEffect, useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { API_BASE, apiGet, apiPatch, apiPost } from "@/lib/api";
+import { API_BASE, apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
 import { clearSession, getSession } from "@/lib/auth";
 import { tryAutoLogin } from "@/lib/autoLogin";
+import Logo from "@/assets/logo.png";
 
 type ApplicationStatus =
   | "under-review"
@@ -86,6 +87,11 @@ type ClientProfileResponse = {
       designation?: string;
       mobile?: string;
       email?: string;
+    };
+    profileImage?: {
+      fileName?: string;
+      mimeType?: string;
+      size?: number;
     };
   };
 };
@@ -208,6 +214,9 @@ const ClientDashboard = () => {
   const [creatingRequirement, setCreatingRequirement] = useState(false);
   const [newRequirementForm, setNewRequirementForm] = useState<JobRequirementForm>(initialJobRequirementForm);
   const [newRequirementWorkModes, setNewRequirementWorkModes] = useState<Array<"On-site" | "Hybrid" | "Remote">>([]);
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+  const [profileImageLoading, setProfileImageLoading] = useState(false);
+  const profileImageInputRef = useRef<HTMLInputElement | null>(null);
   const companyInitial = (profile?.companyName || sessionState?.user.email || "C").trim().charAt(0).toUpperCase();
 
   const loadData = async () => {
@@ -229,6 +238,43 @@ const ClientDashboard = () => {
     }
   };
 
+  const loadProfileImage = async () => {
+    setProfileImageLoading(true);
+    try {
+      const session = getSession();
+      if (!session?.accessToken) {
+        setProfileImageUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return null;
+        });
+        return;
+      }
+
+      const res = await fetch(`${API_BASE}/users/client/profile-image`, {
+        method: "GET",
+        credentials: "include",
+        headers: { Authorization: `Bearer ${session.accessToken}` },
+      });
+
+      if (!res.ok) {
+        setProfileImageUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return null;
+        });
+        return;
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      setProfileImageUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return url;
+      });
+    } finally {
+      setProfileImageLoading(false);
+    }
+  };
+
   useEffect(() => {
     const boot = async () => {
       let session = getSession();
@@ -244,9 +290,17 @@ const ClientDashboard = () => {
       }
 
       await loadData();
+      void loadProfileImage();
     };
 
     void boot();
+  }, []);
+
+  useEffect(() => () => {
+    setProfileImageUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
   }, []);
 
   const updateRequirementStatus = async (jobId: string, status: "active" | "on-hold" | "closed") => {
@@ -505,6 +559,40 @@ const ClientDashboard = () => {
     setSessionState(null);
     navigate("/login");
   };
+
+  const uploadProfileImage = async (file: File) => {
+    setError("");
+    try {
+      const fd = new FormData();
+      fd.append("photo", file);
+      await apiPost("/users/client/profile-image", fd, true);
+      await loadData();
+      await loadProfileImage();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to upload profile image");
+    }
+  };
+
+  const removeProfileImage = async () => {
+    setError("");
+    try {
+      await apiDelete("/users/client/profile-image", true);
+      setProfileImageUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to remove profile image");
+    }
+  };
+
+  const dashboardTabs: Array<{ key: typeof tab; label: string }> = [
+    { key: "overview", label: "Overview" },
+    { key: "requirements", label: "Requirements" },
+    { key: "applications", label: "Applications" },
+    { key: "profile", label: "Profile" },
+  ];
 
   const renderApplicationsTab = () => (
     <div className="grid gap-6 lg:grid-cols-[380px,1fr]">
@@ -989,17 +1077,52 @@ const ClientDashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card/60">
-        <div className="container mx-auto flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <Link to="/" className="font-heading text-2xl font-bold">
-            Recruit<span style={{ color: "#264a7f" }}>kr</span>
-          </Link>
-          <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
-            <button className="rounded-lg border border-border px-3 py-2 text-xs sm:text-sm" onClick={() => setTab("overview")}>Overview</button>
-            <button className="rounded-lg border border-border px-3 py-2 text-xs sm:text-sm" onClick={() => setTab("requirements")}>Requirements</button>
-            <button className="rounded-lg border border-border px-3 py-2 text-xs sm:text-sm" onClick={() => setTab("applications")}>Applications</button>
-            <button className="rounded-lg border border-border px-3 py-2 text-xs sm:text-sm" onClick={() => setTab("profile")}>Profile</button>
-            <button className="rounded-lg border border-border px-3 py-2 text-xs sm:text-sm" onClick={logout}>Logout</button>
+      <header className="sticky top-0 z-30 border-b border-border bg-card/90 backdrop-blur">
+        <div className="container mx-auto flex flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center justify-between gap-4">
+            <div  className="flex items-center" aria-label="RecruitKr home">
+              <span className="flex h-12 max-w-[180px] shrink-0 items-center sm:h-14 sm:max-w-[220px]">
+                <img
+                  src={Logo}
+                  alt="RecruitKr"
+                  className="h-full w-auto origin-left scale-[1.55] object-contain sm:scale-[1.75]"
+                />
+              </span>
+            </div>
+            <button
+              className="rounded-lg border border-border px-3 py-2 text-xs font-medium sm:hidden"
+              onClick={logout}
+            >
+              Logout
+            </button>
+          </div>
+
+          <div className="-mx-4 overflow-x-auto px-4 lg:mx-0 lg:px-0">
+            <div className="flex min-w-max items-center gap-2 pb-1 lg:min-w-0 lg:flex-wrap lg:justify-end">
+              {dashboardTabs.map((item) => {
+                const isActive = tab === item.key;
+
+                return (
+                  <button
+                    key={item.key}
+                    className={`rounded-lg border px-3 py-2 text-xs font-medium transition sm:text-sm ${
+                      isActive
+                        ? "border-[#264a7f] bg-[#264a7f] text-white"
+                        : "border-border bg-background text-foreground"
+                    }`}
+                    onClick={() => setTab(item.key)}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+              <button
+                className="hidden rounded-lg border border-border px-3 py-2 text-xs font-medium sm:text-sm lg:inline-flex"
+                onClick={logout}
+              >
+                Logout
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -1217,19 +1340,60 @@ const ClientDashboard = () => {
                 </button>
               </div>
 
-              <div className="mt-6 flex items-center gap-4 rounded-2xl border border-border bg-background/70 p-4">
-                <div
-                  className="flex h-20 w-20 items-center justify-center rounded-2xl text-3xl font-bold text-white"
-                  style={{ background: "linear-gradient(135deg, #264a7f, #69a44f)" }}
-                >
-                  {companyInitial}
+              <div className="mt-6 flex flex-col gap-4 rounded-2xl border border-border bg-background/70 p-4 sm:flex-row sm:items-center">
+                <div className="flex items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => profileImageInputRef.current?.click()}
+                    className="group relative overflow-hidden rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#264a7f]"
+                    disabled={profileImageLoading}
+                  >
+                    {profileImageUrl ? (
+                      <img
+                        src={profileImageUrl}
+                        alt={profile?.companyName || "Company profile"}
+                        className="h-20 w-20 rounded-2xl border border-border object-cover"
+                      />
+                    ) : (
+                      <div
+                        className="flex h-20 w-20 items-center justify-center rounded-2xl text-3xl font-bold text-white"
+                        style={{ background: "linear-gradient(135deg, #264a7f, #69a44f)" }}
+                      >
+                        {companyInitial}
+                      </div>
+                    )}
+                    <span className="absolute inset-0 flex items-end justify-center bg-black/0 p-2 text-[11px] font-medium text-white opacity-0 transition group-hover:bg-black/35 group-hover:opacity-100">
+                      {profileImageLoading ? "Uploading..." : "Upload image"}
+                    </span>
+                  </button>
+                  <input
+                    ref={profileImageInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) void uploadProfileImage(file);
+                      e.currentTarget.value = "";
+                    }}
+                  />
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Company avatar</p>
                   <p className="mt-1 text-base font-semibold">{profile?.companyName || "Client company"}</p>
                   <p className="text-sm text-muted-foreground">
-                    Visual placeholder based on your company name.
+                    {profileImageUrl ? "Click the image to change it." : "Click the avatar to upload a company image."}
                   </p>
+                </div>
+                <div className="sm:ml-auto">
+                  <button
+                    type="button"
+                    onClick={removeProfileImage}
+                    className="rounded-lg border border-border bg-card px-4 py-2 text-sm disabled:opacity-60"
+                    disabled={!profileImageUrl}
+                  >
+                    Remove image
+                  </button>
                 </div>
               </div>
 
