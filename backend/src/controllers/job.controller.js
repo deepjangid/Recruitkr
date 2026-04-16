@@ -7,6 +7,7 @@ import { ClientProfile } from '../models/ClientProfile.js';
 import { JobRequirement } from '../models/JobRequirement.js';
 import { Resume } from '../models/Resume.js';
 import { User } from '../models/User.js';
+import { publishLiveUpdate } from '../services/liveUpdate.service.js';
 import { generateResumePdfBuffer } from '../services/resume.service.js';
 import { ApiError } from '../utils/ApiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -503,6 +504,29 @@ export const applyToJob = asyncHandler(async (req, res) => {
       },
     ],
   });
+
+  publishLiveUpdate({
+    userId: req.user.id,
+    role: 'candidate',
+    event: 'application-created',
+    payload: {
+      applicationId: String(application._id),
+      jobId: String(jobId),
+      status: application.status,
+    },
+  });
+
+  publishLiveUpdate({
+    userId: String(job.clientId),
+    role: 'client',
+    event: 'application-created',
+    payload: {
+      applicationId: String(application._id),
+      jobId: String(jobId),
+      status: application.status,
+    },
+  });
+
   res.status(StatusCodes.CREATED).json({ success: true, data: application });
 });
 
@@ -703,6 +727,16 @@ export const updateApplicationStatus = asyncHandler(async (req, res) => {
       },
     );
 
+    publishLiveUpdate({
+      userId: req.user.id,
+      role: 'client',
+      event: 'application-updated',
+      payload: {
+        applicationId,
+        status: req.body.status,
+      },
+    });
+
     res.json({
       success: true,
       data: {
@@ -744,6 +778,26 @@ export const updateApplicationStatus = asyncHandler(async (req, res) => {
   ];
 
   const application = await existingApplication.save();
+
+  publishLiveUpdate({
+    userId: req.user.id,
+    role: 'client',
+    event: 'application-updated',
+    payload: {
+      applicationId,
+      status: application.status,
+    },
+  });
+
+  publishLiveUpdate({
+    userId: String(existingApplication.candidateId),
+    role: 'candidate',
+    event: 'application-updated',
+    payload: {
+      applicationId,
+      status: application.status,
+    },
+  });
 
   res.json({ success: true, data: application });
 });

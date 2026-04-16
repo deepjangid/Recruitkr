@@ -24,7 +24,17 @@ app.use(
   }),
 );
 app.use(helmet());
-app.use(compression());
+app.use(
+  compression({
+    filter: (req, res) => {
+      if (req.headers.accept?.includes('text/event-stream') || req.path.includes('/events/stream')) {
+        return false;
+      }
+
+      return compression.filter(req, res);
+    },
+  }),
+);
 app.use(express.json({ limit: '8mb' }));
 app.use(express.urlencoded({ extended: false, limit: '8mb' }));
 app.use(cookieParser());

@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { API_BASE, apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
 import { clearSession, getSession } from "@/lib/auth";
+import { useServerEvents, type SseConnectionStatus } from "@/hooks/useServerEvents";
 import { tryAutoLogin } from "@/lib/autoLogin";
 import Logo from "@/assets/logo.png";
 
 const JOBS_PAGE_LIMIT = 20;
+const LIVE_REFRESH_MS = 5000;
 const BRAND_PRIMARY = "#264a7f";
 const BRAND_SECONDARY = "#69a44f";
 const dashboardShellClass =
@@ -62,6 +64,13 @@ const INTERVIEW_MODE_LABELS: Record<NonNullable<InterviewDetails["mode"]>, strin
   phone: "Phone call",
   video: "Video call",
   other: "Other",
+};
+
+const LIVE_STATUS_META: Record<SseConnectionStatus, { label: string; className: string }> = {
+  connecting: { label: "Live connecting", className: "border-amber-200 bg-amber-50 text-amber-700" },
+  connected: { label: "Live connected", className: "border-emerald-200 bg-emerald-50 text-emerald-700" },
+  reconnecting: { label: "Live reconnecting", className: "border-sky-200 bg-sky-50 text-sky-700" },
+  disconnected: { label: "Live disconnected", className: "border-slate-200 bg-slate-100 text-slate-600" },
 };
 
 const formatStatusLabel = (status: string) =>
@@ -181,6 +190,7 @@ type CandidateDashboardResponse = {
         employmentType?: string;
       };
     }>;
+    profile?: CandidateProfileResponse["data"];
   };
 };
 
@@ -358,44 +368,74 @@ const CandidateDashboard = () => {
     setJobs((prev) => (mode === "append" ? [...prev, ...jobsRes.data] : jobsRes.data));
   };
 
+  const syncResumeFormFromProfile = (profileData?: CandidateProfileResponse["data"] | null) => {
+    if (!profileData) return;
+
+    setResumeForm({
+      highestQualification: profileData?.highestQualification || "",
+      experienceStatus: profileData?.experienceStatus || "fresher",
+      experienceDetails: {
+        currentCompany: profileData?.experienceDetails?.currentCompany || "",
+        designation: profileData?.experienceDetails?.designation || "",
+        totalExperience: profileData?.experienceDetails?.totalExperience || "",
+        industry: profileData?.experienceDetails?.industry || "",
+      },
+      preferences: {
+        preferredRole: profileData?.preferences?.preferredRole || "",
+        preferredLocation: profileData?.preferences?.preferredLocation || "",
+        preferredIndustry: profileData?.preferences?.preferredIndustry || "",
+        workModes: profileData?.preferences?.workModes || [],
+      },
+      summary: profileData?.summary || "",
+      skillsText: (profileData?.skills || []).join(", "),
+      projects: (profileData?.projects || []).map((p) => ({
+        name: p?.name || "",
+        description: p?.description || "",
+      })),
+      certifications: (profileData?.certifications || []).map((c) => ({
+        name: c?.name || "",
+        institute: c?.institute || "",
+      })),
+      referral: profileData?.referral || "",
+    });
+  };
+
+  const refreshLiveData = useCallback(async () => {
+    try {
+      const [dashboardRes, appsRes, jobsRes, profileRes] = await Promise.all([
+        apiGet<CandidateDashboardResponse>("/dashboards/candidate", true),
+        apiGet<CandidateApplicationsResponse>("/jobs/applications/mine", true),
+        apiGet<JobsResponse>(`/jobs?page=1&limit=${JOBS_PAGE_LIMIT}`),
+        apiGet<CandidateProfileResponse>("/users/candidate/me", true).catch(() => null),
+      ]);
+
+      setDashboard(dashboardRes.data);
+      setApplications(appsRes.data);
+      setJobsMeta(jobsRes.meta);
+      setJobs(jobsRes.data);
+      const nextProfile = profileRes?.data || dashboardRes.data?.profile || null;
+      if (nextProfile) {
+        setProfile(nextProfile);
+        syncResumeFormFromProfile(nextProfile);
+      }
+    } catch {
+      // Keep the current UI stable if a background refresh fails.
+    }
+  }, []);
+
   const loadInitialData = async () => {
     setLoading(true);
     setError("");
     try {
       const [dashboardRes, profileRes] = await Promise.all([
         apiGet<CandidateDashboardResponse>("/dashboards/candidate", true),
-        apiGet<CandidateProfileResponse>("/users/candidate/me", true),
+        apiGet<CandidateProfileResponse>("/users/candidate/me", true).catch(() => null),
       ]);
 
       setDashboard(dashboardRes.data);
-      setProfile(profileRes.data);
-      setResumeForm({
-        highestQualification: profileRes.data?.highestQualification || "",
-        experienceStatus: profileRes.data?.experienceStatus || "fresher",
-        experienceDetails: {
-          currentCompany: profileRes.data?.experienceDetails?.currentCompany || "",
-          designation: profileRes.data?.experienceDetails?.designation || "",
-          totalExperience: profileRes.data?.experienceDetails?.totalExperience || "",
-          industry: profileRes.data?.experienceDetails?.industry || "",
-        },
-        preferences: {
-          preferredRole: profileRes.data?.preferences?.preferredRole || "",
-          preferredLocation: profileRes.data?.preferences?.preferredLocation || "",
-          preferredIndustry: profileRes.data?.preferences?.preferredIndustry || "",
-          workModes: profileRes.data?.preferences?.workModes || [],
-        },
-        summary: profileRes.data?.summary || "",
-        skillsText: (profileRes.data?.skills || []).join(", "),
-        projects: (profileRes.data?.projects || []).map((p) => ({
-          name: p?.name || "",
-          description: p?.description || "",
-        })),
-        certifications: (profileRes.data?.certifications || []).map((c) => ({
-          name: c?.name || "",
-          institute: c?.institute || "",
-        })),
-        referral: profileRes.data?.referral || "",
-      });
+      const nextProfile = profileRes?.data || dashboardRes.data?.profile || null;
+      setProfile(nextProfile);
+      syncResumeFormFromProfile(nextProfile);
 
       await Promise.all([refreshApplications(), fetchJobsPage(1, "replace")]);
       void loadProfilePhoto();
@@ -426,6 +466,45 @@ const CandidateDashboard = () => {
 
     void boot();
   }, []);
+
+  useEffect(() => {
+    const session = getSession();
+    if (!session?.accessToken || session.user.role !== "candidate") return;
+
+    const handleWindowFocus = () => {
+      void refreshLiveData();
+    };
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        void refreshLiveData();
+      }
+    };
+
+    const intervalId = window.setInterval(() => {
+      if (!document.hidden) {
+        void refreshLiveData();
+      }
+    }, LIVE_REFRESH_MS);
+
+    window.addEventListener("focus", handleWindowFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", handleWindowFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [refreshLiveData, sessionState?.accessToken]);
+
+  const { status: liveStatus } = useServerEvents({
+    enabled: Boolean(sessionState?.accessToken && sessionState.user.role === "candidate"),
+    onEvent: ({ type }) => {
+      if (type === "application-created" || type === "application-updated" || type === "message") {
+        void refreshLiveData();
+      }
+    },
+  });
 
   const applicationJobIds = useMemo(
     () => new Set((applications || []).map((a) => a.jobId?._id).filter(Boolean)),
@@ -751,8 +830,8 @@ const CandidateDashboard = () => {
   return (
     <div className={dashboardShellClass}>
       <header className={dashboardHeaderClass}>
-        <div className="container mx-auto flex flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center justify-between gap-3 sm:gap-4">
+        <div className="container mx-auto flex flex-col gap-4 px-4 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4">
             <div className="flex min-w-0 items-center gap-3 sm:gap-4">
               <span className="flex h-11 w-[136px] shrink-0 items-center sm:h-12 sm:w-[152px] md:h-14 md:w-[186px]">
                 <img
@@ -768,12 +847,18 @@ const CandidateDashboard = () => {
                 <p className="truncate text-sm text-slate-500">Track jobs, applications, and profile updates.</p>
               </div>
             </div>
-            <button
-              className="rounded-xl border border-[#264a7f]/15 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-sm sm:hidden"
-              onClick={logout}
-            >
-              Logout
-            </button>
+
+            <div className="flex items-center gap-2 sm:gap-3">
+              <span className={`hidden rounded-full border px-3 py-1 text-[11px] font-semibold sm:inline-flex ${LIVE_STATUS_META[liveStatus].className}`}>
+                {LIVE_STATUS_META[liveStatus].label}
+              </span>
+              <button
+                className="rounded-xl border border-[#264a7f]/15 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-sm sm:hidden"
+                onClick={logout}
+              >
+                Logout
+              </button>
+            </div>
           </div>
 
           <div className="-mx-4 overflow-x-auto px-4 lg:mx-0 lg:px-0">

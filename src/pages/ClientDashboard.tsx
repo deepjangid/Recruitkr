@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { API_BASE, apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
 import { clearSession, getSession } from "@/lib/auth";
+import { useServerEvents, type SseConnectionStatus } from "@/hooks/useServerEvents";
 import { tryAutoLogin } from "@/lib/autoLogin";
 import Logo from "@/assets/logo.png";
 
@@ -13,6 +14,8 @@ type ApplicationStatus =
   | "offer"
   | "hired"
   | "rejected";
+
+const LIVE_REFRESH_MS = 5000;
 
 const BRAND_PRIMARY = "#264a7f";
 const BRAND_SECONDARY = "#69a44f";
@@ -66,6 +69,13 @@ const INTERVIEW_MODE_OPTIONS: Array<{ value: NonNullable<InterviewDetails["mode"
   { value: "video", label: "Video call" },
   { value: "other", label: "Other" },
 ];
+
+const LIVE_STATUS_META: Record<SseConnectionStatus, { label: string; className: string }> = {
+  connecting: { label: "Live connecting", className: "border-amber-200 bg-amber-50 text-amber-700" },
+  connected: { label: "Live connected", className: "border-emerald-200 bg-emerald-50 text-emerald-700" },
+  reconnecting: { label: "Live reconnecting", className: "border-sky-200 bg-sky-50 text-sky-700" },
+  disconnected: { label: "Live disconnected", className: "border-slate-200 bg-slate-100 text-slate-600" },
+};
 
 type ClientDashboardResponse = {
   success: boolean;
@@ -339,6 +349,30 @@ const ClientDashboard = () => {
     }
   };
 
+  const refreshLiveData = useCallback(async () => {
+    try {
+      const [dashboardRes, applicationsRes, resumesRes] = await Promise.all([
+        apiGet<ClientDashboardResponse>("/dashboards/client", true),
+        apiGet<ClientApplicationsResponse>("/jobs/applications", true),
+        apiGet<ClientResumesResponse>("/resumes/client", true),
+      ]);
+
+      setDashboard(dashboardRes.data);
+      setApplications(applicationsRes.data);
+      setResumes(resumesRes.data);
+
+      if (selectedApplicationId) {
+        const detailsRes = await apiGet<ClientApplicationDetailsResponse>(
+          `/jobs/applications/${selectedApplicationId}`,
+          true,
+        );
+        setSelectedApplicationDetails(detailsRes.data);
+      }
+    } catch {
+      // Avoid breaking the current screen if a background refresh misses once.
+    }
+  }, [selectedApplicationId]);
+
   const loadProfileImage = async () => {
     setProfileImageLoading(true);
     try {
@@ -397,6 +431,45 @@ const ClientDashboard = () => {
     void boot();
   }, []);
 
+  useEffect(() => {
+    const session = getSession();
+    if (!session?.accessToken || session.user.role !== "client") return;
+
+    const handleWindowFocus = () => {
+      void refreshLiveData();
+    };
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        void refreshLiveData();
+      }
+    };
+
+    const intervalId = window.setInterval(() => {
+      if (!document.hidden) {
+        void refreshLiveData();
+      }
+    }, LIVE_REFRESH_MS);
+
+    window.addEventListener("focus", handleWindowFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", handleWindowFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [refreshLiveData, selectedApplicationId, sessionState?.accessToken]);
+
+  const { status: liveStatus } = useServerEvents({
+    enabled: Boolean(sessionState?.accessToken && sessionState.user.role === "client"),
+    onEvent: ({ type }) => {
+      if (type === "application-created" || type === "application-updated" || type === "message") {
+        void refreshLiveData();
+      }
+    },
+  });
+
   useEffect(() => () => {
     setProfileImageUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev);
@@ -429,24 +502,31 @@ const ClientDashboard = () => {
   const createRequirement = async () => {
     setError("");
 
-    if (
-      !newRequirementForm.jobTitle.trim() ||
-      !newRequirementForm.category.trim() ||
-      !newRequirementForm.department.trim() ||
-      !newRequirementForm.jobLocation.trim() ||
-      !newRequirementForm.employmentType ||
-      !newRequirementForm.experienceRequired.trim() ||
-      !newRequirementForm.qualification.trim() ||
-      !newRequirementForm.minCtcLpa.trim() ||
-      !newRequirementForm.maxCtcLpa.trim() ||
-      !newRequirementForm.fixedPrice.trim() ||
-      !newRequirementForm.ageRequirement.trim() ||
-      !newRequirementForm.jobDescription.trim() ||
-      !newRequirementForm.urgencyLevel ||
-      Number(newRequirementForm.openings) < 1 ||
-      newRequirementWorkModes.length === 0
-    ) {
-      setError("Please complete all required hiring fields before posting the job.");
+    const normalizedDepartment = newRequirementForm.department.trim() || newRequirementForm.category.trim();
+    const missingFields: string[] = [];
+
+    if (!newRequirementForm.jobTitle.trim()) missingFields.push("Job Title");
+    if (!newRequirementForm.category.trim()) missingFields.push("Category");
+    if (!normalizedDepartment) missingFields.push("Department");
+    if (!newRequirementForm.jobLocation.trim()) missingFields.push("Job Location");
+    if (!newRequirementForm.employmentType) missingFields.push("Job Type");
+    if (!newRequirementForm.experienceRequired.trim()) missingFields.push("Experience Level");
+    if (!newRequirementForm.minCtcLpa.trim()) missingFields.push("Min CTC");
+    if (!newRequirementForm.maxCtcLpa.trim()) missingFields.push("Max CTC");
+    if (!newRequirementForm.jobDescription.trim() || newRequirementForm.jobDescription.trim().length < 10) {
+      missingFields.push("Job Description");
+    }
+    if (!newRequirementForm.urgencyLevel) missingFields.push("Urgency Level");
+    if (Number(newRequirementForm.openings) < 1) missingFields.push("Openings");
+    if (newRequirementWorkModes.length === 0) missingFields.push("Work Mode");
+
+    if (missingFields.length > 0) {
+      setError(`Please complete these required fields: ${missingFields.join(", ")}.`);
+      return;
+    }
+
+    if (Number(newRequirementForm.maxCtcLpa) < Number(newRequirementForm.minCtcLpa)) {
+      setError("Max CTC should be greater than or equal to Min CTC.");
       return;
     }
 
@@ -463,15 +543,15 @@ const ClientDashboard = () => {
         category: newRequirementForm.category.trim(),
         company: newRequirementForm.company.trim() || undefined,
         openings: Number(newRequirementForm.openings),
-        department: newRequirementForm.department.trim(),
+        department: normalizedDepartment,
         jobLocation: newRequirementForm.jobLocation.trim(),
         employmentType: newRequirementForm.employmentType,
         experienceRequired: newRequirementForm.experienceRequired.trim(),
-        qualification: newRequirementForm.qualification.trim(),
+        qualification: newRequirementForm.qualification.trim() || undefined,
         minCtcLpa: Number(newRequirementForm.minCtcLpa),
         maxCtcLpa: Number(newRequirementForm.maxCtcLpa),
-        fixedPrice: Number(newRequirementForm.fixedPrice),
-        ageRequirement: newRequirementForm.ageRequirement.trim(),
+        fixedPrice: newRequirementForm.fixedPrice.trim() ? Number(newRequirementForm.fixedPrice) : undefined,
+        ageRequirement: newRequirementForm.ageRequirement.trim() || undefined,
         contactEmail: newRequirementForm.contactEmail.trim() || undefined,
         salaryCurrency: newRequirementForm.salaryCurrency.trim() || "INR",
         preferredIndustryBackground: newRequirementForm.preferredIndustryBackground.trim() || undefined,
@@ -1320,8 +1400,8 @@ const ClientDashboard = () => {
   return (
     <div className={dashboardShellClass}>
       <header className={dashboardHeaderClass}>
-        <div className="container mx-auto flex flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center justify-between gap-3 sm:gap-4">
+        <div className="container mx-auto flex flex-col gap-4 px-4 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4">
             <div className="flex min-w-0 items-center gap-3 sm:gap-4" aria-label="RecruitKr home">
               <span className="flex h-11 w-[136px] shrink-0 items-center sm:h-12 sm:w-[152px] md:h-14 md:w-[186px]">
                 <img
@@ -1337,12 +1417,18 @@ const ClientDashboard = () => {
                 <p className="truncate text-sm text-slate-500">Manage hiring requirements, candidate pipelines, and company details.</p>
               </div>
             </div>
-            <button
-              className="rounded-xl border border-[#264a7f]/15 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-sm sm:hidden"
-              onClick={logout}
-            >
-              Logout
-            </button>
+
+            <div className="flex items-center gap-2 sm:gap-3">
+              <span className={`hidden rounded-full border px-3 py-1 text-[11px] font-semibold sm:inline-flex ${LIVE_STATUS_META[liveStatus].className}`}>
+                {LIVE_STATUS_META[liveStatus].label}
+              </span>
+              <button
+                className="rounded-xl border border-[#264a7f]/15 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-sm sm:hidden"
+                onClick={logout}
+              >
+                Logout
+              </button>
+            </div>
           </div>
 
           <div className="-mx-4 overflow-x-auto px-4 lg:mx-0 lg:px-0">

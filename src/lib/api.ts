@@ -119,4 +119,14 @@ export const apiPatch = <T>(path: string, body?: unknown, auth = false) =>
 export const apiDelete = <T>(path: string, auth = false) =>
   apiRequest<T>(path, { method: "DELETE", auth });
 
+export const createSseUrl = (path: string) => {
+  const session = getSession();
+  if (!session?.accessToken) {
+    throw new Error("Not authenticated");
+  }
+
+  const separator = path.includes("?") ? "&" : "?";
+  return `${API_BASE}${path}${separator}token=${encodeURIComponent(session.accessToken)}`;
+};
+
 export { API_BASE };
