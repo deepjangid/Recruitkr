@@ -263,7 +263,7 @@ const ClientRegister = () => {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-            <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6" style={{ background: "linear-gradient(135deg, #264a7f, #69a44f)" }}>
+            <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6" style={{ background: "var(--brand-gradient)" }}>
             <span className="text-3xl sm:text-4xl">✓</span>
           </div>
           <h2 className="font-heading text-3xl font-bold mb-3">Registration Submitted!</h2>

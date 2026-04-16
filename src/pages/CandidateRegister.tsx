@@ -159,7 +159,7 @@ const CandidateRegister = () => {
     <div className="flex items-center gap-3 mb-6 pb-3 border-b border-border">
       <div
         className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold"
-        style={{ background: "linear-gradient(135deg, #264a7f, #69a44f)" }}
+        style={{ background: "var(--brand-gradient)" }}
       >
         {n}
       </div>
@@ -407,7 +407,7 @@ const CandidateRegister = () => {
         <div className="text-center">
           <div
             className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
-            style={{ background: "linear-gradient(135deg, #264a7f, #69a44f)" }}
+            style={{ background: "var(--brand-gradient)" }}
           >
             <span className="text-3xl sm:text-4xl">✓</span>
           </div>

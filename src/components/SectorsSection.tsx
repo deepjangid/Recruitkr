@@ -22,7 +22,7 @@ const SectorsSection = () => {
           {doubled.map((sector, i) => (
             <span
               key={`${sector}-${i}`}
-              className="inline-flex shrink-0 items-center rounded-full border border-border bg-secondary px-6 py-3 text-sm font-semibold text-foreground transition-colors hover:border-primary hover:text-primary"
+              className="inline-flex shrink-0 items-center  px-6 py-3 text-sm font-semibold text-foreground transition-colors hover:border-primary hover:text-primary"
             >
               {sector}
             </span>

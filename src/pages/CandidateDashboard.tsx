@@ -876,7 +876,7 @@ const CandidateDashboard = () => {
                     }`}
                     style={
                       isActive
-                        ? { background: `linear-gradient(135deg, ${BRAND_PRIMARY}, ${BRAND_SECONDARY})` }
+                        ? { background: "var(--brand-gradient)" }
                         : undefined
                     }
                     onClick={() => setTab(item.key)}
@@ -1010,7 +1010,7 @@ const CandidateDashboard = () => {
                         onClick={() => applyToJob(job._id)}
                         disabled={job.canApply === false || applicationJobIds.has(job._id) || applyLoadingJobId === job._id}
                         className="w-full rounded-xl px-4 py-3 text-sm font-semibold text-white shadow-[0_14px_32px_rgba(38,74,127,0.22)] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:min-w-[140px]"
-                        style={{ background: `linear-gradient(135deg, ${BRAND_PRIMARY}, ${BRAND_SECONDARY})` }}
+                        style={{ background: "var(--brand-gradient)" }}
                       >
                         {job.canApply === false
                           ? "Not available"

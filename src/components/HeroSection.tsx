@@ -11,8 +11,15 @@ const HeroSection = () => {
     <section className="min-h-screen flex items-center justify-center pt-20">
       <div className="container mx-auto px-4 py-20 text-center">
         <div className="animate-fade-up mx-auto max-w-4xl">
-       <h1 className="font-heading mb-6 text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl md:text-7xl">
-            Your Hiring Partner. <span className="text-gradient-teal"><br></br>End to End.</span>
+          <h1 className="font-heading mb-6 text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl md:text-7xl">
+            <span
+              className="bg-clip-text text-transparent"
+              style={{
+                backgroundImage: "var(--brand-gradient)",
+              }}
+            >
+              Your Hiring Partner.
+            </span>
           </h1>
 
           <p className="animate-fade-up-delay-1 mx-auto mb-10 max-w-2xl text-base text-muted-foreground sm:text-lg md:text-xl">

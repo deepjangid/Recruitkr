@@ -1446,7 +1446,7 @@ const ClientDashboard = () => {
                     }`}
                     style={
                       isActive
-                        ? { background: `linear-gradient(135deg, ${BRAND_PRIMARY}, ${BRAND_SECONDARY})` }
+                        ? { background: "var(--brand-gradient)" }
                         : undefined
                     }
                     onClick={() => setTab(item.key)}
@@ -1797,7 +1797,7 @@ const ClientDashboard = () => {
                     ) : (
                       <div
                         className="flex h-20 w-20 items-center justify-center rounded-2xl text-3xl font-bold text-white"
-                        style={{ background: "linear-gradient(135deg, #264a7f, #69a44f)" }}
+                        style={{ background: "var(--brand-gradient)" }}
                       >
                         {companyInitial}
                       </div>
