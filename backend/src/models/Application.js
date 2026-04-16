@@ -42,6 +42,29 @@ const applicationSchema = new mongoose.Schema(
     candidateId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     clientId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     jobId: { type: mongoose.Schema.Types.ObjectId, ref: 'JobRequirement', required: true, index: true },
+    fullName: { type: String, trim: true },
+    email: { type: String, trim: true, lowercase: true },
+    phone: { type: String, trim: true },
+    qualification: { type: String, trim: true },
+    college: { type: String, trim: true, default: '' },
+    currentCity: { type: String, trim: true },
+    experience: {
+      type: [
+        new mongoose.Schema(
+          {
+            jobProfile: { type: String, trim: true },
+          },
+          { _id: false },
+        ),
+      ],
+      default: [],
+    },
+    resumePath: { type: String, trim: true },
+    resumeData: { type: Buffer, select: false },
+    hasCustomResume: { type: Boolean, default: false },
+    submittedAt: { type: Date },
+    notes: { type: String, trim: true, default: '' },
+    appliedFor: { type: String, trim: true },
     status: {
       type: String,
       enum: ['applied', 'under-review', 'screening', 'interview', 'offer', 'hired', 'rejected'],

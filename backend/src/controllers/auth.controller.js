@@ -71,6 +71,48 @@ const buildResetPasswordUrl = (token) => {
   return `${base}/reset-password?token=${encodeURIComponent(token)}`;
 };
 
+const syncCandidateLegacyFields = ({ profile, user, resumeFileName = '' }) => {
+  const summary = profile.summary || '';
+  const preferredLocation = profile.preferences?.preferredLocation || '';
+  const preferredIndustry = profile.preferences?.preferredIndustry || '';
+  const preferredRole = profile.preferences?.preferredRole || '';
+  const workModes = profile.preferences?.workModes || [];
+
+  profile.about = summary;
+  profile.city = preferredLocation;
+  profile.currentCity = preferredLocation;
+  profile.email = user?.email || profile.email || '';
+  profile.isActive = true;
+  profile.mobile = user?.mobile || profile.mobile || '';
+  profile.name = profile.fullName || '';
+  profile.phone = user?.mobile || profile.phone || '';
+  profile.preferredIndustry = preferredIndustry;
+  profile.preferredLocation = preferredLocation;
+  profile.preferredRole = preferredRole;
+  profile.resumePath = resumeFileName ? `resumes/${resumeFileName}` : profile.resumePath || '';
+  profile.workModes = workModes;
+};
+
+const syncClientLegacyFields = ({ profile, user }) => {
+  const companyName = profile.companyName || '';
+  const spocName = profile.spoc?.name || '';
+  const spocMobile = profile.spoc?.mobile || user?.mobile || '';
+  const spocEmail = profile.spoc?.email || user?.email || '';
+  const city = profile.billing?.billingAddress?.split(/\r?\n/)[0] || '';
+
+  profile.city = city;
+  profile.company = companyName;
+  profile.contactName = spocName;
+  profile.description = profile.description || '';
+  profile.email = user?.email || profile.email || '';
+  profile.location = city;
+  profile.mobile = spocMobile;
+  profile.name = spocName;
+  profile.phone = spocMobile;
+  profile.requirements = profile.requirements || '';
+  profile.website = profile.companyWebsite || '';
+};
+
 export const registerCandidate = asyncHandler(async (req, res) => {
   const payload = req.body;
 
@@ -101,11 +143,24 @@ export const registerCandidate = asyncHandler(async (req, res) => {
     experienceStatus: payload.experienceStatus,
     experienceDetails: payload.experienceDetails,
     preferences: payload.preferences,
+    about: payload.summary || '',
+    city: payload.preferences?.preferredLocation || '',
+    currentCity: payload.preferences?.preferredLocation || '',
+    email: payload.email,
+    isActive: true,
+    mobile: payload.mobile,
+    name: payload.fullName,
+    phone: payload.mobile,
+    preferredIndustry: payload.preferences?.preferredIndustry || '',
+    preferredLocation: payload.preferences?.preferredLocation || '',
+    preferredRole: payload.preferences?.preferredRole || '',
+    workModes: payload.preferences?.workModes || [],
     declarationAccepted: payload.declarationAccepted,
     representationAuthorized: payload.representationAuthorized,
   });
 
   let generatedResumePayload = null;
+  let storedResumeFileName = '';
   if (payload.resume?.dataBase64) {
     const resumeBuffer = Buffer.from(payload.resume.dataBase64, 'base64');
     const resumeText = await extractResumeText({
@@ -121,6 +176,7 @@ export const registerCandidate = asyncHandler(async (req, res) => {
       textExtract: resumeText,
       data: resumeBuffer,
     });
+    storedResumeFileName = payload.resume.fileName;
   } else {
     const generatedBuffer = await generateResumePdfBuffer({
       fullName: payload.fullName,
@@ -147,6 +203,7 @@ export const registerCandidate = asyncHandler(async (req, res) => {
       textExtract: '',
       data: generatedBuffer,
     });
+    storedResumeFileName = generatedFileName;
 
     generatedResumePayload = {
       fileName: generatedFileName,
@@ -154,6 +211,9 @@ export const registerCandidate = asyncHandler(async (req, res) => {
       dataBase64: generatedBuffer.toString('base64'),
     };
   }
+
+  syncCandidateLegacyFields({ profile: candidateProfile, user, resumeFileName: storedResumeFileName });
+  await candidateProfile.save();
 
   const tokens = await issueTokensAndPersistRefresh(user);
   setRefreshCookie(res, tokens.refreshToken);
@@ -187,7 +247,7 @@ export const registerClient = asyncHandler(async (req, res) => {
     passwordHash,
   });
 
-  await ClientProfile.create({
+  const clientProfile = await ClientProfile.create({
     userId: user.id,
     companyName: payload.companyName,
     industry: payload.industry,
@@ -199,6 +259,9 @@ export const registerClient = asyncHandler(async (req, res) => {
     billing: payload.billing,
     declarationAccepted: payload.declarationAccepted,
   });
+
+  syncClientLegacyFields({ profile: clientProfile, user });
+  await clientProfile.save();
 
   const tokens = await issueTokensAndPersistRefresh(user);
   setRefreshCookie(res, tokens.refreshToken);
@@ -332,6 +395,8 @@ export const changePassword = asyncHandler(async (req, res) => {
 
 export const forgotPassword = asyncHandler(async (req, res) => {
   const { email } = req.body;
+  let resetUrl;
+  let emailDelivery = 'sent';
 
   const user = await User.findOne({ email })
     .select('+resetPasswordTokenHash +resetPasswordExpiresAt')
@@ -343,14 +408,25 @@ export const forgotPassword = asyncHandler(async (req, res) => {
     user.resetPasswordExpiresAt = new Date(Date.now() + env.PASSWORD_RESET_EXPIRES_MIN * 60 * 1000);
     await user.save();
 
-    const resetUrl = buildResetPasswordUrl(rawToken);
-    await sendPasswordResetEmail({ to: email, resetUrl });
+    resetUrl = buildResetPasswordUrl(rawToken);
+
+    try {
+      await sendPasswordResetEmail({ to: email, resetUrl });
+    } catch (error) {
+      emailDelivery = 'manual';
+      if (env.NODE_ENV !== 'production') {
+        console.warn('Password reset email could not be sent. Use this reset URL manually:', resetUrl);
+      } else {
+        console.error('Password reset email failed:', error?.message || error);
+      }
+    }
   }
 
   // Always return success to prevent account enumeration.
   res.json({
     success: true,
     message: 'If an account exists for this email, a password reset link has been sent.',
+    ...(emailDelivery === 'manual' && resetUrl ? { resetUrl, delivery: emailDelivery } : {}),
   });
 });
 

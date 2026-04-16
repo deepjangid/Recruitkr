@@ -49,11 +49,11 @@ const Footer = () => {
           <div className="flex flex-col items-center rounded-3xl border border-white/10 bg-white/5 p-5 text-center sm:col-span-2 sm:items-start sm:p-6 sm:text-left md:col-span-4">
             <div className="flex w-full flex-col items-center gap-5 sm:flex-row sm:items-center sm:justify-between">
               <a href="/" className="inline-flex items-center">
-                <span className="flex h-20 max-w-[250px] shrink-0 items-center sm:h-24">
+                <span className="flex h-14 w-[150px] shrink-0 items-center sm:h-16 sm:w-[180px]">
                   <img
                     src={Logo}
                     alt="RecruitKr"
-                    className="h-full w-auto origin-left scale-[1.2] object-contain sm:scale-[1.25]"
+                    className="h-full w-full object-contain object-left"
                   />
                 </span>
               </a>

@@ -9,6 +9,7 @@ const ForgotPassword = () => {
   const [loading, setLoading] = useState(false);
   const [emailError, setEmailError] = useState("");
   const [done, setDone] = useState(false);
+  const [resetUrl, setResetUrl] = useState("");
 
   const inputClass =
     "w-full rounded-lg border border-border bg-secondary/50 px-4 py-3 text-sm text-foreground placeholder-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors";
@@ -18,6 +19,7 @@ const ForgotPassword = () => {
     setEmailError("");
     setLoading(true);
     setDone(false);
+    setResetUrl("");
 
     if (!email.trim()) {
       setEmailError("Email is required.");
@@ -26,9 +28,10 @@ const ForgotPassword = () => {
     }
 
     try {
-      await apiPost<{ success: boolean; message?: string }>("/auth/forgot-password", {
+      const response = await apiPost<{ success: boolean; message?: string; resetUrl?: string }>("/auth/forgot-password", {
         email: email.trim().toLowerCase(),
       });
+      setResetUrl(response.resetUrl || "");
       setDone(true);
     } catch (err) {
       setEmailError(err instanceof Error ? err.message : "Request failed");
@@ -55,6 +58,23 @@ const ForgotPassword = () => {
                 <p className="text-sm text-foreground">
                   If an account exists for this email, we&apos;ve sent a password reset link.
                 </p>
+                {resetUrl && (
+                  <div className="rounded-xl border border-border bg-secondary/40 p-4 text-left">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Manual Reset Link
+                    </p>
+                    <a
+                      href={resetUrl}
+                      className="mt-2 block break-all text-sm font-medium hover:underline"
+                      style={{ color: "#264a7f" }}
+                    >
+                      {resetUrl}
+                    </a>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Email delivery is not configured right now, so you can open this link directly.
+                    </p>
+                  </div>
+                )}
                 <Link to="/login" className="text-sm font-medium hover:underline" style={{ color: "#264a7f" }}>
                   Back to Login
                 </Link>

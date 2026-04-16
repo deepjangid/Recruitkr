@@ -2,9 +2,68 @@ import { StatusCodes } from 'http-status-codes';
 
 import { CandidateProfile } from '../models/CandidateProfile.js';
 import { ClientProfile } from '../models/ClientProfile.js';
+import { Resume } from '../models/Resume.js';
 import { User } from '../models/User.js';
+import { generateResumePdfBuffer } from '../services/resume.service.js';
 import { ApiError } from '../utils/ApiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+
+const syncCandidateLegacyFields = ({ profile, user, resumeFileName = '' }) => {
+  const summary = profile.summary || '';
+  const preferredLocation = profile.preferences?.preferredLocation || '';
+  const preferredIndustry = profile.preferences?.preferredIndustry || '';
+  const preferredRole = profile.preferences?.preferredRole || '';
+  const workModes = profile.preferences?.workModes || [];
+
+  profile.about = summary;
+  profile.city = preferredLocation;
+  profile.currentCity = preferredLocation;
+  profile.email = user?.email || profile.email || '';
+  profile.isActive = true;
+  profile.mobile = user?.mobile || profile.mobile || '';
+  profile.name = profile.fullName || '';
+  profile.phone = user?.mobile || profile.phone || '';
+  profile.preferredIndustry = preferredIndustry;
+  profile.preferredLocation = preferredLocation;
+  profile.preferredRole = preferredRole;
+  if (resumeFileName) {
+    profile.resumePath = `resumes/${resumeFileName}`;
+  }
+  profile.workModes = workModes;
+};
+
+const upsertCandidateResume = async ({ profile, user }) => {
+  const fileName = `${String(profile.fullName || 'Resume')
+    .replace(/[^\w\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '_') || 'Resume'}_Resume.pdf`;
+
+  const pdfBuffer = await generateResumePdfBuffer({
+    ...profile.toObject(),
+    email: user.email,
+    mobile: user.mobile,
+  });
+
+  await Resume.findOneAndUpdate(
+    { candidateUserId: user._id },
+    {
+      candidateUserId: user._id,
+      fileName,
+      mimeType: 'application/pdf',
+      source: 'generated',
+      textExtract: '',
+      data: pdfBuffer,
+    },
+    {
+      upsert: true,
+      new: true,
+      setDefaultsOnInsert: true,
+      runValidators: true,
+    },
+  );
+
+  return fileName;
+};
 
 export const getMe = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user.id).select('_id email role mobile createdAt');
@@ -25,7 +84,10 @@ export const getCandidateProfile = asyncHandler(async (req, res) => {
 export const updateCandidateProfile = asyncHandler(async (req, res) => {
   const body = req.body;
 
-  const profile = await CandidateProfile.findOne({ userId: req.user.id });
+  const [profile, user] = await Promise.all([
+    CandidateProfile.findOne({ userId: req.user.id }),
+    User.findById(req.user.id).select('email mobile'),
+  ]);
   if (!profile) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Candidate profile not found');
   }
@@ -70,6 +132,9 @@ export const updateCandidateProfile = asyncHandler(async (req, res) => {
   if (body.projects !== undefined) profile.projects = body.projects;
   if (body.certifications !== undefined) profile.certifications = body.certifications;
   assignIfDefined('referral', body.referral);
+
+  const resumeFileName = await upsertCandidateResume({ profile, user });
+  syncCandidateLegacyFields({ profile, user, resumeFileName });
 
   await profile.save();
 

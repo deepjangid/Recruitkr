@@ -3,7 +3,9 @@ import { Router } from 'express';
 import {
   applyToJob,
   createJob,
+  deleteMyJob,
   downloadClientApplicationResume,
+  updateMyJob,
   getClientApplicationDetails,
   listCandidateApplications,
   listClientApplications,
@@ -17,7 +19,7 @@ import {
   applyJobSchema,
   updateApplicationStatusSchema,
 } from '../schemas/application.schema.js';
-import { createJobSchema, listJobsQuerySchema, updateJobStatusSchema } from '../schemas/job.schema.js';
+import { createJobSchema, listJobsQuerySchema, updateJobSchema, updateJobStatusSchema } from '../schemas/job.schema.js';
 import { validate } from '../middlewares/validate.js';
 
 const router = Router();
@@ -26,6 +28,8 @@ router.get('/', validate(listJobsQuerySchema, 'query'), listPublicJobs);
 
 router.post('/', requireAuth, requireRole('client'), validate(createJobSchema), createJob);
 router.get('/mine', requireAuth, requireRole('client'), listMyJobs);
+router.patch('/:jobId', requireAuth, requireRole('client'), validate(updateJobSchema), updateMyJob);
+router.delete('/:jobId', requireAuth, requireRole('client'), deleteMyJob);
 router.patch(
   '/:jobId/status',
   requireAuth,

@@ -6,6 +6,16 @@ import { tryAutoLogin } from "@/lib/autoLogin";
 import Logo from "@/assets/logo.png";
 
 const JOBS_PAGE_LIMIT = 20;
+const BRAND_PRIMARY = "#264a7f";
+const BRAND_SECONDARY = "#69a44f";
+const dashboardShellClass =
+  "min-h-screen bg-[radial-gradient(circle_at_top,_rgba(38,74,127,0.12),_transparent_38%),linear-gradient(180deg,#f8fbff_0%,#ffffff_28%,#f8fbff_100%)]";
+const dashboardHeaderClass =
+  "sticky top-0 z-30 border-b border-[#264a7f]/10 bg-white/88 backdrop-blur-xl shadow-[0_12px_40px_rgba(38,74,127,0.08)]";
+const brandCardClass =
+  "rounded-[28px] border border-[#264a7f]/10 bg-white/92 shadow-[0_20px_60px_rgba(38,74,127,0.08)] backdrop-blur";
+const statCardClass =
+  "rounded-2xl border border-[#264a7f]/10 bg-white/95 p-5 shadow-[0_16px_40px_rgba(38,74,127,0.08)]";
 
 type ApplicationStatus =
   | "applied"
@@ -246,6 +256,28 @@ type JobsResponse = {
     employmentType: string;
     minCtcLpa?: number;
     maxCtcLpa?: number;
+    companyName?: string;
+    openings?: number;
+    canApply?: boolean;
+    applyDisabledReason?: string;
+    isLegacy?: boolean;
+    description?: string;
+    department?: string;
+    experienceRequired?: string;
+    qualification?: string;
+    preferredIndustryBackground?: string;
+    workModes?: Array<"On-site" | "Hybrid" | "Remote"> | string[];
+    urgencyLevel?: string;
+    requirements?: string[];
+    responsibilities?: string[];
+    skills?: string[];
+    genderRequirement?: string;
+    salary?: {
+      min?: number;
+      max?: number;
+      currency?: string;
+    };
+    applicationDeadline?: string;
   }>;
   meta: {
     page: number;
@@ -267,6 +299,7 @@ const CandidateDashboard = () => {
   const [jobsMeta, setJobsMeta] = useState<JobsResponse["meta"] | null>(null);
   const [jobsLoadingMore, setJobsLoadingMore] = useState(false);
   const [applyLoadingJobId, setApplyLoadingJobId] = useState<string | null>(null);
+  const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
   const [expandedApplicationId, setExpandedApplicationId] = useState<string | null>(null);
   const [resumeSaving, setResumeSaving] = useState(false);
   const [resumeDownloading, setResumeDownloading] = useState(false);
@@ -707,76 +740,275 @@ const CandidateDashboard = () => {
     return <div className="min-h-screen bg-background p-8">Loading candidate dashboard...</div>;
   }
 
+  const candidateTabs: Array<{ key: typeof tab; label: string }> = [
+    { key: "overview", label: "Overview" },
+    { key: "jobs", label: "Browse Jobs" },
+    { key: "applications", label: "My Applications" },
+    { key: "profile", label: "Profile" },
+    { key: "resume", label: "My Resume" },
+  ];
+
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card/60">
-        <div className="container mx-auto flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div  className="flex items-center">
-              <span className="flex h-12 max-w-[180px] shrink-0 items-center sm:h-14">
+    <div className={dashboardShellClass}>
+      <header className={dashboardHeaderClass}>
+        <div className="container mx-auto flex flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center justify-between gap-3 sm:gap-4">
+            <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+              <span className="flex h-11 w-[136px] shrink-0 items-center sm:h-12 sm:w-[152px] md:h-14 md:w-[186px]">
                 <img
                   src={Logo}
                   alt="RecruitKr"
-                  className="h-full w-auto origin-left scale-[1.7] object-contain"
+                  className="h-full w-full object-contain object-left"
                 />
               </span>
+              <div className="hidden min-w-0 md:block">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#264a7f]">
+                  Candidate Dashboard
+                </p>
+                <p className="truncate text-sm text-slate-500">Track jobs, applications, and profile updates.</p>
+              </div>
             </div>
-          
+            <button
+              className="rounded-xl border border-[#264a7f]/15 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-sm sm:hidden"
+              onClick={logout}
+            >
+              Logout
+            </button>
           </div>
 
-          <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
-            <button className="rounded-lg border border-border px-3 py-2 text-xs sm:text-sm" onClick={() => setTab("overview")}>Overview</button>
-            <button className="rounded-lg border border-border px-3 py-2 text-xs sm:text-sm" onClick={() => setTab("jobs")}>Browse Jobs</button>
-            <button className="rounded-lg border border-border px-3 py-2 text-xs sm:text-sm" onClick={() => setTab("applications")}>My Applications</button>
-            <button className="rounded-lg border border-border px-3 py-2 text-xs sm:text-sm" onClick={() => setTab("profile")}>Profile</button>
-            <button className="rounded-lg border border-border px-3 py-2 text-xs sm:text-sm" onClick={() => setTab("resume")}>My Resume</button>
-            <button className="rounded-lg border border-border px-3 py-2 text-xs sm:text-sm" onClick={logout}>Logout</button>
+          <div className="-mx-4 overflow-x-auto px-4 lg:mx-0 lg:px-0">
+            <div className="flex min-w-max items-center gap-2 pb-1 lg:min-w-0 lg:flex-wrap lg:justify-end">
+              {candidateTabs.map((item) => {
+                const isActive = tab === item.key;
+
+                return (
+                  <button
+                    key={item.key}
+                    className={`rounded-xl border px-4 py-2.5 text-xs font-semibold transition sm:text-sm ${
+                      isActive
+                        ? "border-transparent text-white shadow-[0_14px_30px_rgba(38,74,127,0.24)]"
+                        : "border-[#264a7f]/12 bg-white text-slate-700 hover:border-[#264a7f]/30 hover:text-[#264a7f]"
+                    }`}
+                    style={
+                      isActive
+                        ? { background: `linear-gradient(135deg, ${BRAND_PRIMARY}, ${BRAND_SECONDARY})` }
+                        : undefined
+                    }
+                    onClick={() => setTab(item.key)}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+              <button
+                className="hidden rounded-xl border border-[#264a7f]/12 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 sm:text-sm lg:inline-flex"
+                onClick={logout}
+              >
+                Logout
+              </button>
+            </div>
           </div>
         </div>
       </header>
 
       <main className="container mx-auto px-4 py-8 space-y-6">
-        {error && <p className="text-sm text-red-500">{error}</p>}
+        {error && <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>}
 
         {tab === "overview" && (
           <>
-            <div className="rounded-xl border border-border bg-card p-6">
-              <h1 className="font-heading text-2xl font-bold mb-2">Welcome, {profile?.fullName || sessionState?.user.email}</h1>
-              <p className="text-sm text-muted-foreground">Preferred Role: {profile?.preferences?.preferredRole || "Not set"}</p>
+            <div
+              className={`${brandCardClass} overflow-hidden p-6 md:p-8`}
+              style={{
+                background: "linear-gradient(135deg, rgba(38,74,127,0.96) 0%, rgba(55,110,168,0.95) 58%, rgba(105,164,79,0.9) 100%)",
+              }}
+            >
+              <div className="grid gap-6 lg:grid-cols-[1.25fr,0.75fr] lg:items-end">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/75">RecruitKr Candidate Space</p>
+                  <h1 className="mt-3 font-heading text-3xl font-bold text-white md:text-4xl">
+                    Welcome, {profile?.fullName || sessionState?.user.email}
+                  </h1>
+                  <p className="mt-3 max-w-2xl text-sm text-white/80 md:text-base">
+                    Keep your applications moving, stay ready for interviews, and make your profile recruiter-ready.
+                  </p>
+                </div>
+                <div className="rounded-3xl border border-white/20 bg-white/10 p-5 backdrop-blur-md">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/70">Quick Snapshot</p>
+                  <div className="mt-4 space-y-3 text-sm text-white/90">
+                    <p>Preferred Role: {profile?.preferences?.preferredRole || "Not set yet"}</p>
+                    <p>Preferred Location: {profile?.preferences?.preferredLocation || "Not set yet"}</p>
+                    <p>Work Mode: {profile?.preferences?.workModes?.join(", ") || "Not selected"}</p>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="rounded-xl border border-border bg-card p-4"><p className="text-2xl font-bold">{dashboard?.stats.applicationsSent || 0}</p><p className="text-xs text-muted-foreground">Applications Sent</p></div>
-              <div className="rounded-xl border border-border bg-card p-4"><p className="text-2xl font-bold">{dashboard?.stats.interviewCalls || 0}</p><p className="text-xs text-muted-foreground">Interview Calls</p></div>
-              <div className="rounded-xl border border-border bg-card p-4"><p className="text-2xl font-bold">{dashboard?.stats.offersReceived || 0}</p><p className="text-xs text-muted-foreground">Offers Received</p></div>
-              <div className="rounded-xl border border-border bg-card p-4"><p className="text-2xl font-bold">{dashboard?.stats.profileCompletion || 0}%</p><p className="text-xs text-muted-foreground">Profile Completion</p></div>
+              <div className={statCardClass}><p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#264a7f]">Applications</p><p className="mt-3 text-3xl font-bold text-slate-900">{dashboard?.stats.applicationsSent || 0}</p><p className="mt-1 text-sm text-slate-500">Roles you have already applied for</p></div>
+              <div className={statCardClass}><p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#264a7f]">Interview Calls</p><p className="mt-3 text-3xl font-bold text-slate-900">{dashboard?.stats.interviewCalls || 0}</p><p className="mt-1 text-sm text-slate-500">Opportunities moving to discussion stage</p></div>
+              <div className={statCardClass}><p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#69a44f]">Offers</p><p className="mt-3 text-3xl font-bold text-slate-900">{dashboard?.stats.offersReceived || 0}</p><p className="mt-1 text-sm text-slate-500">Positive outcomes received so far</p></div>
+              <div className={statCardClass}><p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#69a44f]">Profile Strength</p><p className="mt-3 text-3xl font-bold text-slate-900">{dashboard?.stats.profileCompletion || 0}%</p><p className="mt-1 text-sm text-slate-500">Complete more fields to improve visibility</p></div>
             </div>
           </>
         )}
 
         {tab === "jobs" && (
-          <div className="space-y-4">
-            {jobs.map((job) => (
-              <div key={job._id} className="rounded-xl border border-border bg-card p-5">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <h3 className="font-semibold">{job.jobTitle}</h3>
-                    <p className="text-sm text-muted-foreground">{job.jobLocation} - {job.employmentType}</p>
-                    <p className="text-sm text-muted-foreground mt-1">CTC: {job.minCtcLpa || 0} - {job.maxCtcLpa || 0} LPA</p>
+          <div className="space-y-6">
+            <div className={`${brandCardClass} overflow-hidden p-6`}>
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#264a7f]">Browse Jobs</p>
+                  <h2 className="mt-2 font-heading text-2xl font-bold text-slate-900">Explore roles matched to your next move</h2>
+                  <p className="mt-2 max-w-2xl text-sm text-slate-500">
+                    Review active openings, compare compensation and location quickly, and apply directly from your dashboard.
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-3 sm:w-auto">
+                  <div className="rounded-2xl bg-[#264a7f]/6 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#264a7f]">Visible Jobs</p>
+                    <p className="mt-1 text-2xl font-bold text-slate-900">{jobsMeta?.total || jobs.length}</p>
                   </div>
-                  <button
-                    onClick={() => applyToJob(job._id)}
-                    disabled={applicationJobIds.has(job._id) || applyLoadingJobId === job._id}
-                    className="btn-gradient w-full rounded-lg px-4 py-2 text-sm disabled:opacity-60 sm:w-auto"
-                  >
-                    {applicationJobIds.has(job._id) ? "Applied" : applyLoadingJobId === job._id ? "Applying..." : "Apply"}
-                  </button>
+                  <div className="rounded-2xl bg-[#69a44f]/8 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#5a8d43]">Applied</p>
+                    <p className="mt-1 text-2xl font-bold text-slate-900">{applicationJobIds.size}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-2">
+            {jobs.map((job) => (
+              <div key={job._id} className={`${brandCardClass} p-5`}>
+                <div className="flex h-full flex-col gap-5">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-[#264a7f]/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-[#264a7f]">Active opening</span>
+                      <span className="rounded-full bg-[#69a44f]/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-[#5a8d43]">{job.employmentType}</span>
+                      {job.isLegacy && (
+                        <span className="rounded-full bg-amber-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-800">
+                          Legacy opening
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="mt-3 text-lg font-semibold text-slate-900">{job.jobTitle}</h3>
+                    <p className="mt-1 text-sm text-slate-500">{job.jobLocation}</p>
+                    {job.companyName && <p className="mt-1 text-sm font-medium text-slate-700">{job.companyName}</p>}
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-2xl border border-[#264a7f]/10 bg-[#264a7f]/[0.03] px-4 py-3">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#264a7f]">Compensation</p>
+                        <p className="mt-1 text-sm font-medium text-slate-800">{job.minCtcLpa || 0} - {job.maxCtcLpa || 0} LPA</p>
+                      </div>
+                      <div className="rounded-2xl border border-[#69a44f]/12 bg-[#69a44f]/[0.05] px-4 py-3">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#5a8d43]">{job.openings ? "Openings" : "Work Setup"}</p>
+                        <p className="mt-1 text-sm font-medium text-slate-800">{job.openings || job.employmentType}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm text-slate-500">
+                      {job.canApply === false
+                        ? job.applyDisabledReason || "This job is visible for reference only."
+                        : applicationJobIds.has(job._id)
+                        ? "You have already applied to this role."
+                        : "Ready to apply with your current profile and resume."}
+                    </p>
+                    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                      <button
+                        type="button"
+                        onClick={() => setExpandedJobId((current) => (current === job._id ? null : job._id))}
+                        className="w-full rounded-xl border border-[#264a7f]/12 bg-white px-4 py-3 text-sm font-semibold text-[#264a7f] shadow-sm sm:w-auto sm:min-w-[140px]"
+                      >
+                        {expandedJobId === job._id ? "Hide details" : "Read more"}
+                      </button>
+                      <button
+                        onClick={() => applyToJob(job._id)}
+                        disabled={job.canApply === false || applicationJobIds.has(job._id) || applyLoadingJobId === job._id}
+                        className="w-full rounded-xl px-4 py-3 text-sm font-semibold text-white shadow-[0_14px_32px_rgba(38,74,127,0.22)] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:min-w-[140px]"
+                        style={{ background: `linear-gradient(135deg, ${BRAND_PRIMARY}, ${BRAND_SECONDARY})` }}
+                      >
+                        {job.canApply === false
+                          ? "Not available"
+                          : applicationJobIds.has(job._id)
+                            ? "Applied"
+                            : applyLoadingJobId === job._id
+                              ? "Applying..."
+                              : "Apply now"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {expandedJobId === job._id && (
+                    <div className="rounded-3xl border border-[#264a7f]/10 bg-[#f8fbff] p-5">
+                      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                        <div className="rounded-2xl bg-white p-4 shadow-sm">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#264a7f]">Department</p>
+                          <p className="mt-2 text-sm font-medium text-slate-800">{job.department || "Not specified"}</p>
+                        </div>
+                        <div className="rounded-2xl bg-white p-4 shadow-sm">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#264a7f]">Experience</p>
+                          <p className="mt-2 text-sm font-medium text-slate-800">{job.experienceRequired || "Not specified"}</p>
+                        </div>
+                        <div className="rounded-2xl bg-white p-4 shadow-sm">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#264a7f]">Qualification</p>
+                          <p className="mt-2 text-sm font-medium text-slate-800">{job.qualification || "Not specified"}</p>
+                        </div>
+                        <div className="rounded-2xl bg-white p-4 shadow-sm">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#264a7f]">Deadline</p>
+                          <p className="mt-2 text-sm font-medium text-slate-800">
+                            {job.applicationDeadline ? new Date(job.applicationDeadline).toLocaleDateString() : "Open until filled"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 grid gap-4 lg:grid-cols-[1.15fr,0.85fr]">
+                        <div className="rounded-2xl bg-white p-5 shadow-sm">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#264a7f]">Role Overview</p>
+                          <p className="mt-3 text-sm leading-6 text-slate-600">
+                            {job.description || "No detailed description shared for this opening."}
+                          </p>
+                        </div>
+
+                        <div className="space-y-4">
+                          <div className="rounded-2xl bg-white p-5 shadow-sm">
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#264a7f]">Requirement Snapshot</p>
+                            <div className="mt-3 space-y-2 text-sm text-slate-600">
+                              <p>Gender: {job.genderRequirement || "No preference"}</p>
+                              <p>Urgency: {job.urgencyLevel || "Not specified"}</p>
+                              <p>Work Modes: {job.workModes?.length ? job.workModes.join(", ") : "Not specified"}</p>
+                              <p>
+                                Salary: {job.salary?.min ?? job.minCtcLpa ?? 0} - {job.salary?.max ?? job.maxCtcLpa ?? 0} {job.salary?.currency || "INR"}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="rounded-2xl bg-white p-5 shadow-sm">
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#264a7f]">Must-have Details</p>
+                            <div className="mt-3 space-y-3 text-sm text-slate-600">
+                              <div>
+                                <p className="font-medium text-slate-800">Requirements</p>
+                                <p>{job.requirements?.length ? job.requirements.join(", ") : "Not provided"}</p>
+                              </div>
+                              <div>
+                                <p className="font-medium text-slate-800">Skills</p>
+                                <p>{job.skills?.length ? job.skills.join(", ") : "Not provided"}</p>
+                              </div>
+                              <div>
+                                <p className="font-medium text-slate-800">Responsibilities</p>
+                                <p>{job.responsibilities?.length ? job.responsibilities.join(", ") : "Not provided"}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
+            </div>
 
             {jobsMeta && jobsMeta.total > 0 && (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-center text-xs text-muted-foreground">
                 Showing {jobs.length} of {jobsMeta.total} active jobs
               </p>
             )}
@@ -785,19 +1017,25 @@ const CandidateDashboard = () => {
               <button
                 onClick={loadMoreJobs}
                 disabled={jobsLoadingMore}
-                className="rounded-lg border border-border bg-card px-4 py-2 text-sm disabled:opacity-60"
+                className="mx-auto block rounded-xl border border-[#264a7f]/12 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm disabled:opacity-60"
               >
                 {jobsLoadingMore ? "Loading..." : "Load more"}
               </button>
             )}
-            {jobs.length === 0 && <p className="text-sm text-muted-foreground">No  active jobs available.</p>}
+            {jobs.length === 0 && (
+              <div className={`${brandCardClass} p-8 text-center`}>
+                <p className="text-lg font-semibold text-slate-900">No active jobs available right now.</p>
+                <p className="mt-2 text-sm text-slate-500">New openings will appear here as soon as employers publish them.</p>
+              </div>
+            )}
           </div>
         )}
 
         {tab === "applications" && (
-          <div className="rounded-xl border border-border bg-card overflow-hidden">
-            <div className="px-4 py-4 border-b border-border sm:px-6">
-              <h2 className="font-heading font-semibold">My Applications</h2>
+          <div className={`${brandCardClass} overflow-hidden`}>
+            <div className="border-b border-[#264a7f]/10 px-4 py-5 sm:px-6">
+              <h2 className="font-heading font-semibold text-slate-900">My Applications</h2>
+              <p className="mt-1 text-sm text-slate-500">Track progress, interview schedules, and recruiter notes in one place.</p>
             </div>
             <div className="divide-y divide-border">
               {(applications || []).map((application) => (

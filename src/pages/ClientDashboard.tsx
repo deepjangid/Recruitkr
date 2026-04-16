@@ -6,12 +6,24 @@ import { tryAutoLogin } from "@/lib/autoLogin";
 import Logo from "@/assets/logo.png";
 
 type ApplicationStatus =
+  | "applied"
   | "under-review"
   | "screening"
   | "interview"
   | "offer"
   | "hired"
   | "rejected";
+
+const BRAND_PRIMARY = "#264a7f";
+const BRAND_SECONDARY = "#69a44f";
+const dashboardShellClass =
+  "min-h-screen bg-[radial-gradient(circle_at_top,_rgba(38,74,127,0.12),_transparent_38%),linear-gradient(180deg,#f8fbff_0%,#ffffff_28%,#f8fbff_100%)]";
+const dashboardHeaderClass =
+  "sticky top-0 z-30 border-b border-[#264a7f]/10 bg-white/88 backdrop-blur-xl shadow-[0_12px_40px_rgba(38,74,127,0.08)]";
+const brandCardClass =
+  "rounded-[28px] border border-[#264a7f]/10 bg-white/92 shadow-[0_20px_60px_rgba(38,74,127,0.08)] backdrop-blur";
+const statCardClass =
+  "rounded-2xl border border-[#264a7f]/10 bg-white/95 p-5 shadow-[0_16px_40px_rgba(38,74,127,0.08)]";
 
 type InterviewDetails = {
   scheduledAt?: string;
@@ -43,6 +55,10 @@ const STATUS_LABELS: Record<ApplicationTimelineItem["status"], string> = {
   rejected: "Rejected",
 };
 
+const formatStatusLabel = (status?: string) =>
+  (status && STATUS_LABELS[status as ApplicationTimelineItem["status"]]) ||
+  (status ? status.replace(/-/g, " ") : "Status pending");
+
 const INTERVIEW_MODE_OPTIONS: Array<{ value: NonNullable<InterviewDetails["mode"]>; label: string }> = [
   { value: "onsite", label: "On-site" },
   { value: "google-meet", label: "Google Meet" },
@@ -70,6 +86,41 @@ type ClientDashboardResponse = {
       createdAt: string;
     }>;
   };
+};
+
+type ClientMyJobsResponse = {
+  success: boolean;
+  data: Array<{
+    _id: string;
+    jobTitle: string;
+    category?: string;
+    company?: string;
+    openings: number;
+    department: string;
+    jobLocation: string;
+    employmentType: string;
+    experienceRequired: string;
+    qualification?: string;
+    minCtcLpa: number;
+    maxCtcLpa: number;
+    fixedPrice?: number;
+    ageRequirement?: string;
+    contactEmail?: string;
+    salary?: {
+      currency?: string;
+    };
+    preferredIndustryBackground?: string;
+    genderPreference?: string;
+    workModes?: Array<"On-site" | "Hybrid" | "Remote">;
+    jobDescription: string;
+    requirements?: string[];
+    responsibilities?: string[];
+    skills?: string[];
+    urgencyLevel: string;
+    expectedJoiningDate?: string;
+    status: "active" | "on-hold" | "closed";
+    createdAt: string;
+  }>;
 };
 
 type ClientProfileResponse = {
@@ -165,32 +216,52 @@ type ClientApplicationDetailsResponse = {
 
 type JobRequirementForm = {
   jobTitle: string;
+  category: string;
+  company: string;
   openings: string;
   department: string;
   jobLocation: string;
   employmentType: string;
   experienceRequired: string;
+  qualification: string;
   minCtcLpa: string;
   maxCtcLpa: string;
+  fixedPrice: string;
+  ageRequirement: string;
+  contactEmail: string;
+  salaryCurrency: string;
   preferredIndustryBackground: string;
   genderPreference: string;
   jobDescription: string;
+  requirementsText: string;
+  responsibilitiesText: string;
+  skillsText: string;
   urgencyLevel: string;
   expectedJoiningDate: string;
 };
 
 const initialJobRequirementForm: JobRequirementForm = {
   jobTitle: "",
+  category: "",
+  company: "",
   openings: "1",
   department: "",
   jobLocation: "",
   employmentType: "",
   experienceRequired: "",
+  qualification: "",
   minCtcLpa: "",
   maxCtcLpa: "",
+  fixedPrice: "",
+  ageRequirement: "",
+  contactEmail: "",
+  salaryCurrency: "INR",
   preferredIndustryBackground: "",
   genderPreference: "",
   jobDescription: "",
+  requirementsText: "",
+  responsibilitiesText: "",
+  skillsText: "",
   urgencyLevel: "",
   expectedJoiningDate: "",
 };
@@ -203,6 +274,7 @@ const ClientDashboard = () => {
   const [dashboard, setDashboard] = useState<ClientDashboardResponse["data"] | null>(null);
   const [profile, setProfile] = useState<ClientProfileResponse["data"] | null>(null);
   const [applications, setApplications] = useState<ClientApplicationsResponse["data"]>([]);
+  const [requirements, setRequirements] = useState<ClientMyJobsResponse["data"]>([]);
   const [selectedApplicationId, setSelectedApplicationId] = useState<string | null>(null);
   const [selectedApplicationDetails, setSelectedApplicationDetails] =
     useState<ClientApplicationDetailsResponse["data"] | null>(null);
@@ -212,6 +284,8 @@ const ClientDashboard = () => {
   const [tab, setTab] = useState<"overview" | "requirements" | "applications" | "profile">("overview");
   const [showCreateRequirementForm, setShowCreateRequirementForm] = useState(false);
   const [creatingRequirement, setCreatingRequirement] = useState(false);
+  const [editingRequirementId, setEditingRequirementId] = useState<string | null>(null);
+  const [deletingRequirementId, setDeletingRequirementId] = useState<string | null>(null);
   const [newRequirementForm, setNewRequirementForm] = useState<JobRequirementForm>(initialJobRequirementForm);
   const [newRequirementWorkModes, setNewRequirementWorkModes] = useState<Array<"On-site" | "Hybrid" | "Remote">>([]);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
@@ -223,14 +297,21 @@ const ClientDashboard = () => {
     setLoading(true);
     setError("");
     try {
-      const [dashboardRes, profileRes, applicationsRes] = await Promise.all([
+      const [dashboardRes, profileRes, applicationsRes, jobsRes] = await Promise.all([
         apiGet<ClientDashboardResponse>("/dashboards/client", true),
         apiGet<ClientProfileResponse>("/users/client/me", true),
         apiGet<ClientApplicationsResponse>("/jobs/applications", true),
+        apiGet<ClientMyJobsResponse>("/jobs/mine", true),
       ]);
       setDashboard(dashboardRes.data);
       setProfile(profileRes.data);
       setApplications(applicationsRes.data);
+      setRequirements(jobsRes.data);
+      setNewRequirementForm((prev) => ({
+        ...prev,
+        company: profileRes.data?.companyName || prev.company,
+        contactEmail: profileRes.data?.spoc?.email || profileRes.data?.email || prev.contactEmail,
+      }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load dashboard");
     } finally {
@@ -330,12 +411,16 @@ const ClientDashboard = () => {
 
     if (
       !newRequirementForm.jobTitle.trim() ||
+      !newRequirementForm.category.trim() ||
       !newRequirementForm.department.trim() ||
       !newRequirementForm.jobLocation.trim() ||
       !newRequirementForm.employmentType ||
       !newRequirementForm.experienceRequired.trim() ||
+      !newRequirementForm.qualification.trim() ||
       !newRequirementForm.minCtcLpa.trim() ||
       !newRequirementForm.maxCtcLpa.trim() ||
+      !newRequirementForm.fixedPrice.trim() ||
+      !newRequirementForm.ageRequirement.trim() ||
       !newRequirementForm.jobDescription.trim() ||
       !newRequirementForm.urgencyLevel ||
       Number(newRequirementForm.openings) < 1 ||
@@ -347,39 +432,120 @@ const ClientDashboard = () => {
 
     setCreatingRequirement(true);
     try {
-      await apiPost(
-        "/jobs",
-        {
-          jobTitle: newRequirementForm.jobTitle.trim(),
-          openings: Number(newRequirementForm.openings),
-          department: newRequirementForm.department.trim(),
-          jobLocation: newRequirementForm.jobLocation.trim(),
-          employmentType: newRequirementForm.employmentType,
-          experienceRequired: newRequirementForm.experienceRequired.trim(),
-          minCtcLpa: Number(newRequirementForm.minCtcLpa),
-          maxCtcLpa: Number(newRequirementForm.maxCtcLpa),
-          preferredIndustryBackground: newRequirementForm.preferredIndustryBackground.trim() || undefined,
-          genderPreference:
-            newRequirementForm.genderPreference &&
-            newRequirementForm.genderPreference !== "No Preference"
-              ? newRequirementForm.genderPreference
-              : undefined,
-          workModes: newRequirementWorkModes,
-          jobDescription: newRequirementForm.jobDescription.trim(),
-          urgencyLevel: newRequirementForm.urgencyLevel,
-          expectedJoiningDate: newRequirementForm.expectedJoiningDate || undefined,
-        },
-        true,
-      );
+      const parseLines = (value: string) =>
+        value
+          .split(/\r?\n/)
+          .map((item) => item.trim())
+          .filter(Boolean);
+
+      const payload = {
+        jobTitle: newRequirementForm.jobTitle.trim(),
+        category: newRequirementForm.category.trim(),
+        company: newRequirementForm.company.trim() || undefined,
+        openings: Number(newRequirementForm.openings),
+        department: newRequirementForm.department.trim(),
+        jobLocation: newRequirementForm.jobLocation.trim(),
+        employmentType: newRequirementForm.employmentType,
+        experienceRequired: newRequirementForm.experienceRequired.trim(),
+        qualification: newRequirementForm.qualification.trim(),
+        minCtcLpa: Number(newRequirementForm.minCtcLpa),
+        maxCtcLpa: Number(newRequirementForm.maxCtcLpa),
+        fixedPrice: Number(newRequirementForm.fixedPrice),
+        ageRequirement: newRequirementForm.ageRequirement.trim(),
+        contactEmail: newRequirementForm.contactEmail.trim() || undefined,
+        salaryCurrency: newRequirementForm.salaryCurrency.trim() || "INR",
+        preferredIndustryBackground: newRequirementForm.preferredIndustryBackground.trim() || undefined,
+        genderPreference:
+          newRequirementForm.genderPreference &&
+          newRequirementForm.genderPreference !== "No Preference"
+            ? newRequirementForm.genderPreference
+            : undefined,
+        workModes: newRequirementWorkModes,
+        jobDescription: newRequirementForm.jobDescription.trim(),
+        requirements: parseLines(newRequirementForm.requirementsText),
+        responsibilities: parseLines(newRequirementForm.responsibilitiesText),
+        skills: parseLines(newRequirementForm.skillsText),
+        urgencyLevel: newRequirementForm.urgencyLevel,
+        expectedJoiningDate: newRequirementForm.expectedJoiningDate || undefined,
+      };
+
+      if (editingRequirementId) {
+        await apiPatch(`/jobs/${editingRequirementId}`, payload, true);
+      } else {
+        await apiPost(
+          "/jobs",
+          payload,
+          true,
+        );
+      }
 
       setNewRequirementForm(initialJobRequirementForm);
       setNewRequirementWorkModes([]);
       setShowCreateRequirementForm(false);
+      setEditingRequirementId(null);
       await loadData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to post hiring requirement");
+      setError(err instanceof Error ? err.message : editingRequirementId ? "Failed to update hiring requirement" : "Failed to post hiring requirement");
     } finally {
       setCreatingRequirement(false);
+    }
+  };
+
+  const editRequirement = (requirement: ClientMyJobsResponse["data"][number]) => {
+    setEditingRequirementId(requirement._id);
+    setNewRequirementForm({
+      jobTitle: requirement.jobTitle || "",
+      category: requirement.category || requirement.department || "",
+      company: requirement.company || profile?.companyName || "",
+      openings: String(requirement.openings || 1),
+      department: requirement.department || "",
+      jobLocation: requirement.jobLocation || "",
+      employmentType: requirement.employmentType || "",
+      experienceRequired: requirement.experienceRequired || "",
+      qualification: requirement.qualification || "",
+      minCtcLpa: String(requirement.minCtcLpa ?? ""),
+      maxCtcLpa: String(requirement.maxCtcLpa ?? ""),
+      fixedPrice: String(requirement.fixedPrice ?? ""),
+      ageRequirement: requirement.ageRequirement || "",
+      contactEmail: requirement.contactEmail || profile?.spoc?.email || profile?.email || "",
+      salaryCurrency: requirement.salary?.currency || "INR",
+      preferredIndustryBackground: requirement.preferredIndustryBackground || "",
+      genderPreference: requirement.genderPreference || "",
+      jobDescription: requirement.jobDescription || "",
+      requirementsText: requirement.requirements?.join("\n") || "",
+      responsibilitiesText: requirement.responsibilities?.join("\n") || "",
+      skillsText: requirement.skills?.join("\n") || "",
+      urgencyLevel: requirement.urgencyLevel || "",
+      expectedJoiningDate: requirement.expectedJoiningDate ? requirement.expectedJoiningDate.slice(0, 10) : "",
+    });
+    setNewRequirementWorkModes(requirement.workModes || []);
+    setShowCreateRequirementForm(true);
+  };
+
+  const resetRequirementForm = () => {
+    setEditingRequirementId(null);
+    setNewRequirementForm({
+      ...initialJobRequirementForm,
+      company: profile?.companyName || "",
+      contactEmail: profile?.spoc?.email || profile?.email || "",
+    });
+    setNewRequirementWorkModes([]);
+    setShowCreateRequirementForm(false);
+  };
+
+  const deleteRequirement = async (jobId: string) => {
+    setDeletingRequirementId(jobId);
+    setError("");
+    try {
+      await apiDelete(`/jobs/${jobId}`, true);
+      if (editingRequirementId === jobId) {
+        resetRequirementForm();
+      }
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete requirement");
+    } finally {
+      setDeletingRequirementId(null);
     }
   };
 
@@ -596,9 +762,10 @@ const ClientDashboard = () => {
 
   const renderApplicationsTab = () => (
     <div className="grid gap-6 lg:grid-cols-[380px,1fr]">
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <div className="px-4 py-4 border-b border-border sm:px-6">
-          <h2 className="font-heading font-semibold">Candidate Applications</h2>
+      <div className={`${brandCardClass} overflow-hidden`}>
+        <div className="border-b border-[#264a7f]/10 px-4 py-5 sm:px-6">
+          <h2 className="font-heading font-semibold text-slate-900">Candidate Applications</h2>
+          <p className="mt-1 text-sm text-slate-500">Review every applicant with status, resume, and form details side by side.</p>
         </div>
         <div className="divide-y divide-border">
           {applications.map((application) => (
@@ -606,7 +773,7 @@ const ClientDashboard = () => {
               key={application._id}
               type="button"
               className={`w-full px-4 py-4 text-left transition sm:px-6 ${
-                selectedApplicationId === application._id ? "bg-background/70" : "hover:bg-background/40"
+                selectedApplicationId === application._id ? "bg-[#264a7f]/5" : "hover:bg-[#264a7f]/[0.03]"
               }`}
               onClick={() => void openApplicationDetails(application._id)}
             >
@@ -620,8 +787,8 @@ const ClientDashboard = () => {
                     Applied on {new Date(application.createdAt).toLocaleDateString()}
                   </p>
                 </div>
-                <div className="rounded-full border border-border bg-card px-3 py-1 text-[11px] font-medium">
-                  {STATUS_LABELS[application.status]}
+                <div className="rounded-full border border-[#264a7f]/12 bg-white px-3 py-1 text-[11px] font-semibold text-slate-700">
+                  {formatStatusLabel(application.status)}
                 </div>
               </div>
             </button>
@@ -632,7 +799,7 @@ const ClientDashboard = () => {
         </div>
       </div>
 
-      <div className="rounded-xl border border-border bg-card p-6">
+      <div className={`${brandCardClass} p-6`}>
         {!selectedApplicationId && !detailsLoading && (
           <p className="text-sm text-muted-foreground">
             Click any application to see the candidate form, mobile number, and resume.
@@ -655,7 +822,7 @@ const ClientDashboard = () => {
                 </p>
               </div>
               <div className="rounded-full border border-border bg-background px-3 py-1 text-xs font-medium">
-                {STATUS_LABELS[selectedApplicationDetails.application.status]}
+                {formatStatusLabel(selectedApplicationDetails.application.status)}
               </div>
             </div>
 
@@ -1048,7 +1215,7 @@ const ClientDashboard = () => {
                       className="rounded-lg border border-border p-3"
                     >
                       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                        <p className="text-sm font-medium">{STATUS_LABELS[item.status]}</p>
+                        <p className="text-sm font-medium">{formatStatusLabel(item.status)}</p>
                         <p className="text-xs text-muted-foreground">
                           {item.changedAt ? new Date(item.changedAt).toLocaleString() : "Recently updated"}
                         </p>
@@ -1076,21 +1243,27 @@ const ClientDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-30 border-b border-border bg-card/90 backdrop-blur">
+    <div className={dashboardShellClass}>
+      <header className={dashboardHeaderClass}>
         <div className="container mx-auto flex flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center justify-between gap-4">
-            <div  className="flex items-center" aria-label="RecruitKr home">
-              <span className="flex h-12 max-w-[180px] shrink-0 items-center sm:h-14 sm:max-w-[220px]">
+          <div className="flex items-center justify-between gap-3 sm:gap-4">
+            <div className="flex min-w-0 items-center gap-3 sm:gap-4" aria-label="RecruitKr home">
+              <span className="flex h-11 w-[136px] shrink-0 items-center sm:h-12 sm:w-[152px] md:h-14 md:w-[186px]">
                 <img
                   src={Logo}
                   alt="RecruitKr"
-                  className="h-full w-auto origin-left scale-[1.55] object-contain sm:scale-[1.75]"
+                  className="h-full w-full object-contain object-left"
                 />
               </span>
+              <div className="hidden min-w-0 md:block">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#264a7f]">
+                  Employer Dashboard
+                </p>
+                <p className="truncate text-sm text-slate-500">Manage hiring requirements, candidate pipelines, and company details.</p>
+              </div>
             </div>
             <button
-              className="rounded-lg border border-border px-3 py-2 text-xs font-medium sm:hidden"
+              className="rounded-xl border border-[#264a7f]/15 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-sm sm:hidden"
               onClick={logout}
             >
               Logout
@@ -1105,11 +1278,16 @@ const ClientDashboard = () => {
                 return (
                   <button
                     key={item.key}
-                    className={`rounded-lg border px-3 py-2 text-xs font-medium transition sm:text-sm ${
+                    className={`rounded-xl border px-4 py-2.5 text-xs font-semibold transition sm:text-sm ${
                       isActive
-                        ? "border-[#264a7f] bg-[#264a7f] text-white"
-                        : "border-border bg-background text-foreground"
+                        ? "border-transparent text-white shadow-[0_14px_30px_rgba(38,74,127,0.24)]"
+                        : "border-[#264a7f]/12 bg-white text-slate-700 hover:border-[#264a7f]/30 hover:text-[#264a7f]"
                     }`}
+                    style={
+                      isActive
+                        ? { background: `linear-gradient(135deg, ${BRAND_PRIMARY}, ${BRAND_SECONDARY})` }
+                        : undefined
+                    }
                     onClick={() => setTab(item.key)}
                   >
                     {item.label}
@@ -1117,7 +1295,7 @@ const ClientDashboard = () => {
                 );
               })}
               <button
-                className="hidden rounded-lg border border-border px-3 py-2 text-xs font-medium sm:text-sm lg:inline-flex"
+                className="hidden rounded-xl border border-[#264a7f]/12 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 sm:text-sm lg:inline-flex"
                 onClick={logout}
               >
                 Logout
@@ -1128,22 +1306,42 @@ const ClientDashboard = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8 space-y-6">
-        {error && <p className="text-sm text-red-500">{error}</p>}
+        {error && <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>}
 
         {tab === "overview" && (
           <>
-            <div className="rounded-xl border border-border bg-card p-6">
-              <h1 className="font-heading text-2xl font-bold mb-2 break-words">{profile?.companyName || sessionState?.user.email}</h1>
-              <p className="text-sm text-muted-foreground">
-                {profile?.industry || "Industry"} - {profile?.companyType || "Company Type"} - {profile?.companySize || "Company Size"}
-              </p>
+            <div
+              className={`${brandCardClass} overflow-hidden p-6 md:p-8`}
+              style={{
+                background: "linear-gradient(135deg, rgba(38,74,127,0.96) 0%, rgba(55,110,168,0.95) 58%, rgba(105,164,79,0.9) 100%)",
+              }}
+            >
+              <div className="grid gap-6 lg:grid-cols-[1.25fr,0.75fr] lg:items-end">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/75">RecruitKr Employer Space</p>
+                  <h1 className="mt-3 break-words font-heading text-3xl font-bold text-white md:text-4xl">
+                    {profile?.companyName || sessionState?.user.email}
+                  </h1>
+                  <p className="mt-3 max-w-2xl text-sm text-white/80 md:text-base">
+                    Build your hiring pipeline, review candidate details faster, and keep every opening on track.
+                  </p>
+                </div>
+                <div className="rounded-3xl border border-white/20 bg-white/10 p-5 backdrop-blur-md">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/70">Company Snapshot</p>
+                  <div className="mt-4 space-y-3 text-sm text-white/90">
+                    <p>Industry: {profile?.industry || "Not added yet"}</p>
+                    <p>Type: {profile?.companyType || "Not added yet"}</p>
+                    <p>Size: {profile?.companySize || "Not added yet"}</p>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="rounded-xl border border-border bg-card p-4"><p className="text-2xl font-bold">{dashboard?.stats.activeRequirements || 0}</p><p className="text-xs text-muted-foreground">Active Requirements</p></div>
-              <div className="rounded-xl border border-border bg-card p-4"><p className="text-2xl font-bold">{dashboard?.stats.candidatesSourced || 0}</p><p className="text-xs text-muted-foreground">Candidates Sourced</p></div>
-              <div className="rounded-xl border border-border bg-card p-4"><p className="text-2xl font-bold">{dashboard?.stats.interviewsScheduled || 0}</p><p className="text-xs text-muted-foreground">Interviews Scheduled</p></div>
-              <div className="rounded-xl border border-border bg-card p-4"><p className="text-2xl font-bold">{dashboard?.stats.positionsFilled || 0}</p><p className="text-xs text-muted-foreground">Positions Filled</p></div>
+              <div className={statCardClass}><p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#264a7f]">Active Roles</p><p className="mt-3 text-3xl font-bold text-slate-900">{dashboard?.stats.activeRequirements || 0}</p><p className="mt-1 text-sm text-slate-500">Open requirements currently live</p></div>
+              <div className={statCardClass}><p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#264a7f]">Candidates</p><p className="mt-3 text-3xl font-bold text-slate-900">{dashboard?.stats.candidatesSourced || 0}</p><p className="mt-1 text-sm text-slate-500">Profiles now in your hiring funnel</p></div>
+              <div className={statCardClass}><p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#69a44f]">Interviews</p><p className="mt-3 text-3xl font-bold text-slate-900">{dashboard?.stats.interviewsScheduled || 0}</p><p className="mt-1 text-sm text-slate-500">Scheduled interactions with shortlisted talent</p></div>
+              <div className={statCardClass}><p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#69a44f]">Filled</p><p className="mt-3 text-3xl font-bold text-slate-900">{dashboard?.stats.positionsFilled || 0}</p><p className="mt-1 text-sm text-slate-500">Roles successfully closed</p></div>
             </div>
           </>
         )}
@@ -1159,7 +1357,13 @@ const ClientDashboard = () => {
               </div>
               <button
                 type="button"
-                onClick={() => setShowCreateRequirementForm((prev) => !prev)}
+                onClick={() => {
+                  if (showCreateRequirementForm) {
+                    resetRequirementForm();
+                    return;
+                  }
+                  setShowCreateRequirementForm(true);
+                }}
                 className="rounded-lg bg-[#264a7f] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#1f3b66]"
               >
                 {showCreateRequirementForm ? "Close Form" : "Post More Hiring"}
@@ -1169,9 +1373,13 @@ const ClientDashboard = () => {
             {showCreateRequirementForm && (
               <div className="rounded-xl border border-border bg-card p-6 space-y-5">
                 <div>
-                  <h3 className="font-heading text-lg font-semibold">Post New Hiring Requirement</h3>
+                  <h3 className="font-heading text-lg font-semibold">
+                    {editingRequirementId ? "Edit Hiring Requirement" : "Post New Hiring Requirement"}
+                  </h3>
                   <p className="text-sm text-muted-foreground">
-                    Create another job requirement here without leaving the dashboard.
+                    {editingRequirementId
+                      ? "Update the role details here without leaving the dashboard."
+                      : "Create another job requirement here without leaving the dashboard."}
                   </p>
                 </div>
 
@@ -1179,6 +1387,14 @@ const ClientDashboard = () => {
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Job Title</label>
                     <input value={newRequirementForm.jobTitle} onChange={updateNewRequirementField("jobTitle")} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" placeholder="e.g. Sales Executive" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Category</label>
+                    <input value={newRequirementForm.category} onChange={updateNewRequirementField("category")} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" placeholder="e.g. IT" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Company</label>
+                    <input value={newRequirementForm.company} onChange={updateNewRequirementField("company")} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" placeholder="e.g. RecruitKr" />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Openings</label>
@@ -1204,8 +1420,12 @@ const ClientDashboard = () => {
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Experience Required</label>
-                    <input value={newRequirementForm.experienceRequired} onChange={updateNewRequirementField("experienceRequired")} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" placeholder="e.g. 3 years" />
+                    <label className="text-sm font-medium">Experience Level</label>
+                    <input value={newRequirementForm.experienceRequired} onChange={updateNewRequirementField("experienceRequired")} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" placeholder="e.g. 1-4" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Qualification</label>
+                    <input value={newRequirementForm.qualification} onChange={updateNewRequirementField("qualification")} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" placeholder="e.g. 12th" />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Min CTC (LPA)</label>
@@ -1216,11 +1436,19 @@ const ClientDashboard = () => {
                     <input type="number" min={0} value={newRequirementForm.maxCtcLpa} onChange={updateNewRequirementField("maxCtcLpa")} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" />
                   </div>
                   <div className="space-y-2">
+                    <label className="text-sm font-medium">Fixed Price</label>
+                    <input type="number" min={0} value={newRequirementForm.fixedPrice} onChange={updateNewRequirementField("fixedPrice")} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" placeholder="e.g. 1500" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Salary Currency</label>
+                    <input value={newRequirementForm.salaryCurrency} onChange={updateNewRequirementField("salaryCurrency")} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" placeholder="INR / USD" />
+                  </div>
+                  <div className="space-y-2">
                     <label className="text-sm font-medium">Preferred Industry Background</label>
                     <input value={newRequirementForm.preferredIndustryBackground} onChange={updateNewRequirementField("preferredIndustryBackground")} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" placeholder="Optional" />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Gender Preference</label>
+                    <label className="text-sm font-medium">Gender Requirement</label>
                     <select value={newRequirementForm.genderPreference} onChange={updateNewRequirementField("genderPreference")} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
                       <option value="">Select</option>
                       <option>No Preference</option>
@@ -1228,6 +1456,14 @@ const ClientDashboard = () => {
                       <option>Female</option>
                       <option>Other</option>
                     </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Age Requirement</label>
+                    <input value={newRequirementForm.ageRequirement} onChange={updateNewRequirementField("ageRequirement")} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" placeholder="e.g. 18-35" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Contact Email</label>
+                    <input type="email" value={newRequirementForm.contactEmail} onChange={updateNewRequirementField("contactEmail")} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" placeholder="careers@recruitkr.com" />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Urgency Level</label>
@@ -1262,22 +1498,47 @@ const ClientDashboard = () => {
                     <label className="text-sm font-medium">Job Description</label>
                     <textarea value={newRequirementForm.jobDescription} onChange={updateNewRequirementField("jobDescription")} rows={5} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" placeholder="Add role details, responsibilities, and must-have skills" />
                   </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-sm font-medium">Requirements (one per line)</label>
+                    <textarea value={newRequirementForm.requirementsText} onChange={updateNewRequirementField("requirementsText")} rows={4} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" placeholder={"e.g.\nBasic knowledge of wiring\nCCTV installation"} />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-sm font-medium">Responsibilities (one per line)</label>
+                    <textarea value={newRequirementForm.responsibilitiesText} onChange={updateNewRequirementField("responsibilitiesText")} rows={4} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" placeholder={"e.g.\nInstall devices\nVisit client sites"} />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-sm font-medium">Skills (one per line)</label>
+                    <textarea value={newRequirementForm.skillsText} onChange={updateNewRequirementField("skillsText")} rows={4} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" placeholder={"e.g.\nJava\nCamera setup"} />
+                  </div>
                 </div>
 
                 <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={resetRequirementForm}
+                    className="mr-3 rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium"
+                  >
+                    Cancel
+                  </button>
                   <button
                     type="button"
                     onClick={() => void createRequirement()}
                     disabled={creatingRequirement}
                     className="rounded-lg bg-[#264a7f] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
                   >
-                    {creatingRequirement ? "Posting..." : "Post Requirement"}
+                    {creatingRequirement
+                      ? editingRequirementId
+                        ? "Saving..."
+                        : "Posting..."
+                      : editingRequirementId
+                        ? "Save Changes"
+                        : "Post Requirement"}
                   </button>
                 </div>
               </div>
             )}
 
-            {(dashboard?.requirements || []).map((requirement) => (
+            {requirements.map((requirement) => (
               <div key={requirement._id} className="rounded-xl border border-border bg-card p-5">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div>
@@ -1290,7 +1551,7 @@ const ClientDashboard = () => {
                       Urgency: {requirement.urgencyLevel} - Posted {new Date(requirement.createdAt).toLocaleDateString()}
                     </p>
                   </div>
-                  <div className="flex w-full gap-2 sm:w-auto">
+                  <div className="flex w-full flex-col gap-2 sm:w-auto">
                     <select
                       className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm sm:w-auto"
                       value={requirement.status}
@@ -1300,11 +1561,28 @@ const ClientDashboard = () => {
                       <option value="on-hold">on-hold</option>
                       <option value="closed">closed</option>
                     </select>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => editRequirement(requirement)}
+                        className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void deleteRequirement(requirement._id)}
+                        disabled={deletingRequirementId === requirement._id}
+                        className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600 disabled:opacity-60"
+                      >
+                        {deletingRequirementId === requirement._id ? "Deleting..." : "Delete"}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
             ))}
-            {(dashboard?.requirements || []).length === 0 && (
+            {requirements.length === 0 && (
               <div className="rounded-xl border border-dashed border-border bg-card/60 p-6 text-center">
                 <p className="text-sm text-muted-foreground">No job requirements yet.</p>
                 <button
