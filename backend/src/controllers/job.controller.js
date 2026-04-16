@@ -95,6 +95,7 @@ const transformLegacyApplication = (legacyApplication, jobsByKey = new Map()) =>
 
   return {
     _id: String(legacyApplication._id),
+    fullName: legacyApplication.fullName || '',
     status,
     createdAt,
     statusNote,

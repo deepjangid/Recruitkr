@@ -151,6 +151,7 @@ type ClientApplicationsResponse = {
   success: boolean;
   data: Array<{
     _id: string;
+    fullName?: string;
     status: ApplicationStatus;
     createdAt: string;
     statusNote?: string;
@@ -214,6 +215,22 @@ type ClientApplicationDetailsResponse = {
   };
 };
 
+type ClientResumesResponse = {
+  success: boolean;
+  data: Array<{
+    _id: string;
+    applicationId: string;
+    candidateName: string;
+    candidateEmail?: string;
+    jobTitle?: string;
+    fileName?: string;
+    mimeType?: string;
+    source?: string;
+    updatedAt?: string;
+    isLegacy?: boolean;
+  }>;
+};
+
 type JobRequirementForm = {
   jobTitle: string;
   category: string;
@@ -274,6 +291,7 @@ const ClientDashboard = () => {
   const [dashboard, setDashboard] = useState<ClientDashboardResponse["data"] | null>(null);
   const [profile, setProfile] = useState<ClientProfileResponse["data"] | null>(null);
   const [applications, setApplications] = useState<ClientApplicationsResponse["data"]>([]);
+  const [resumes, setResumes] = useState<ClientResumesResponse["data"]>([]);
   const [requirements, setRequirements] = useState<ClientMyJobsResponse["data"]>([]);
   const [selectedApplicationId, setSelectedApplicationId] = useState<string | null>(null);
   const [selectedApplicationDetails, setSelectedApplicationDetails] =
@@ -281,7 +299,7 @@ const ClientDashboard = () => {
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsFormVisible, setDetailsFormVisible] = useState(false);
   const [savingApplicationId, setSavingApplicationId] = useState<string | null>(null);
-  const [tab, setTab] = useState<"overview" | "requirements" | "applications" | "profile">("overview");
+  const [tab, setTab] = useState<"overview" | "requirements" | "applications" | "resumes" | "profile">("overview");
   const [showCreateRequirementForm, setShowCreateRequirementForm] = useState(false);
   const [creatingRequirement, setCreatingRequirement] = useState(false);
   const [editingRequirementId, setEditingRequirementId] = useState<string | null>(null);
@@ -297,15 +315,17 @@ const ClientDashboard = () => {
     setLoading(true);
     setError("");
     try {
-      const [dashboardRes, profileRes, applicationsRes, jobsRes] = await Promise.all([
+      const [dashboardRes, profileRes, applicationsRes, resumesRes, jobsRes] = await Promise.all([
         apiGet<ClientDashboardResponse>("/dashboards/client", true),
         apiGet<ClientProfileResponse>("/users/client/me", true),
         apiGet<ClientApplicationsResponse>("/jobs/applications", true),
+        apiGet<ClientResumesResponse>("/resumes/client", true),
         apiGet<ClientMyJobsResponse>("/jobs/mine", true),
       ]);
       setDashboard(dashboardRes.data);
       setProfile(profileRes.data);
       setApplications(applicationsRes.data);
+      setResumes(resumesRes.data);
       setRequirements(jobsRes.data);
       setNewRequirementForm((prev) => ({
         ...prev,
@@ -757,8 +777,63 @@ const ClientDashboard = () => {
     { key: "overview", label: "Overview" },
     { key: "requirements", label: "Requirements" },
     { key: "applications", label: "Applications" },
+    { key: "resumes", label: "Resumes" },
     { key: "profile", label: "Profile" },
   ];
+
+  const renderResumesTab = () => (
+    <div className="space-y-6">
+      <div className={brandCardClass}>
+        <div className="border-b border-[#264a7f]/10 px-4 py-5 sm:px-6">
+          <h2 className="font-heading font-semibold text-slate-900">All Candidate Resumes</h2>
+          <p className="mt-1 text-sm text-slate-500">See every resume linked to your applications in one place.</p>
+        </div>
+
+        <div className="divide-y divide-border">
+          {resumes.map((resume) => (
+            <div key={`${resume.applicationId}-${resume.fileName}`} className="flex flex-col gap-4 px-4 py-5 sm:px-6 md:flex-row md:items-center md:justify-between">
+              <div className="min-w-0">
+                <p className="font-medium text-slate-900">{resume.candidateName || "Candidate"}</p>
+                <p className="text-sm text-slate-500">{resume.jobTitle || "Job"}</p>
+                <p className="mt-1 break-all text-sm text-slate-500">{resume.fileName || "candidate_resume.pdf"}</p>
+                <p className="mt-1 text-xs text-slate-400">
+                  {resume.source === "uploaded" ? "Uploaded resume" : "Generated resume"}
+                  {resume.updatedAt ? ` • Updated ${new Date(resume.updatedAt).toLocaleDateString()}` : ""}
+                  {resume.isLegacy ? " • Legacy record" : ""}
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => void downloadResume(resume.applicationId, resume.fileName)}
+                  className="rounded-lg border border-border bg-white px-4 py-2 text-sm font-medium text-slate-700"
+                >
+                  Download Resume
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTab("applications");
+                    void openApplicationDetails(resume.applicationId);
+                  }}
+                  className="rounded-lg bg-[#264a7f] px-4 py-2 text-sm font-medium text-white"
+                >
+                  View Application
+                </button>
+              </div>
+            </div>
+          ))}
+
+          {resumes.length === 0 && (
+            <div className="px-4 py-8 text-center text-sm text-muted-foreground sm:px-6">
+              No resumes available yet.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
   const renderApplicationsTab = () => (
     <div className="grid gap-6 lg:grid-cols-[380px,1fr]">
@@ -777,14 +852,14 @@ const ClientDashboard = () => {
               }`}
               onClick={() => void openApplicationDetails(application._id)}
             >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="font-medium">{application.jobId?.jobTitle || "Job"}</p>
-                  <p className="text-sm text-muted-foreground break-all">
-                    {application.candidateId?.email || "Candidate"}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Applied on {new Date(application.createdAt).toLocaleDateString()}
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-medium">{application.jobId?.jobTitle || "Job"}</p>
+                    <p className="text-sm text-muted-foreground break-all">
+                      {application.fullName?.trim() || application.candidateId?.email || "Candidate"}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Applied on {new Date(application.createdAt).toLocaleDateString()}
                   </p>
                 </div>
                 <div className="rounded-full border border-[#264a7f]/12 bg-white px-3 py-1 text-[11px] font-semibold text-slate-700">
@@ -1598,6 +1673,7 @@ const ClientDashboard = () => {
         )}
 
         {tab === "applications" && renderApplicationsTab()}
+        {tab === "resumes" && renderResumesTab()}
 
         {tab === "profile" && (
           <div className="grid gap-6 lg:grid-cols-[1.2fr,0.8fr]">

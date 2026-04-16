@@ -1,9 +1,11 @@
 import { StatusCodes } from 'http-status-codes';
 
+import { Application } from '../models/Application.js';
 import { CandidateProfile } from '../models/CandidateProfile.js';
 import { CandidateFile } from '../models/CandidateFile.js';
 import { Resume } from '../models/Resume.js';
 import { User } from '../models/User.js';
+import { fetchLegacyApplicationsForClient } from './job.controller.js';
 import { ApiError } from '../utils/ApiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import {
@@ -30,6 +32,76 @@ export const parseResume = asyncHandler(async (req, res) => {
       file: { fileName: req.file.originalname, mimeType: req.file.mimetype },
     },
   });
+});
+
+export const listClientResumes = asyncHandler(async (req, res) => {
+  const applications = await Application.find({ clientId: req.user.id })
+    .select('candidateId jobId fullName email resumePath hasCustomResume createdAt updatedAt')
+    .populate('jobId', 'jobTitle')
+    .populate({ path: 'candidateId', select: 'email' })
+    .sort({ createdAt: -1 })
+    .lean();
+
+  const candidateUserIds = [...new Set(applications.map((application) => String(application.candidateId?._id || application.candidateId || '')).filter(Boolean))];
+  const resumes = await Resume.find({ candidateUserId: { $in: candidateUserIds } })
+    .select('_id candidateUserId fileName mimeType source updatedAt')
+    .lean();
+
+  const resumesByCandidateId = new Map(resumes.map((resume) => [String(resume.candidateUserId), resume]));
+
+  const currentResumeItems = applications
+    .map((application) => {
+      const candidateUserId = String(application.candidateId?._id || application.candidateId || '');
+      const storedResume = candidateUserId ? resumesByCandidateId.get(candidateUserId) : null;
+      const fallbackResume = application.resumePath
+        ? {
+            _id: String(application._id),
+            fileName: String(application.resumePath).split(/[\\/]/).pop() || 'candidate_resume.pdf',
+            mimeType: 'application/pdf',
+            source: application.hasCustomResume ? 'uploaded' : 'generated',
+            updatedAt: application.updatedAt || application.createdAt,
+          }
+        : null;
+      const resumeMeta = storedResume || fallbackResume;
+
+      if (!resumeMeta) return null;
+
+      return {
+        _id: String(application._id),
+        applicationId: String(application._id),
+        candidateName: application.fullName || 'Candidate',
+        candidateEmail: application.candidateId?.email || application.email || '',
+        jobTitle: application.jobId?.jobTitle || 'Job',
+        fileName: resumeMeta.fileName || 'candidate_resume.pdf',
+        mimeType: resumeMeta.mimeType || 'application/pdf',
+        source: resumeMeta.source || 'generated',
+        updatedAt: resumeMeta.updatedAt || application.updatedAt || application.createdAt,
+        isLegacy: false,
+      };
+    })
+    .filter(Boolean);
+
+  const legacyApplications = await fetchLegacyApplicationsForClient(req.user.id);
+  const legacyResumeItems = legacyApplications
+    .filter((application) => application.resume)
+    .map((application) => ({
+      _id: String(application._id),
+      applicationId: String(application._id),
+      candidateName: application.candidateProfile?.fullName || 'Candidate',
+      candidateEmail: application.candidateId?.email || '',
+      jobTitle: application.jobId?.jobTitle || 'Job',
+      fileName: application.resume?.fileName || 'candidate_resume.pdf',
+      mimeType: application.resume?.mimeType || 'application/pdf',
+      source: application.resume?.source || 'generated',
+      updatedAt: application.resume?.updatedAt || application.createdAt,
+      isLegacy: true,
+    }));
+
+  const data = [...currentResumeItems, ...legacyResumeItems].sort(
+    (a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime(),
+  );
+
+  res.json({ success: true, data });
 });
 
 export const getMyResume = asyncHandler(async (req, res) => {
