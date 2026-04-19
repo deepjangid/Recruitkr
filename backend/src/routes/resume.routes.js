@@ -13,7 +13,7 @@ const router = Router();
 
 router.post('/parse', resumeUpload.single('resume'), parseResume);
 router.get('/mine', requireAuth, requireRole('candidate'), getMyResume);
-router.get('/client', requireAuth, requireRole('client'), listClientResumes);
+router.get('/client', requireAuth, requireRole('client', 'admin'), listClientResumes);
 router.get('/generated', requireAuth, requireRole('candidate'), downloadMyGeneratedResume);
 
 export default router;

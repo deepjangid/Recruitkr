@@ -81,7 +81,8 @@ export const listClientResumes = asyncHandler(async (req, res) => {
     })
     .filter(Boolean);
 
-  const legacyApplications = await fetchLegacyApplicationsForClient(req.user.id);
+  const legacyApplications =
+    req.user.role === 'client' ? await fetchLegacyApplicationsForClient(req.user.id) : [];
   const legacyResumeItems = legacyApplications
     .filter((application) => application.resume)
     .map((application) => ({

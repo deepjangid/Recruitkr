@@ -6,7 +6,7 @@ const interviewDetailsSchema = new mongoose.Schema(
     timezone: { type: String, trim: true },
     mode: {
       type: String,
-      enum: ['onsite', 'google-meet', 'phone', 'video', 'other'],
+      enum: ['onsite', 'google-meet', 'phone', 'video', 'zoom', 'other'],
     },
     locationText: { type: String, trim: true },
     googleMapsUrl: { type: String, trim: true },
@@ -15,6 +15,9 @@ const interviewDetailsSchema = new mongoose.Schema(
     contactEmail: { type: String, trim: true, lowercase: true },
     contactPhone: { type: String, trim: true },
     notes: { type: String, trim: true },
+    reportingNotes: { type: String, trim: true },
+    documentsRequired: { type: String, trim: true },
+    additionalInstructions: { type: String, trim: true },
   },
   { _id: false },
 );
@@ -41,7 +44,15 @@ const applicationSchema = new mongoose.Schema(
   {
     candidateId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     clientId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-    jobId: { type: mongoose.Schema.Types.ObjectId, ref: 'JobRequirement', required: true, index: true },
+    jobId: { type: mongoose.Schema.Types.ObjectId, ref: 'JobRequirement', index: true },
+    sourceCollection: { type: String, trim: true, enum: ['jobs', 'openings', 'jobRequirements'] },
+    sourceJobId: { type: String, trim: true },
+    sourceJobSnapshot: {
+      jobTitle: { type: String, trim: true },
+      jobLocation: { type: String, trim: true },
+      employmentType: { type: String, trim: true },
+      companyName: { type: String, trim: true },
+    },
     fullName: { type: String, trim: true },
     email: { type: String, trim: true, lowercase: true },
     phone: { type: String, trim: true },
@@ -79,7 +90,25 @@ const applicationSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-applicationSchema.index({ candidateId: 1, jobId: 1 }, { unique: true });
+applicationSchema.index(
+  { candidateId: 1, jobId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      jobId: { $exists: true, $type: 'objectId' },
+    },
+  },
+);
+applicationSchema.index(
+  { candidateId: 1, sourceCollection: 1, sourceJobId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      sourceCollection: { $exists: true, $type: 'string' },
+      sourceJobId: { $exists: true, $type: 'string' },
+    },
+  },
+);
 
 export const Application = mongoose.model('Application', applicationSchema);
 

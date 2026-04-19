@@ -45,26 +45,25 @@ router.get(
   requireRole('candidate'),
   listCandidateApplications,
 );
-router.get('/applications', requireAuth, requireRole('client'), listClientApplications);
+router.get('/applications', requireAuth, requireRole('client', 'admin'), listClientApplications);
 router.get(
   '/applications/:applicationId',
   requireAuth,
-  requireRole('client'),
+  requireRole('client', 'admin'),
   getClientApplicationDetails,
 );
 router.get(
   '/applications/:applicationId/resume',
   requireAuth,
-  requireRole('client'),
+  requireRole('client', 'admin'),
   downloadClientApplicationResume,
 );
 router.patch(
   '/applications/:applicationId/status',
   requireAuth,
-  requireRole('client'),
+  requireRole('client', 'admin'),
   validate(updateApplicationStatusSchema),
   updateApplicationStatus,
 );
 
 export default router;
-

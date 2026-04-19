@@ -30,7 +30,10 @@ export const candidateDashboard = asyncHandler(async (req, res) => {
 
 export const clientDashboard = asyncHandler(async (req, res) => {
   const [jobs, applications, legacyApplications] = await Promise.all([
-    JobRequirement.find({ clientId: req.user.id }).sort({ createdAt: -1 }),
+    JobRequirement.find({
+      clientId: req.user.id,
+      sourceCollection: { $exists: false },
+    }).sort({ createdAt: -1 }),
     Application.find({ clientId: req.user.id }).populate('jobId').sort({ createdAt: -1 }),
     fetchLegacyApplicationsForClient(req.user.id),
   ]);

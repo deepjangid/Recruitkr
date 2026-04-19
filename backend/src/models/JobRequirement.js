@@ -3,6 +3,8 @@ import mongoose from 'mongoose';
 const jobRequirementSchema = new mongoose.Schema(
   {
     clientId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    sourceCollection: { type: String, trim: true, enum: ['jobs', 'openings'] },
+    sourceJobId: { type: String, trim: true },
     title: { type: String, trim: true },
     company: { type: String, trim: true },
     location: { type: String, trim: true },
@@ -48,6 +50,10 @@ const jobRequirementSchema = new mongoose.Schema(
 );
 
 jobRequirementSchema.index({ clientId: 1, status: 1, createdAt: -1 });
+jobRequirementSchema.index(
+  { sourceCollection: 1, sourceJobId: 1 },
+  { unique: true, sparse: true },
+);
 
 export const JobRequirement = mongoose.model('JobRequirement', jobRequirementSchema);
 

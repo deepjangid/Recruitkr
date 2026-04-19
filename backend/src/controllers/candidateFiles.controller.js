@@ -35,7 +35,7 @@ export const getMyProfilePhoto = asyncHandler(async (req, res) => {
     .exec();
 
   if (!file) {
-    throw new ApiError(StatusCodes.NOT_FOUND, 'Profile photo not found');
+    return res.status(StatusCodes.NO_CONTENT).send();
   }
 
   res.setHeader('Content-Type', file.mimeType);
@@ -128,4 +128,3 @@ export const deleteMyCertificate = asyncHandler(async (req, res) => {
 
   res.json({ success: true, message: 'Certificate deleted' });
 });
-

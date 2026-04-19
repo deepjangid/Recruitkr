@@ -47,7 +47,6 @@ const clientProfileSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-clientProfileSchema.index({ userId: 1 });
 clientProfileSchema.index({ companyName: 1 });
 
 export const ClientProfile = mongoose.model('ClientProfile', clientProfileSchema);

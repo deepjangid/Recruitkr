@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { ArrowLeft, BriefcaseBusiness, Building2, Filter, MapPin, Search, Sparkles, X } from "lucide-react";
 import { API_BASE, apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
 import { clearSession, getSession } from "@/lib/auth";
 import { useServerEvents, type SseConnectionStatus } from "@/hooks/useServerEvents";
@@ -15,9 +16,10 @@ const dashboardShellClass =
 const dashboardHeaderClass =
   "sticky top-0 z-30 border-b border-[#264a7f]/10 bg-white/88 backdrop-blur-xl shadow-[0_12px_40px_rgba(38,74,127,0.08)]";
 const brandCardClass =
-  "rounded-[28px] border border-[#264a7f]/10 bg-white/92 shadow-[0_20px_60px_rgba(38,74,127,0.08)] backdrop-blur";
+  "   border border-[#264a7f]/10 bg-white/92 shadow-[0_20px_60px_rgba(38,74,127,0.08)] backdrop-blur";
 const statCardClass =
   "rounded-2xl border border-[#264a7f]/10 bg-white/95 p-5 shadow-[0_16px_40px_rgba(38,74,127,0.08)]";
+const JOBS_HERO_GRADIENT = "linear-gradient(90deg, rgba(36, 70, 121, 1) 0%, rgba(105, 164, 79, 1) 100%)";
 
 type ApplicationStatus =
   | "applied"
@@ -31,7 +33,7 @@ type ApplicationStatus =
 type InterviewDetails = {
   scheduledAt?: string;
   timezone?: string;
-  mode?: "onsite" | "google-meet" | "phone" | "video" | "other";
+  mode?: "onsite" | "google-meet" | "phone" | "video" | "zoom" | "other";
   locationText?: string;
   googleMapsUrl?: string;
   meetingLink?: string;
@@ -39,6 +41,14 @@ type InterviewDetails = {
   contactEmail?: string;
   contactPhone?: string;
   notes?: string;
+  reportingNotes?: string;
+  documentsRequired?: string;
+  additionalInstructions?: string;
+};
+
+type ApplicationResponseSnapshot = {
+  statusNote?: string;
+  interviewDetails?: InterviewDetails;
 };
 
 type ApplicationTimelineItem = {
@@ -63,6 +73,7 @@ const INTERVIEW_MODE_LABELS: Record<NonNullable<InterviewDetails["mode"]>, strin
   "google-meet": "Google Meet",
   phone: "Phone call",
   video: "Video call",
+  zoom: "Zoom",
   other: "Other",
 };
 
@@ -96,6 +107,68 @@ const formatInterviewTime = (value?: string) => {
     hour: "numeric",
     minute: "2-digit",
   });
+};
+
+const parseApplicationScheduledAt = (application: Record<string, any>) => {
+  const nested = application?.interviewDetails?.scheduledAt;
+  if (nested) return nested;
+
+  const dateText = String(application?.interviewDate || "").trim();
+  const timeText = String(application?.interviewTime || "").trim();
+  if (!dateText) return "";
+  if (!timeText) return dateText;
+
+  const direct = new Date(`${dateText} ${timeText}`);
+  if (!Number.isNaN(direct.getTime())) return direct.toISOString();
+
+  const dateMatch = dateText.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  const timeMatch = timeText.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!dateMatch || !timeMatch) return `${dateText} ${timeText}`;
+
+  const day = Number(dateMatch[1]);
+  const monthIndex = Number(dateMatch[2]) - 1;
+  const year = Number(dateMatch[3]);
+  let hour = Number(timeMatch[1]);
+  const minute = Number(timeMatch[2]);
+  const meridiem = timeMatch[3].toUpperCase();
+
+  if (meridiem === "PM" && hour < 12) hour += 12;
+  if (meridiem === "AM" && hour === 12) hour = 0;
+
+  const composed = new Date(year, monthIndex, day, hour, minute, 0, 0);
+  return Number.isNaN(composed.getTime()) ? `${dateText} ${timeText}` : composed.toISOString();
+};
+
+const getApplicationResponseSnapshot = (application: Record<string, any>): ApplicationResponseSnapshot => {
+  const nested = application?.interviewDetails || {};
+  const scheduledAt = parseApplicationScheduledAt(application);
+
+  return {
+    statusNote:
+      application?.statusNote ||
+      application?.candidateResponse ||
+      application?.clientNote ||
+      application?.note ||
+      application?.notes ||
+      "",
+    interviewDetails: {
+      scheduledAt,
+      timezone: nested?.timezone || application?.timezone || "",
+      mode: nested?.mode || application?.interviewMode || application?.mode || "",
+      locationText: nested?.locationText || application?.interviewLocation || application?.locationText || "",
+      googleMapsUrl:
+        nested?.googleMapsUrl || application?.googleMapLocation || application?.googleMapsUrl || "",
+      meetingLink: nested?.meetingLink || application?.meetingLink || "",
+      contactPerson: nested?.contactPerson || application?.contactPerson || "",
+      contactEmail: nested?.contactEmail || application?.contactEmail || "",
+      contactPhone: nested?.contactPhone || application?.contactPhone || "",
+      notes: nested?.notes || "",
+      reportingNotes: nested?.reportingNotes || application?.reportingNotes || "",
+      documentsRequired: nested?.documentsRequired || application?.documentsRequired || "",
+      additionalInstructions:
+        nested?.additionalInstructions || application?.additionalInstructions || "",
+    },
+  };
 };
 
 const getInterviewTimingMeta = (value?: string) => {
@@ -179,6 +252,13 @@ type CandidateDashboardResponse = {
       _id: string;
       status: ApplicationStatus;
       createdAt: string;
+      fullName?: string;
+      email?: string;
+      phone?: string;
+      qualification?: string;
+      currentCity?: string;
+      appliedFor?: string;
+      experience?: Array<{ jobProfile?: string }>;
       statusNote?: string;
       statusUpdatedAt?: string;
       interviewDetails?: InterviewDetails;
@@ -188,6 +268,8 @@ type CandidateDashboardResponse = {
         jobTitle?: string;
         jobLocation?: string;
         employmentType?: string;
+        sourceCollection?: string;
+        sourceLabel?: string;
       };
     }>;
     profile?: CandidateProfileResponse["data"];
@@ -200,6 +282,13 @@ type CandidateApplicationsResponse = {
     _id: string;
     status: ApplicationStatus;
     createdAt: string;
+    fullName?: string;
+    email?: string;
+    phone?: string;
+    qualification?: string;
+    currentCity?: string;
+    appliedFor?: string;
+    experience?: Array<{ jobProfile?: string }>;
     statusNote?: string;
     statusUpdatedAt?: string;
     interviewDetails?: InterviewDetails;
@@ -209,6 +298,8 @@ type CandidateApplicationsResponse = {
       jobTitle?: string;
       jobLocation?: string;
       employmentType?: string;
+      sourceCollection?: string;
+      sourceLabel?: string;
     };
   }>;
 };
@@ -268,6 +359,9 @@ type JobsResponse = {
     maxCtcLpa?: number;
     companyName?: string;
     openings?: number;
+    sourceCollection?: string;
+    sourceLabel?: string;
+    ownerRole?: "admin" | "client";
     canApply?: boolean;
     applyDisabledReason?: string;
     isLegacy?: boolean;
@@ -299,7 +393,7 @@ type JobsResponse = {
 
 const CandidateDashboard = () => {
   const navigate = useNavigate();
-  const [tab, setTab] = useState<"overview" | "jobs" | "applications" | "resume" | "profile">("overview");
+  const [tab, setTab] = useState<"overview" | "jobs" | "applications" | "resume" | "profile">("jobs");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [dashboard, setDashboard] = useState<CandidateDashboardResponse["data"] | null>(null);
@@ -307,6 +401,11 @@ const CandidateDashboard = () => {
   const [applications, setApplications] = useState<CandidateApplicationsResponse["data"]>([]);
   const [jobs, setJobs] = useState<JobsResponse["data"]>([]);
   const [jobsMeta, setJobsMeta] = useState<JobsResponse["meta"] | null>(null);
+  const [currentJobsPage, setCurrentJobsPage] = useState(1);
+  const [jobSearch, setJobSearch] = useState("");
+  const [jobTypeFilter, setJobTypeFilter] = useState("all");
+  const [jobLocationFilter, setJobLocationFilter] = useState("all");
+  const [jobReadinessFilter, setJobReadinessFilter] = useState<"all" | "ready">("all");
   const [jobsLoadingMore, setJobsLoadingMore] = useState(false);
   const [applyLoadingJobId, setApplyLoadingJobId] = useState<string | null>(null);
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
@@ -362,10 +461,10 @@ const CandidateDashboard = () => {
     setApplications(appsRes.data);
   };
 
-  const fetchJobsPage = async (page: number, mode: "replace" | "append") => {
+  const fetchJobsPage = async (page: number) => {
     const jobsRes = await apiGet<JobsResponse>(`/jobs?page=${page}&limit=${JOBS_PAGE_LIMIT}`);
     setJobsMeta(jobsRes.meta);
-    setJobs((prev) => (mode === "append" ? [...prev, ...jobsRes.data] : jobsRes.data));
+    setJobs(jobsRes.data);
   };
 
   const syncResumeFormFromProfile = (profileData?: CandidateProfileResponse["data"] | null) => {
@@ -405,7 +504,7 @@ const CandidateDashboard = () => {
       const [dashboardRes, appsRes, jobsRes, profileRes] = await Promise.all([
         apiGet<CandidateDashboardResponse>("/dashboards/candidate", true),
         apiGet<CandidateApplicationsResponse>("/jobs/applications/mine", true),
-        apiGet<JobsResponse>(`/jobs?page=1&limit=${JOBS_PAGE_LIMIT}`),
+        apiGet<JobsResponse>(`/jobs?page=${currentJobsPage}&limit=${JOBS_PAGE_LIMIT}`),
         apiGet<CandidateProfileResponse>("/users/candidate/me", true).catch(() => null),
       ]);
 
@@ -421,7 +520,7 @@ const CandidateDashboard = () => {
     } catch {
       // Keep the current UI stable if a background refresh fails.
     }
-  }, []);
+  }, [currentJobsPage]);
 
   const loadInitialData = async () => {
     setLoading(true);
@@ -437,7 +536,7 @@ const CandidateDashboard = () => {
       setProfile(nextProfile);
       syncResumeFormFromProfile(nextProfile);
 
-      await Promise.all([refreshApplications(), fetchJobsPage(1, "replace")]);
+      await Promise.all([refreshApplications(), fetchJobsPage(1)]);
       void loadProfilePhoto();
       void loadCertificates();
     } catch (err) {
@@ -511,6 +610,50 @@ const CandidateDashboard = () => {
     [applications],
   );
 
+  const jobTypeOptions = useMemo(
+    () => Array.from(new Set(jobs.map((job) => job.employmentType).filter(Boolean))).sort(),
+    [jobs],
+  );
+
+  const jobLocationOptions = useMemo(
+    () => Array.from(new Set(jobs.map((job) => job.jobLocation).filter(Boolean))).sort(),
+    [jobs],
+  );
+
+  const filteredJobs = useMemo(() => {
+    const query = jobSearch.trim().toLowerCase();
+
+    return jobs.filter((job) => {
+      const matchesQuery =
+        !query ||
+        [
+          job.jobTitle,
+          job.companyName,
+          job.department,
+          job.jobLocation,
+          job.description,
+          ...(job.skills || []),
+        ]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(query));
+
+      const matchesType = jobTypeFilter === "all" || job.employmentType === jobTypeFilter;
+      const matchesLocation = jobLocationFilter === "all" || job.jobLocation === jobLocationFilter;
+      const isApplied = applicationJobIds.has(job._id);
+      if (isApplied) return false;
+      const matchesReadiness =
+        jobReadinessFilter === "all" ||
+        (jobReadinessFilter === "ready" && job.canApply !== false);
+
+      return matchesQuery && matchesType && matchesLocation && matchesReadiness;
+    });
+  }, [applicationJobIds, jobLocationFilter, jobReadinessFilter, jobSearch, jobTypeFilter, jobs]);
+
+  const readyToApplyCount = useMemo(
+    () => jobs.filter((job) => job.canApply !== false && !applicationJobIds.has(job._id)).length,
+    [applicationJobIds, jobs],
+  );
+
   useEffect(() => {
     if (!applications.length) {
       setExpandedApplicationId(null);
@@ -521,9 +664,20 @@ const CandidateDashboard = () => {
       if (current && applications.some((application) => application._id === current)) {
         return current;
       }
-      return applications[0]?._id || null;
+      return null;
     });
   }, [applications]);
+
+  const activeApplicationId = expandedApplicationId || applications[0]?._id || null;
+  const mobileApplicationOpen = Boolean(expandedApplicationId);
+
+  const selectedApplication = useMemo(
+    () =>
+      applications.find((application) => application._id === activeApplicationId) ||
+      applications[0] ||
+      null,
+    [activeApplicationId, applications],
+  );
 
   const applyToJob = async (jobId: string) => {
     setApplyLoadingJobId(jobId);
@@ -645,8 +799,12 @@ const CandidateDashboard = () => {
       });
 
       if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(text || "Failed to download resume");
+        const payload = await res.json().catch(() => null);
+        const message =
+          payload && typeof payload === "object" && "message" in payload && typeof payload.message === "string"
+            ? payload.message
+            : "Failed to download resume";
+        throw new Error(message);
       }
 
       const blob = await res.blob();
@@ -679,6 +837,14 @@ const CandidateDashboard = () => {
         credentials: "include",
         headers: { Authorization: `Bearer ${session.accessToken}` },
       });
+
+      if (res.status === 204) {
+        setProfilePhotoUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return null;
+        });
+        return;
+      }
 
       if (!res.ok) {
         setProfilePhotoUrl(null);
@@ -784,17 +950,16 @@ const CandidateDashboard = () => {
     }
   };
 
-  const loadMoreJobs = async () => {
-    if (!jobsMeta) return;
+  const goToJobsPage = async (page: number) => {
+    if (page < 1) return;
     if (jobsLoadingMore) return;
-    if (jobsMeta.page >= jobsMeta.totalPages) return;
-
     setJobsLoadingMore(true);
     setError("");
     try {
-      await fetchJobsPage(jobsMeta.page + 1, "append");
+      await fetchJobsPage(page);
+      setCurrentJobsPage(page);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load more jobs");
+      setError(err instanceof Error ? err.message : "Failed to change jobs page");
     } finally {
       setJobsLoadingMore(false);
     }
@@ -916,6 +1081,22 @@ const CandidateDashboard = () => {
                   <p className="mt-3 max-w-2xl text-sm text-white/80 md:text-base">
                     Keep your applications moving, stay ready for interviews, and make your profile recruiter-ready.
                   </p>
+                  <div className="mt-5 flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setTab("jobs")}
+                      className="rounded-xl bg-white px-4 py-3 text-sm font-semibold text-[#264a7f] shadow-sm transition hover:bg-white/95"
+                    >
+                      Browse jobs and apply
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTab("applications")}
+                      className="rounded-xl border border-white/25 bg-white/10 px-4 py-3 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/15"
+                    >
+                      View my applications
+                    </button>
+                  </div>
                 </div>
                 <div className="rounded-3xl border border-white/20 bg-white/10 p-5 backdrop-blur-md">
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/70">Quick Snapshot</p>
@@ -938,482 +1119,801 @@ const CandidateDashboard = () => {
         )}
 
         {tab === "jobs" && (
-          <div className="space-y-6">
-            <div className={`${brandCardClass} overflow-hidden p-6`}>
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#264a7f]">Browse Jobs</p>
-                  <h2 className="mt-2 font-heading text-2xl font-bold text-slate-900">Explore roles matched to your next move</h2>
-                  <p className="mt-2 max-w-2xl text-sm text-slate-500">
-                    Review active openings, compare compensation and location quickly, and apply directly from your dashboard.
-                  </p>
-                </div>
-                <div className="grid grid-cols-2 gap-3 sm:w-auto">
-                  <div className="rounded-2xl bg-[#264a7f]/6 px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#264a7f]">Visible Jobs</p>
-                    <p className="mt-1 text-2xl font-bold text-slate-900">{jobsMeta?.total || jobs.length}</p>
-                  </div>
-                  <div className="rounded-2xl bg-[#69a44f]/8 px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#5a8d43]">Applied</p>
-                    <p className="mt-1 text-2xl font-bold text-slate-900">{applicationJobIds.size}</p>
-                  </div>
+          <div className="">
+            <div className="">
+              
+
+              <div className="border-t border-[#264a7f]/10 bg-white p-4 sm:p-5">
+                <div className="grid gap-3 md:grid-cols-[1.4fr,1fr,1fr,auto]">
+                  <label className="relative block">
+                    <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      value={jobSearch}
+                      onChange={(event) => setJobSearch(event.target.value)}
+                      placeholder="Search job title or company"
+                      className="w-full rounded-xl border border-[#264a7f]/12 bg-slate-50 py-3 pl-11 pr-4 text-sm text-slate-700 outline-none"
+                    />
+                  </label>
+
+                  <label className="relative block">
+                    <MapPin className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <select
+                      value={jobLocationFilter}
+                      onChange={(event) => setJobLocationFilter(event.target.value)}
+                      className="w-full appearance-none rounded-xl border border-[#264a7f]/12 bg-slate-50 py-3 pl-11 pr-4 text-sm text-slate-700 outline-none"
+                    >
+                      <option value="all">All locations</option>
+                      {jobLocationOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="relative block">
+                    <BriefcaseBusiness className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <select
+                      value={jobTypeFilter}
+                      onChange={(event) => setJobTypeFilter(event.target.value)}
+                      className="w-full appearance-none rounded-xl border border-[#264a7f]/12 bg-slate-50 py-3 pl-11 pr-4 text-sm text-slate-700 outline-none"
+                    >
+                      <option value="all">All job types</option>
+                      {jobTypeOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setJobSearch("");
+                      setJobTypeFilter("all");
+                      setJobLocationFilter("all");
+                      setJobReadinessFilter("all");
+                    }}
+                    className="rounded-xl border border-[#264a7f]/12 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
+                  >
+                    Reset
+                  </button>
                 </div>
               </div>
             </div>
 
-            <div className="grid gap-4 xl:grid-cols-2">
-            {jobs.map((job) => (
-              <div key={job._id} className={`${brandCardClass} p-5`}>
-                <div className="flex h-full flex-col gap-5">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-full bg-[#264a7f]/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-[#264a7f]">Active opening</span>
-                      <span className="rounded-full bg-[#69a44f]/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-[#5a8d43]">{job.employmentType}</span>
-                      {job.isLegacy && (
-                        <span className="rounded-full bg-amber-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-800">
-                          Legacy opening
+            
+            <div className="space-y-4 my-10">
+               
+                <div className="grid gap-3 lg:grid-cols-2">
+                  {filteredJobs.map((job) => {
+                const isApplied = applicationJobIds.has(job._id);
+                const isExpanded = expandedJobId === job._id;
+                const applyLabel = job.canApply === false
+                  ? "Apply unavailable"
+                  : isApplied
+                    ? "Applied"
+                    : applyLoadingJobId === job._id
+                      ? "Applying..."
+                      : "Apply now";
+
+                const helperText = isApplied
+                  ? "You have already applied to this job. Open My Applications to track updates."
+                  : job.canApply === false
+                    ? job.applyDisabledReason || "Applications are not available for this opening yet."
+                    : "This job is live and ready for direct application.";
+
+                    return (
+                      <div
+                        key={job._id}
+                        className="rounded-2xl border border-[#264a7f]/10 bg-white p-4 shadow-sm"
+                      >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h3 className="line-clamp-2 text-base font-semibold text-slate-900">
+                            {job.jobTitle || "Job Opening"}
+                          </h3>
+                          <p className="mt-1 text-sm text-slate-600">
+                            {job.companyName || "Company not shared"}
+                          </p>
+                          <p className="mt-1 text-sm text-slate-500">
+                            {job.jobLocation || "Location not shared"} • {job.employmentType || "Job type pending"}
+                          </p>
+                        </div>
+                        <span className="rounded-full bg-[#264a7f]/8 px-3 py-1 text-xs font-medium text-[#264a7f]">
+                          {job.minCtcLpa || 0} - {job.maxCtcLpa || 0} LPA
                         </span>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-600">
+                        <span className="rounded-full bg-slate-100 px-3 py-1">
+                          {job.department || "Department pending"}
+                        </span>
+                        <span className="rounded-full bg-slate-100 px-3 py-1">
+                          {job.experienceRequired || "Experience pending"}
+                        </span>
+                        <span className="rounded-full bg-slate-100 px-3 py-1">
+                          {job.qualification || "Qualification pending"}
+                        </span>
+                      </div>
+
+                      <p className="mt-3 text-sm leading-6 text-slate-600">
+                        <span className={isExpanded ? "" : "line-clamp-2"}>
+                          {job.description || "No detailed description shared for this opening."}
+                        </span>
+                      </p>
+
+                      {isExpanded && (
+                        <div className="mt-3 grid gap-2 rounded-xl bg-slate-50 p-3 text-sm text-slate-600">
+                          <p><span className="font-medium text-slate-800">Work mode:</span> {job.workModes?.join(", ") || "Not specified"}</p>
+                          <p><span className="font-medium text-slate-800">Industry:</span> {job.preferredIndustryBackground || "Not specified"}</p>
+                          <p><span className="font-medium text-slate-800">Deadline:</span> {job.applicationDeadline ? new Date(job.applicationDeadline).toLocaleDateString() : "Open until filled"}</p>
+                          <p><span className="font-medium text-slate-800">Skills:</span> {job.skills?.length ? job.skills.join(", ") : "Not provided"}</p>
+                        </div>
                       )}
-                    </div>
-                    <h3 className="mt-3 text-lg font-semibold text-slate-900">{job.jobTitle}</h3>
-                    <p className="mt-1 text-sm text-slate-500">{job.jobLocation}</p>
-                    {job.companyName && <p className="mt-1 text-sm font-medium text-slate-700">{job.companyName}</p>}
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-2xl border border-[#264a7f]/10 bg-[#264a7f]/[0.03] px-4 py-3">
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#264a7f]">Compensation</p>
-                        <p className="mt-1 text-sm font-medium text-slate-800">{job.minCtcLpa || 0} - {job.maxCtcLpa || 0} LPA</p>
+
+                      <p className="mt-3 text-xs text-slate-500">
+                        {helperText}
+                      </p>
+
+                      <div className="mt-4 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedJobId((current) => (current === job._id ? null : job._id))}
+                          className="flex-1 rounded-xl border border-[#264a7f]/12 bg-white px-4 py-2.5 text-sm font-semibold text-[#264a7f]"
+                        >
+                          {isExpanded ? "Hide details" : "View details"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void applyToJob(job._id);
+                          }}
+                          disabled={job.canApply === false || isApplied || applyLoadingJobId === job._id}
+                          title={job.canApply === false ? job.applyDisabledReason || "Applications are not available for this opening yet." : undefined}
+                          className="flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                          style={{ background: JOBS_HERO_GRADIENT }}
+                        >
+                          {applyLabel}
+                        </button>
                       </div>
-                      <div className="rounded-2xl border border-[#69a44f]/12 bg-[#69a44f]/[0.05] px-4 py-3">
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#5a8d43]">{job.openings ? "Openings" : "Work Setup"}</p>
-                        <p className="mt-1 text-sm font-medium text-slate-800">{job.openings || job.employmentType}</p>
-                      </div>
-                    </div>
                   </div>
-
-                  <div className="mt-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="text-sm text-slate-500">
-                      {job.canApply === false
-                        ? job.applyDisabledReason || "This job is visible for reference only."
-                        : applicationJobIds.has(job._id)
-                        ? "You have already applied to this role."
-                        : "Ready to apply with your current profile and resume."}
-                    </p>
-                    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-                      <button
-                        type="button"
-                        onClick={() => setExpandedJobId((current) => (current === job._id ? null : job._id))}
-                        className="w-full rounded-xl border border-[#264a7f]/12 bg-white px-4 py-3 text-sm font-semibold text-[#264a7f] shadow-sm sm:w-auto sm:min-w-[140px]"
-                      >
-                        {expandedJobId === job._id ? "Hide details" : "Read more"}
-                      </button>
-                      <button
-                        onClick={() => applyToJob(job._id)}
-                        disabled={job.canApply === false || applicationJobIds.has(job._id) || applyLoadingJobId === job._id}
-                        className="w-full rounded-xl px-4 py-3 text-sm font-semibold text-white shadow-[0_14px_32px_rgba(38,74,127,0.22)] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:min-w-[140px]"
-                        style={{ background: "var(--brand-gradient)" }}
-                      >
-                        {job.canApply === false
-                          ? "Not available"
-                          : applicationJobIds.has(job._id)
-                            ? "Applied"
-                            : applyLoadingJobId === job._id
-                              ? "Applying..."
-                              : "Apply now"}
-                      </button>
-                    </div>
-                  </div>
-
-                  {expandedJobId === job._id && (
-                    <div className="rounded-3xl border border-[#264a7f]/10 bg-[#f8fbff] p-5">
-                      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                        <div className="rounded-2xl bg-white p-4 shadow-sm">
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#264a7f]">Department</p>
-                          <p className="mt-2 text-sm font-medium text-slate-800">{job.department || "Not specified"}</p>
-                        </div>
-                        <div className="rounded-2xl bg-white p-4 shadow-sm">
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#264a7f]">Experience</p>
-                          <p className="mt-2 text-sm font-medium text-slate-800">{job.experienceRequired || "Not specified"}</p>
-                        </div>
-                        <div className="rounded-2xl bg-white p-4 shadow-sm">
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#264a7f]">Qualification</p>
-                          <p className="mt-2 text-sm font-medium text-slate-800">{job.qualification || "Not specified"}</p>
-                        </div>
-                        <div className="rounded-2xl bg-white p-4 shadow-sm">
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#264a7f]">Deadline</p>
-                          <p className="mt-2 text-sm font-medium text-slate-800">
-                            {job.applicationDeadline ? new Date(job.applicationDeadline).toLocaleDateString() : "Open until filled"}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 grid gap-4 lg:grid-cols-[1.15fr,0.85fr]">
-                        <div className="rounded-2xl bg-white p-5 shadow-sm">
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#264a7f]">Role Overview</p>
-                          <p className="mt-3 text-sm leading-6 text-slate-600">
-                            {job.description || "No detailed description shared for this opening."}
-                          </p>
-                        </div>
-
-                        <div className="space-y-4">
-                          <div className="rounded-2xl bg-white p-5 shadow-sm">
-                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#264a7f]">Requirement Snapshot</p>
-                            <div className="mt-3 space-y-2 text-sm text-slate-600">
-                              <p>Gender: {job.genderRequirement || "No preference"}</p>
-                              <p>Urgency: {job.urgencyLevel || "Not specified"}</p>
-                              <p>Work Modes: {job.workModes?.length ? job.workModes.join(", ") : "Not specified"}</p>
-                              <p>
-                                Salary: {job.salary?.min ?? job.minCtcLpa ?? 0} - {job.salary?.max ?? job.maxCtcLpa ?? 0} {job.salary?.currency || "INR"}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="rounded-2xl bg-white p-5 shadow-sm">
-                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#264a7f]">Must-have Details</p>
-                            <div className="mt-3 space-y-3 text-sm text-slate-600">
-                              <div>
-                                <p className="font-medium text-slate-800">Requirements</p>
-                                <p>{job.requirements?.length ? job.requirements.join(", ") : "Not provided"}</p>
-                              </div>
-                              <div>
-                                <p className="font-medium text-slate-800">Skills</p>
-                                <p>{job.skills?.length ? job.skills.join(", ") : "Not provided"}</p>
-                              </div>
-                              <div>
-                                <p className="font-medium text-slate-800">Responsibilities</p>
-                                <p>{job.responsibilities?.length ? job.responsibilities.join(", ") : "Not provided"}</p>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                );
+                  })}
                 </div>
               </div>
-            ))}
-            </div>
 
             {jobsMeta && jobsMeta.total > 0 && (
-              <p className="text-center text-xs text-muted-foreground">
-                Showing {jobs.length} of {jobsMeta.total} active jobs
-              </p>
-            )}
+              <div className={`${brandCardClass} px-5 py-4`}>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="text-sm text-slate-600">
+                    <p className="font-medium text-slate-900">
+                      Page {currentJobsPage} is showing {filteredJobs.length} jobs
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {jobsMeta.total} total active jobs across {jobsMeta.totalPages} pages {" • "} up to {JOBS_PAGE_LIMIT} jobs per page
+                    </p>
+                  </div>
 
-            {jobsMeta && jobsMeta.page < jobsMeta.totalPages && (
-              <button
-                onClick={loadMoreJobs}
-                disabled={jobsLoadingMore}
-                className="mx-auto block rounded-xl border border-[#264a7f]/12 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm disabled:opacity-60"
-              >
-                {jobsLoadingMore ? "Loading..." : "Load more"}
-              </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => void goToJobsPage(currentJobsPage - 1)}
+                      disabled={jobsLoadingMore || currentJobsPage <= 1}
+                      className="rounded-xl border border-[#264a7f]/12 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm disabled:opacity-60"
+                    >
+                      Previous page
+                    </button>
+                    <button
+                      onClick={() => void goToJobsPage(currentJobsPage + 1)}
+                      disabled={jobsLoadingMore || currentJobsPage >= jobsMeta.totalPages}
+                      className="rounded-xl border border-[#264a7f]/12 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm disabled:opacity-60"
+                    >
+                      {jobsLoadingMore ? "Loading..." : "Next page"}
+                    </button>
+                  </div>
+                </div>
+              </div>
             )}
-            {jobs.length === 0 && (
+            {filteredJobs.length === 0 && (
               <div className={`${brandCardClass} p-8 text-center`}>
-                <p className="text-lg font-semibold text-slate-900">No active jobs available right now.</p>
-                <p className="mt-2 text-sm text-slate-500">New openings will appear here as soon as employers publish them.</p>
+                <p className="text-lg font-semibold text-slate-900">No jobs match these filters right now.</p>
+                <p className="mt-2 text-sm text-slate-500">Try clearing the filters or loading more jobs to see additional openings.</p>
               </div>
             )}
           </div>
         )}
 
+
+
         {tab === "applications" && (
           <div className={`${brandCardClass} overflow-hidden`}>
-            <div className="border-b border-[#264a7f]/10 px-4 py-5 sm:px-6">
-              <h2 className="font-heading font-semibold text-slate-900">My Applications</h2>
-              <p className="mt-1 text-sm text-slate-500">Track progress, interview schedules, and recruiter notes in one place.</p>
+            <div className="border-b border-[#264a7f]/10 bg-[linear-gradient(135deg,rgba(38,74,127,0.08),rgba(105,164,79,0.08))] px-4 py-5 sm:px-6">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                  <h2 className="font-heading font-semibold text-slate-900">My Applications</h2>
+                  <p className="mt-1 text-sm text-slate-500">A mobile-friendly inbox for every client update, interview note, and hiring step.</p>
+                </div>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <span className="rounded-full bg-white/80 px-3 py-1.5 font-medium text-slate-700 shadow-sm">
+                    Total {applications.length}
+                  </span>
+                  <span className="rounded-full bg-white/80 px-3 py-1.5 font-medium text-slate-700 shadow-sm">
+                    Interviews {applications.filter((item) => item.status === "interview").length}
+                  </span>
+                </div>
+              </div>
             </div>
-            <div className="divide-y divide-border">
-              {(applications || []).map((application) => (
-                <div key={application._id} className="px-4 py-4 sm:px-6">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setExpandedApplicationId((current) =>
-                        current === application._id ? null : application._id,
-                      )
-                    }
-                    className={`w-full rounded-2xl border p-4 text-left transition ${
-                      expandedApplicationId === application._id
-                        ? "border-sky-200 bg-sky-50/60"
-                        : "border-border bg-background/60 hover:border-sky-100 hover:bg-background"
-                    }`}
-                  >
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-semibold text-slate-900">{application.jobId?.jobTitle || "Job"}</p>
-                          <span className="rounded-full border border-border bg-background px-3 py-1 text-xs font-medium capitalize">
-                            {formatStatusLabel(application.status)}
-                          </span>
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          {application.jobId?.jobLocation || "Location not shared"} -{" "}
-                          {application.jobId?.employmentType || "Employment type pending"}
-                        </p>
-                        <div className="flex flex-wrap gap-2 text-xs">
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">
-                            Applied {new Date(application.createdAt).toLocaleDateString()}
-                          </span>
-                          {application.statusUpdatedAt && (
-                            <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">
-                              Updated {new Date(application.statusUpdatedAt).toLocaleDateString()}
-                            </span>
-                          )}
-                          {application.interviewDetails?.scheduledAt && (
-                            <span className="rounded-full bg-sky-100 px-3 py-1 text-sky-800">
-                              Interview {getInterviewTimingMeta(application.interviewDetails.scheduledAt).label}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-sm text-slate-600">
-                          {application.statusNote
-                            ? application.statusNote
-                            : application.interviewDetails?.scheduledAt
-                              ? `${formatInterviewDate(application.interviewDetails.scheduledAt)} at ${formatInterviewTime(application.interviewDetails.scheduledAt)}`
-                              : "Open to see full job and application details."}
-                        </p>
-                      </div>
 
-                      <div className="flex items-center gap-2 text-sm font-medium text-sky-700">
-                        <span>{expandedApplicationId === application._id ? "Hide details" : "View details"}</span>
-                        <span aria-hidden="true">{expandedApplicationId === application._id ? '-' : '+'}</span>
-                      </div>
-                    </div>
-                  </button>
+            {(applications || []).length > 0 ? (
+              <div className="grid gap-0 lg:grid-cols-[300px,minmax(0,1fr)]">
+                <div
+                  className={`border-b border-[#264a7f]/10 bg-slate-50/70 p-2 lg:max-h-[calc(100vh-16rem)] lg:overflow-y-auto lg:border-b-0 lg:border-r ${
+                    mobileApplicationOpen ? "hidden lg:block" : "block"
+                  }`}
+                >
+                  <div className="space-y-2">
+                    {(applications || []).map((application) => {
+                      const isActive = activeApplicationId === application._id;
+                      const applicationResponse = getApplicationResponseSnapshot(application as Record<string, any>);
+                      const timelineItems =
+                        application.timeline && application.timeline.length
+                          ? application.timeline
+                          : [
+                              {
+                                status: application.status,
+                                changedAt: application.statusUpdatedAt || application.createdAt,
+                                note: application.statusNote,
+                              },
+                            ];
 
-                  {expandedApplicationId === application._id && (
-                    <div className="space-y-4 pt-4">
-                      <div className="grid gap-3 md:grid-cols-3">
-                        <div className="rounded-xl border border-border bg-background/70 p-4">
-                          <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                            Application status
-                          </p>
-                          <p className="mt-2 text-base font-semibold text-slate-900">
-                            {formatStatusLabel(application.status)}
-                          </p>
-                          <p className="mt-1 text-sm text-slate-600">
-                            Your latest position in the hiring process.
-                          </p>
-                        </div>
-                        <div className="rounded-xl border border-border bg-background/70 p-4">
-                          <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                            Job location
-                          </p>
-                          <p className="mt-2 text-base font-semibold text-slate-900">
-                            {application.jobId?.jobLocation || "Location not shared"}
-                          </p>
-                          <p className="mt-1 text-sm text-slate-600">
-                            {application.jobId?.employmentType || "Employment type pending"}
-                          </p>
-                        </div>
-                        <div className="rounded-xl border border-border bg-background/70 p-4">
-                          <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                            Application date
-                          </p>
-                          <p className="mt-2 text-base font-semibold text-slate-900">
-                            {new Date(application.createdAt).toLocaleDateString()}
-                          </p>
-                          <p className="mt-1 text-sm text-slate-600">
-                            Added to your dashboard on this date.
-                          </p>
-                        </div>
-                      </div>
-
-                      {application.statusNote && (
-                        <div className="rounded-lg border border-border bg-background/70 p-3 text-sm">
-                          <p className="font-medium">Latest update</p>
-                          <p className="mt-1 text-muted-foreground">{application.statusNote}</p>
-                          {application.statusUpdatedAt && (
-                            <p className="mt-2 text-xs text-muted-foreground">
-                              Updated on {new Date(application.statusUpdatedAt).toLocaleString()}
-                            </p>
-                          )}
-                        </div>
-                      )}
-
-                      {application.interviewDetails && (
-                        <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-4 text-sm">
-                          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                            <div className="space-y-2">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <p className="font-semibold text-slate-900">Interview schedule</p>
-                                <span
-                                  className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
-                                    getInterviewTimingMeta(application.interviewDetails.scheduledAt).tone
-                                  }`}
-                                >
-                                  {getInterviewTimingMeta(application.interviewDetails.scheduledAt).label}
-                                </span>
-                              </div>
-
-                              {application.interviewDetails.scheduledAt ? (
-                                <div className="rounded-xl bg-white/80 p-3 shadow-sm ring-1 ring-sky-100">
-                                  <p className="text-xs font-medium uppercase tracking-[0.18em] text-sky-700">
-                                    Scheduled for
-                                  </p>
-                                  <p className="mt-1 text-lg font-semibold text-slate-900">
-                                    {formatInterviewDate(application.interviewDetails.scheduledAt)}
-                                  </p>
-                                  <p className="text-sm text-slate-600">
-                                    {formatInterviewTime(application.interviewDetails.scheduledAt)}
-                                    {application.interviewDetails.timezone
-                                      ? ` (${application.interviewDetails.timezone})`
-                                      : ''}
-                                  </p>
-                                </div>
-                              ) : (
-                                <div className="rounded-xl bg-white/80 p-3 shadow-sm ring-1 ring-sky-100">
-                                  <p className="text-sm text-slate-600">
-                                    The client moved your application to the interview stage. Timing details are still
-                                    pending.
-                                  </p>
-                                </div>
-                              )}
+                      return (
+                        <button
+                          key={application._id}
+                          type="button"
+                          onClick={() => setExpandedApplicationId(application._id)}
+                          className={`w-full rounded-2xl border px-3 py-2.5 text-left transition ${
+                            isActive
+                              ? "border-[#264a7f]/20 bg-white shadow-sm"
+                              : "border-transparent bg-white/80 hover:border-[#264a7f]/10 hover:bg-white"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-slate-900">
+                                {application.jobId?.jobTitle || "Job"}
+                              </p>
+                              <p className="mt-0.5 truncate text-[11px] text-slate-500">
+                                {application.jobId?.jobLocation || "Location not shared"} {" - "} {application.jobId?.employmentType || "Type pending"}
+                              </p>
                             </div>
-
-                            <div className="grid gap-2 sm:grid-cols-2 lg:w-[360px]">
-                              <div className="rounded-xl border border-white/70 bg-white/80 p-3">
-                                <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
-                                  Mode
-                                </p>
-                                <p className="mt-1 font-medium text-slate-800">
-                                  {application.interviewDetails.mode
-                                    ? INTERVIEW_MODE_LABELS[application.interviewDetails.mode]
-                                    : "Not shared yet"}
-                                </p>
-                              </div>
-
-                              <div className="rounded-xl border border-white/70 bg-white/80 p-3">
-                                <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
-                                  Contact person
-                                </p>
-                                <p className="mt-1 font-medium text-slate-800">
-                                  {application.interviewDetails.contactPerson || "Will be shared by recruiter"}
-                                </p>
-                              </div>
-                            </div>
+                            <span className="rounded-full bg-[#264a7f]/8 px-2 py-1 text-[10px] font-semibold text-[#264a7f]">
+                              {formatStatusLabel(application.status)}
+                            </span>
                           </div>
 
-                          <div className="mt-4 grid gap-3 md:grid-cols-2">
-                            {(application.interviewDetails.locationText ||
-                              application.interviewDetails.googleMapsUrl ||
-                              application.interviewDetails.meetingLink) && (
-                              <div className="rounded-xl border border-white/70 bg-white/80 p-4">
-                                <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
-                                  Joining details
+                          <div className="mt-1.5 flex items-center gap-2">
+                            <span className="h-2.5 w-2.5 rounded-full bg-[#69a44f]" />
+                            <p className="line-clamp-1 text-[11px] leading-5 text-slate-600">
+                              {applicationResponse.statusNote
+                                ? applicationResponse.statusNote
+                                : applicationResponse.interviewDetails?.scheduledAt
+                                  ? `Interview ${formatInterviewDate(applicationResponse.interviewDetails.scheduledAt)} at ${formatInterviewTime(applicationResponse.interviewDetails.scheduledAt)}`
+                                  : "Open this card to read all client updates."}
+                            </p>
+                          </div>
+
+                          <div className="mt-1.5 flex items-center justify-between text-[10px] text-slate-500">
+                            <span>{timelineItems.length} updates</span>
+                            <span>
+                              {new Date(
+                                application.statusUpdatedAt || application.createdAt,
+                              ).toLocaleDateString()}
+                            </span>
+                          </div>
+
+                          <div className="mt-1.5 grid grid-cols-2 gap-2 text-[10px] text-slate-500">
+                            <span className="rounded-full bg-slate-50 px-2.5 py-1">
+                              {new Date(application.createdAt).toLocaleDateString()}
+                            </span>
+                            <span className="rounded-full bg-slate-50 px-2.5 py-1">
+                              {application.qualification || "Qualification not shared"}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {selectedApplication && (
+                  <div className={`bg-white p-2 sm:p-3 ${mobileApplicationOpen ? "block" : "hidden lg:block"}`}>
+                    {(() => {
+                      const selectedResponse = getApplicationResponseSnapshot(
+                        selectedApplication as Record<string, any>,
+                      );
+                      return (
+                    <div className="rounded-2xl border border-[#264a7f]/10 bg-white">
+                      <div className="border-b border-[#264a7f]/10 px-4 py-3 lg:hidden">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedApplicationId(null)}
+                          className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600"
+                        >
+                          <ArrowLeft className="h-3.5 w-3.5" />
+                          Back to applications
+                        </button>
+                      </div>
+                      <div className="border-b border-[#264a7f]/10 px-4 py-3 sm:px-5">
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-base font-semibold text-slate-900 sm:text-lg">
+                                {selectedApplication.jobId?.jobTitle || "Job"}
+                              </p>
+                              {(selectedApplication.jobId?.sourceLabel ||
+                                selectedApplication.jobId?.sourceCollection) && (
+                                <span className="hidden rounded-full border border-[#264a7f]/10 bg-[#264a7f]/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#264a7f]">
+                                  {selectedApplication.jobId?.sourceLabel ||
+                                    (selectedApplication.jobId?.sourceCollection === "openings"
+                                      ? "RecruitKr Hiring"
+                                      : "Client Requirement")}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-slate-500">
+                              {selectedApplication.jobId?.jobLocation || "Location not shared"} •{" "}
+                              {selectedApplication.jobId?.employmentType || "Employment type pending"}
+                            </p>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            <span className="rounded-full bg-[#264a7f] px-3 py-1.5 text-xs font-semibold text-white">
+                              {formatStatusLabel(selectedApplication.status)}
+                            </span>
+                            <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600">
+                              Applied {new Date(selectedApplication.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="hidden">
+                        <div className="rounded-2xl bg-slate-50 px-3 py-2.5">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            Latest update
+                          </p>
+                          <p className="mt-2 text-sm font-medium text-slate-900">
+                            {selectedApplication.statusNote || "No written note yet"}
+                          </p>
+                        </div>
+                        <div className="rounded-2xl bg-slate-50 px-3 py-2.5">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            Last changed
+                          </p>
+                          <p className="mt-2 text-sm font-medium text-slate-900">
+                            {new Date(
+                              selectedApplication.statusUpdatedAt || selectedApplication.createdAt,
+                            ).toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="rounded-2xl bg-slate-50 px-3 py-2.5">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            Interview state
+                          </p>
+                          <p className="mt-2 text-sm font-medium text-slate-900">
+                            {getInterviewTimingMeta(selectedApplication.interviewDetails?.scheduledAt).label}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3 px-4 py-4 sm:px-5">
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                          <p className="text-xs font-semibold text-slate-500">Latest update</p>
+                          <p className="mt-1 text-sm text-slate-900">
+                            {selectedResponse.statusNote || "No written update yet."}
+                          </p>
+                          <p className="mt-2 text-xs text-slate-500">
+                            Last changed{" "}
+                            {new Date(
+                              selectedApplication.statusUpdatedAt || selectedApplication.createdAt,
+                            ).toLocaleString()}
+                          </p>
+                        </div>
+
+                        {(() => {
+                          const responseItems = [
+                            {
+                              label: "Status",
+                              value: formatStatusLabel(selectedApplication.status),
+                            },
+                            selectedResponse.statusNote
+                              ? {
+                                  label: "Candidate message",
+                                  value: selectedResponse.statusNote,
+                                }
+                              : null,
+                            selectedResponse.interviewDetails?.mode
+                              ? {
+                                  label: "Interview mode",
+                                  value:
+                                    INTERVIEW_MODE_LABELS[selectedResponse.interviewDetails.mode],
+                                }
+                              : null,
+                            selectedResponse.interviewDetails?.scheduledAt
+                              ? {
+                                  label: "Interview date",
+                                  value: formatInterviewDate(
+                                    selectedResponse.interviewDetails.scheduledAt,
+                                  ),
+                                }
+                              : null,
+                            selectedResponse.interviewDetails?.scheduledAt
+                              ? {
+                                  label: "Interview time",
+                                  value: formatInterviewTime(
+                                    selectedResponse.interviewDetails.scheduledAt,
+                                  ),
+                                }
+                              : null,
+                            selectedResponse.interviewDetails?.locationText
+                              ? {
+                                  label: "Interview location",
+                                  value: selectedResponse.interviewDetails.locationText,
+                                }
+                              : null,
+                            selectedResponse.interviewDetails?.contactPerson
+                              ? {
+                                  label: "Contact person",
+                                  value: selectedResponse.interviewDetails.contactPerson,
+                                }
+                              : null,
+                            selectedResponse.interviewDetails?.contactPhone
+                              ? {
+                                  label: "Contact phone",
+                                  value: selectedResponse.interviewDetails.contactPhone,
+                                }
+                              : null,
+                            selectedResponse.interviewDetails?.contactEmail
+                              ? {
+                                  label: "Contact email",
+                                  value: selectedResponse.interviewDetails.contactEmail,
+                                }
+                              : null,
+                            selectedResponse.interviewDetails?.googleMapsUrl
+                              ? {
+                                  label: "Google map location",
+                                  value: selectedResponse.interviewDetails.googleMapsUrl,
+                                  href: selectedResponse.interviewDetails.googleMapsUrl,
+                                }
+                              : null,
+                            selectedResponse.interviewDetails?.reportingNotes
+                              ? {
+                                  label: "Reporting notes",
+                                  value: selectedResponse.interviewDetails.reportingNotes,
+                                }
+                              : null,
+                            selectedResponse.interviewDetails?.documentsRequired
+                              ? {
+                                  label: "Documents required",
+                                  value: selectedResponse.interviewDetails.documentsRequired,
+                                }
+                              : null,
+                            selectedResponse.interviewDetails?.additionalInstructions
+                              ? {
+                                  label: "Additional instructions",
+                                  value:
+                                    selectedResponse.interviewDetails.additionalInstructions,
+                                }
+                              : null,
+                          ].filter(Boolean) as Array<{
+                            label: string;
+                            value: string;
+                            href?: string;
+                          }>;
+
+                          return (
+                            <div className="rounded-xl border border-[#264a7f]/10 bg-[#f8fbff] p-3">
+                              <p className="text-sm font-semibold text-slate-900">Client response</p>
+                              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                                {responseItems.map((item) => (
+                                  <div
+                                    key={item.label}
+                                    className={`rounded-xl bg-white p-3 ${
+                                      item.label === "Contact email" ||
+                                      item.label === "Google map location" ||
+                                      item.label === "Reporting notes" ||
+                                      item.label === "Documents required" ||
+                                      item.label === "Additional instructions"
+                                        ? "sm:col-span-2"
+                                        : ""
+                                    }`}
+                                  >
+                                    <p className="text-xs font-semibold text-slate-500">{item.label}</p>
+                                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                                      <p className="break-all text-sm text-slate-900">{item.value}</p>
+                                      {item.href && (
+                                        <a
+                                          href={item.href}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700"
+                                        >
+                                          Open map
+                                        </a>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <div className="rounded-xl border border-slate-200 p-3">
+                            <p className="text-xs font-semibold text-slate-500">Applied on</p>
+                            <p className="mt-1 text-sm text-slate-900">
+                              {new Date(selectedApplication.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="rounded-xl border border-slate-200 p-3">
+                            <p className="text-xs font-semibold text-slate-500">Qualification</p>
+                            <p className="mt-1 text-sm text-slate-900">
+                              {selectedApplication.qualification || "Not shared"}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <div className="rounded-xl border border-slate-200 p-3">
+                            <p className="text-xs font-semibold text-slate-500">Candidate name</p>
+                            <p className="mt-1 text-sm text-slate-900">
+                              {selectedApplication.fullName || profile?.fullName || "Not shared"}
+                            </p>
+                          </div>
+                          <div className="rounded-xl border border-slate-200 p-3">
+                            <p className="text-xs font-semibold text-slate-500">Email</p>
+                            <p className="mt-1 break-all text-sm text-slate-900">
+                              {selectedApplication.email || "No email"}
+                            </p>
+                          </div>
+                          <div className="rounded-xl border border-slate-200 p-3">
+                            <p className="text-xs font-semibold text-slate-500">Phone</p>
+                            <p className="mt-1 text-sm text-slate-900">
+                              {selectedApplication.phone || "No phone"}
+                            </p>
+                          </div>
+                          <div className="rounded-xl border border-slate-200 p-3">
+                            <p className="text-xs font-semibold text-slate-500">Current city</p>
+                            <p className="mt-1 text-sm text-slate-900">
+                              {selectedApplication.currentCity || "Not shared"}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-200 p-3">
+                          <p className="text-sm font-semibold text-slate-900">Your submitted application</p>
+                          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                            <div className="rounded-xl bg-slate-50 p-3">
+                              <p className="text-xs font-semibold text-slate-500">Applied for</p>
+                              <p className="mt-1 text-sm text-slate-900">
+                                {selectedApplication.appliedFor || selectedApplication.jobId?.jobTitle || "Job"}
+                              </p>
+                            </div>
+                            <div className="rounded-xl bg-slate-50 p-3">
+                              <p className="text-xs font-semibold text-slate-500">Experience</p>
+                              <p className="mt-1 text-sm text-slate-900">
+                                {selectedApplication.experience?.[0]?.jobProfile || "Not shared"}
+                              </p>
+                            </div>
+                            <div className="rounded-xl bg-slate-50 p-3">
+                              <p className="text-xs font-semibold text-slate-500">Applied on</p>
+                              <p className="mt-1 text-sm text-slate-900">
+                                {new Date(selectedApplication.createdAt).toLocaleString()}
+                              </p>
+                            </div>
+                            <div className="rounded-xl bg-slate-50 p-3">
+                              <p className="text-xs font-semibold text-slate-500">Source</p>
+                              <p className="mt-1 text-sm text-slate-900">
+                                {selectedApplication.jobId?.sourceLabel || "RecruitKr"}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {selectedResponse.interviewDetails &&
+                          (selectedResponse.interviewDetails.scheduledAt ||
+                            selectedResponse.interviewDetails.mode ||
+                            selectedResponse.interviewDetails.locationText ||
+                            selectedResponse.interviewDetails.contactPerson ||
+                            selectedResponse.interviewDetails.contactEmail ||
+                            selectedResponse.interviewDetails.contactPhone ||
+                            selectedResponse.interviewDetails.notes ||
+                            selectedResponse.interviewDetails.reportingNotes ||
+                            selectedResponse.interviewDetails.documentsRequired ||
+                            selectedResponse.interviewDetails.additionalInstructions) && (
+                          <div className="rounded-xl border border-sky-200 bg-sky-50 p-3">
+                            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                              <div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <p className="text-sm font-semibold text-slate-900">Interview details shared by client</p>
+                                  <span
+                                    className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                                      getInterviewTimingMeta(selectedResponse.interviewDetails.scheduledAt).tone
+                                    }`}
+                                  >
+                                    {getInterviewTimingMeta(selectedResponse.interviewDetails.scheduledAt).label}
+                                  </span>
+                                </div>
+                                <p className="mt-2 text-sm text-slate-600">
+                                  {selectedResponse.interviewDetails.scheduledAt
+                                    ? `${formatInterviewDate(selectedResponse.interviewDetails.scheduledAt)} at ${formatInterviewTime(selectedResponse.interviewDetails.scheduledAt)}${selectedResponse.interviewDetails.timezone ? ` (${selectedResponse.interviewDetails.timezone})` : ""}`
+                                    : "The client moved your application to interview and timing details are still pending."}
                                 </p>
-                                {application.interviewDetails.locationText && (
-                                  <p className="mt-2 text-sm text-slate-700">
-                                    {application.interviewDetails.locationText}
-                                  </p>
-                                )}
+                              </div>
+
+                              <div className="hidden rounded-2xl bg-white/80 px-4 py-3 text-sm text-slate-700 shadow-sm">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                  Next step
+                                </p>
+                                <p className="mt-2">{getInterviewTimingMeta(selectedResponse.interviewDetails.scheduledAt).hint}</p>
+                              </div>
+                            </div>
+
+                            <div className="mt-3 grid gap-3">
+                              <div className="rounded-xl bg-white p-3">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                  Meeting setup
+                                </p>
+                                <div className="mt-2 space-y-2 text-sm text-slate-700">
+                                  <p>Mode: {selectedResponse.interviewDetails.mode ? INTERVIEW_MODE_LABELS[selectedResponse.interviewDetails.mode] : "Not shared yet"}</p>
+                                  <p>Contact: {selectedResponse.interviewDetails.contactPerson || "Will be shared by client"}</p>
+                                  {selectedResponse.interviewDetails.locationText && <p>{selectedResponse.interviewDetails.locationText}</p>}
+                                </div>
                                 <div className="mt-3 flex flex-wrap gap-2">
-                                  {application.interviewDetails.meetingLink && (
+                                  {selectedResponse.interviewDetails.meetingLink && (
                                     <a
-                                      href={application.interviewDetails.meetingLink}
+                                      href={selectedResponse.interviewDetails.meetingLink}
                                       target="_blank"
                                       rel="noreferrer"
-                                      className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white"
+                                      className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white"
                                     >
                                       Open meeting link
                                     </a>
                                   )}
-                                  {application.interviewDetails.googleMapsUrl && (
+                                  {selectedResponse.interviewDetails.googleMapsUrl && (
                                     <a
-                                      href={application.interviewDetails.googleMapsUrl}
+                                      href={selectedResponse.interviewDetails.googleMapsUrl}
                                       target="_blank"
                                       rel="noreferrer"
-                                      className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700"
+                                      className="rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700"
                                     >
                                       Open map
                                     </a>
                                   )}
                                 </div>
                               </div>
-                            )}
 
-                            {(application.interviewDetails.contactEmail ||
-                              application.interviewDetails.contactPhone ||
-                              application.interviewDetails.notes) && (
-                              <div className="rounded-xl border border-white/70 bg-white/80 p-4">
-                                <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+                              <div className="rounded-xl bg-white p-3">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                                   Notes and support
                                 </p>
                                 <div className="mt-2 space-y-2 text-sm text-slate-700">
-                                  {application.interviewDetails.contactEmail && (
-                                    <p className="break-all">
-                                      Email: {application.interviewDetails.contactEmail}
-                                    </p>
+                                  {selectedResponse.interviewDetails.contactEmail && (
+                                    <p className="break-all">Email: {selectedResponse.interviewDetails.contactEmail}</p>
                                   )}
-                                  {application.interviewDetails.contactPhone && (
-                                    <p>Phone: {application.interviewDetails.contactPhone}</p>
+                                  {selectedResponse.interviewDetails.contactPhone && (
+                                    <p>Phone: {selectedResponse.interviewDetails.contactPhone}</p>
                                   )}
-                                  {application.interviewDetails.notes && (
-                                    <p className="rounded-lg bg-slate-50 p-3 text-slate-600">
-                                      {application.interviewDetails.notes}
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                          </div>
+                                  <div className="space-y-2">
+                                    <div className="rounded-xl bg-slate-50 px-3 py-2 text-slate-600">
+                                      <p className="text-xs font-semibold text-slate-500">Candidate message</p>
+                                      <p className="mt-1">
+                                        {selectedResponse.interviewDetails.notes || "No extra note shared yet."}
+                                      </p>
+                                    </div>
 
-                          <div className="mt-4 rounded-xl border border-dashed border-sky-200 bg-white/70 p-3">
-                            <p className="text-xs font-medium uppercase tracking-[0.16em] text-sky-700">
-                              What to do next
-                            </p>
-                            <p className="mt-1 text-sm text-slate-700">
-                              {getInterviewTimingMeta(application.interviewDetails.scheduledAt).hint}
-                            </p>
-                          </div>
-                        </div>
-                      )}
+                                    {selectedResponse.interviewDetails.reportingNotes && (
+                                      <div className="rounded-xl bg-slate-50 px-3 py-2 text-slate-600">
+                                        <p className="text-xs font-semibold text-slate-500">Reporting notes</p>
+                                        <p className="mt-1">{selectedResponse.interviewDetails.reportingNotes}</p>
+                                      </div>
+                                    )}
 
-                      <div>
-                        <p className="mb-2 text-sm font-medium">RecruitKr updates</p>
-                        <div className="space-y-3">
-                          {(application.timeline && application.timeline.length
-                            ? application.timeline
-                            : [
-                                {
-                                  status: application.status,
-                                  changedAt: application.statusUpdatedAt || application.createdAt,
-                                  note: application.statusNote,
-                                },
-                              ]
-                          ).map((item, index) => (
-                            <div
-                              key={`${application._id}-${item.status}-${index}`}
-                              className={`flex ${item.changedByRole === 'candidate' ? 'justify-end' : 'justify-start'}`}
-                            >
-                              <div className="max-w-2xl rounded-2xl border border-border bg-background px-4 py-3">
-                                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                                  <p className="text-sm font-medium">{formatStatusLabel(item.status)}</p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {item.changedAt ? new Date(item.changedAt).toLocaleString() : 'Recently updated'}
-                                  </p>
+                                    {selectedResponse.interviewDetails.documentsRequired && (
+                                      <div className="rounded-xl bg-slate-50 px-3 py-2 text-slate-600">
+                                        <p className="text-xs font-semibold text-slate-500">Documents required</p>
+                                        <p className="mt-1">{selectedResponse.interviewDetails.documentsRequired}</p>
+                                      </div>
+                                    )}
+
+                                    {selectedResponse.interviewDetails.additionalInstructions && (
+                                      <div className="rounded-xl bg-slate-50 px-3 py-2 text-slate-600">
+                                        <p className="text-xs font-semibold text-slate-500">Additional instructions</p>
+                                        <p className="mt-1">{selectedResponse.interviewDetails.additionalInstructions}</p>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
-                                <p className="mt-1 text-xs uppercase tracking-wide text-muted-foreground">
-                                  {item.changedByRole === 'client'
-                                    ? 'RecruitKr / Client update'
-                                    : item.changedByRole === 'candidate'
-                                      ? 'You'
-                                      : 'System'}
-                                </p>
-                                {item.note && <p className="mt-2 text-sm text-muted-foreground">{item.note}</p>}
                               </div>
                             </div>
-                          ))}
+                          </div>
+                        )}
+
+                        <div className="rounded-xl border border-slate-200 bg-white p-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-semibold text-slate-900">Status history</p>
+                              <p className="mt-1 text-xs text-slate-500">Simple list of all updates.</p>
+                            </div>
+                            <span className="hidden rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600 sm:inline-flex">
+                              Live thread
+                            </span>
+                          </div>
+
+                          <div className="mt-3 space-y-2">
+                            {(selectedApplication.timeline && selectedApplication.timeline.length
+                              ? selectedApplication.timeline
+                              : [
+                                  {
+                                    status: selectedApplication.status,
+                                    changedAt:
+                                      selectedApplication.statusUpdatedAt || selectedApplication.createdAt,
+                                    note: selectedResponse.statusNote,
+                                  },
+                                ]
+                            ).map((item, index) => {
+                              const isCandidate = item.changedByRole === "candidate";
+                              const isClient = item.changedByRole === "client";
+
+                              return (
+                                <div
+                                  key={`${selectedApplication._id}-${item.status}-${index}`}
+                                  className="rounded-xl border border-slate-200 p-3"
+                                >
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-semibold text-slate-900">
+                                        {formatStatusLabel(item.status)}
+                                      </p>
+                                      <p className="mt-1 text-xs text-slate-500">
+                                        {isClient
+                                          ? "Client / RecruitKr"
+                                          : isCandidate
+                                            ? "You"
+                                            : "System"}
+                                      </p>
+                                    </div>
+                                    <p className="text-xs text-slate-500">
+                                      {item.changedAt
+                                        ? new Date(item.changedAt).toLocaleDateString()
+                                        : "Recently updated"}
+                                    </p>
+                                  </div>
+                                  <p className="mt-2 text-sm leading-6 text-slate-700">
+                                    {item.note ||
+                                      (item.status === "applied"
+                                        ? "Your application was submitted."
+                                        : "Status changed with no extra note yet.")}
+                                  </p>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-              {(applications || []).length === 0 && (
-                <div className="px-4 py-4 text-sm text-muted-foreground sm:px-6">No applications yet.</div>
-              )}
-            </div>
+                      </div>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="px-4 py-8 text-center text-sm text-slate-500 sm:px-6">
+                No applications yet.
+              </div>
+            )}
           </div>
         )}
 

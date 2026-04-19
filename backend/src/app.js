@@ -46,7 +46,9 @@ app.use((req, _res, next) => {
   next();
 });
 app.use(hpp());
-app.use(globalLimiter);
+if (env.NODE_ENV === 'production') {
+  app.use(globalLimiter);
+}
 app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
 app.use('/api/v1', apiRoutes);

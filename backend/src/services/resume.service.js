@@ -748,7 +748,9 @@ export const generateResumePdfBuffer = async (profile) => {
     process.env.PUPPETEER_NO_SANDBOX === 'true' ||
     process.env.DISABLE_CHROME_SANDBOX === 'true';
 
-  const resolvedUserDataDir = process.env.PUPPETEER_USER_DATA_DIR || path.join(os.tmpdir(), 'recruitkr-puppeteer');
+  const configuredUserDataDir = String(process.env.PUPPETEER_USER_DATA_DIR || '').trim();
+  const resolvedUserDataDir =
+    configuredUserDataDir || fs.mkdtempSync(path.join(os.tmpdir(), 'recruitkr-puppeteer-'));
   const launchArgs = [
     '--disable-dev-shm-usage',
     '--font-render-hinting=none',
@@ -796,12 +798,13 @@ export const generateResumePdfBuffer = async (profile) => {
     return Buffer.from(pdfBuffer);
   } catch (error) {
     console.error('Resume template PDF generation failed:', error?.message || error);
-    throw new Error(
-      `Resume template rendering failed. resume.html could not be rendered by Puppeteer. ${error?.message || error}`,
-    );
+    throw new Error('Unable to generate the resume PDF right now. Please try again.');
   } finally {
     if (browser) {
       await browser.close();
+    }
+    if (!configuredUserDataDir && resolvedUserDataDir) {
+      fs.rmSync(resolvedUserDataDir, { recursive: true, force: true });
     }
   }
 };

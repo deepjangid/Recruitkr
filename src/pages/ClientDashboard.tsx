@@ -31,7 +31,7 @@ const statCardClass =
 type InterviewDetails = {
   scheduledAt?: string;
   timezone?: string;
-  mode?: "onsite" | "google-meet" | "phone" | "video" | "other";
+  mode?: "onsite" | "google-meet" | "phone" | "video" | "zoom" | "other";
   locationText?: string;
   googleMapsUrl?: string;
   meetingLink?: string;
@@ -39,6 +39,9 @@ type InterviewDetails = {
   contactEmail?: string;
   contactPhone?: string;
   notes?: string;
+  reportingNotes?: string;
+  documentsRequired?: string;
+  additionalInstructions?: string;
 };
 
 type ApplicationTimelineItem = {
@@ -67,6 +70,7 @@ const INTERVIEW_MODE_OPTIONS: Array<{ value: NonNullable<InterviewDetails["mode"
   { value: "google-meet", label: "Google Meet" },
   { value: "phone", label: "Phone call" },
   { value: "video", label: "Video call" },
+  { value: "zoom", label: "Zoom" },
   { value: "other", label: "Other" },
 ];
 
@@ -740,6 +744,15 @@ const ClientDashboard = () => {
             ? { contactPhone: rawInterviewDetails.contactPhone.trim() }
             : {}),
           ...(rawInterviewDetails.notes?.trim() ? { notes: rawInterviewDetails.notes.trim() } : {}),
+          ...(rawInterviewDetails.reportingNotes?.trim()
+            ? { reportingNotes: rawInterviewDetails.reportingNotes.trim() }
+            : {}),
+          ...(rawInterviewDetails.documentsRequired?.trim()
+            ? { documentsRequired: rawInterviewDetails.documentsRequired.trim() }
+            : {}),
+          ...(rawInterviewDetails.additionalInstructions?.trim()
+            ? { additionalInstructions: rawInterviewDetails.additionalInstructions.trim() }
+            : {}),
         }).filter(([, value]) => value !== undefined && value !== ""),
       );
 
@@ -747,7 +760,47 @@ const ClientDashboard = () => {
         `/jobs/applications/${applicationId}/status`,
         {
           status: application.status,
-          ...(application.statusNote?.trim() ? { note: application.statusNote.trim() } : {}),
+          ...(application.statusNote?.trim()
+            ? {
+                note: application.statusNote.trim(),
+                candidateResponse: application.statusNote.trim(),
+                clientNote: application.statusNote.trim(),
+              }
+            : {}),
+          ...(rawInterviewDetails.scheduledAt
+            ? {
+                interviewDate: new Date(rawInterviewDetails.scheduledAt).toLocaleDateString("en-GB"),
+                interviewTime: new Date(rawInterviewDetails.scheduledAt).toLocaleTimeString("en-US", {
+                  hour: "numeric",
+                  minute: "2-digit",
+                }),
+              }
+            : {}),
+          ...(rawInterviewDetails.mode ? { interviewMode: rawInterviewDetails.mode } : {}),
+          ...(rawInterviewDetails.locationText?.trim()
+            ? { interviewLocation: rawInterviewDetails.locationText.trim() }
+            : {}),
+          ...(rawInterviewDetails.googleMapsUrl?.trim()
+            ? { googleMapLocation: rawInterviewDetails.googleMapsUrl.trim() }
+            : {}),
+          ...(rawInterviewDetails.contactPerson?.trim()
+            ? { contactPerson: rawInterviewDetails.contactPerson.trim() }
+            : {}),
+          ...(rawInterviewDetails.contactEmail?.trim()
+            ? { contactEmail: rawInterviewDetails.contactEmail.trim() }
+            : {}),
+          ...(rawInterviewDetails.contactPhone?.trim()
+            ? { contactPhone: rawInterviewDetails.contactPhone.trim() }
+            : {}),
+          ...(rawInterviewDetails.reportingNotes?.trim()
+            ? { reportingNotes: rawInterviewDetails.reportingNotes.trim() }
+            : {}),
+          ...(rawInterviewDetails.documentsRequired?.trim()
+            ? { documentsRequired: rawInterviewDetails.documentsRequired.trim() }
+            : {}),
+          ...(rawInterviewDetails.additionalInstructions?.trim()
+            ? { additionalInstructions: rawInterviewDetails.additionalInstructions.trim() }
+            : {}),
           ...(Object.keys(sanitizedInterviewDetails).length
             ? { interviewDetails: sanitizedInterviewDetails }
             : {}),
@@ -1344,6 +1397,57 @@ const ClientDashboard = () => {
                       rows={3}
                       className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
                       placeholder="Documents, reporting instructions, rounds, etc."
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Reporting notes</label>
+                    <textarea
+                      value={selectedApplicationDetails.application.interviewDetails?.reportingNotes || ""}
+                      onChange={(e) =>
+                        updateInterviewField(
+                          selectedApplicationDetails.application._id,
+                          "reportingNotes",
+                          e.target.value,
+                        )
+                      }
+                      rows={3}
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                      placeholder="Where to report, floor, gate, timing instructions"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Documents required</label>
+                    <textarea
+                      value={selectedApplicationDetails.application.interviewDetails?.documentsRequired || ""}
+                      onChange={(e) =>
+                        updateInterviewField(
+                          selectedApplicationDetails.application._id,
+                          "documentsRequired",
+                          e.target.value,
+                        )
+                      }
+                      rows={3}
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                      placeholder="Resume, Aadhaar, certificates, photos, etc."
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Additional instructions</label>
+                    <textarea
+                      value={selectedApplicationDetails.application.interviewDetails?.additionalInstructions || ""}
+                      onChange={(e) =>
+                        updateInterviewField(
+                          selectedApplicationDetails.application._id,
+                          "additionalInstructions",
+                          e.target.value,
+                        )
+                      }
+                      rows={3}
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                      placeholder="Any extra details the candidate should know"
                     />
                   </div>
                 </div>

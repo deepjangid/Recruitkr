@@ -48,6 +48,53 @@ const toISOStringSafe = (value, fallback) => {
   return Number.isNaN(date.getTime()) ? fallback : date.toISOString();
 };
 
+const parseFlexibleScheduledAt = (dateValue, timeValue) => {
+  const dateText = String(dateValue || '').trim();
+  const timeText = String(timeValue || '').trim();
+  if (!dateText) return undefined;
+
+  if (!timeText) {
+    const directDate = new Date(dateText);
+    return Number.isNaN(directDate.getTime()) ? undefined : directDate;
+  }
+
+  const directDateTime = new Date(`${dateText} ${timeText}`);
+  if (!Number.isNaN(directDateTime.getTime())) {
+    return directDateTime;
+  }
+
+  const dateMatch = dateText.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  const timeMatch = timeText.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!dateMatch || !timeMatch) return undefined;
+
+  const day = Number(dateMatch[1]);
+  const monthIndex = Number(dateMatch[2]) - 1;
+  const year = Number(dateMatch[3]);
+  let hour = Number(timeMatch[1]);
+  const minute = Number(timeMatch[2]);
+  const meridiem = timeMatch[3].toUpperCase();
+
+  if (meridiem === 'PM' && hour < 12) hour += 12;
+  if (meridiem === 'AM' && hour === 12) hour = 0;
+
+  const composed = new Date(year, monthIndex, day, hour, minute, 0, 0);
+  return Number.isNaN(composed.getTime()) ? undefined : composed;
+};
+
+const normalizeInterviewMode = (value) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return undefined;
+  if (normalized === 'google meet' || normalized === 'gmeet' || normalized === 'meet') {
+    return 'google-meet';
+  }
+  if (normalized === 'video call' || normalized === 'video') return 'video';
+  if (normalized === 'phone call' || normalized === 'phone') return 'phone';
+  if (normalized === 'on-site' || normalized === 'onsite') return 'onsite';
+  if (normalized === 'zoom') return 'zoom';
+  if (normalized === 'other') return 'other';
+  return normalized;
+};
+
 const buildLegacyTimeline = (legacyApplication, fallbackCreatedAt, mappedStatus, statusNote) => {
   if (Array.isArray(legacyApplication.timeline) && legacyApplication.timeline.length > 0) {
     return legacyApplication.timeline.map((item) => ({
@@ -87,9 +134,7 @@ const transformLegacyApplication = (legacyApplication, jobsByKey = new Map()) =>
     new Date().toISOString(),
   );
   const status = mapLegacyStatus(legacyApplication.status);
-  const statusNote = String(
-    legacyApplication.statusNote || legacyApplication.notes || legacyApplication.note || '',
-  ).trim();
+  const statusNote = deriveStatusNoteFromRecord(legacyApplication);
   const jobTitle = String(legacyApplication.jobTitle || legacyApplication.appliedFor || 'Job').trim();
   const matchedJob = jobsByKey.get(normalizeJobKey(jobTitle));
   const experienceLabel = String(legacyApplication.experience?.[0]?.jobProfile || '').toLowerCase();
@@ -104,7 +149,7 @@ const transformLegacyApplication = (legacyApplication, jobsByKey = new Map()) =>
       legacyApplication.statusUpdatedAt || legacyApplication.updatedAt,
       createdAt,
     ),
-    interviewDetails: legacyApplication.interviewDetails || undefined,
+    interviewDetails: deriveInterviewDetailsFromRecord(legacyApplication),
     timeline: buildLegacyTimeline(legacyApplication, createdAt, status, statusNote),
     jobId: matchedJob
       ? {
@@ -160,8 +205,103 @@ const getLegacyResumeBuffer = (resumeData) => {
   return null;
 };
 
+const PUBLIC_JOB_COLLECTIONS = ['jobs', 'openings'];
+
+const getSourceCollectionLabel = (sourceCollection) => {
+  if (sourceCollection === 'openings') return 'RecruitKr Hiring';
+  if (sourceCollection === 'jobs') return 'Imported Hiring';
+  return 'Client Requirement';
+};
+
+const resolveJobOwnerId = (job, sourceCollection) => {
+  if (!job) return '';
+
+  if (!sourceCollection || sourceCollection === 'jobRequirements') {
+    return String(job.clientId || '').trim();
+  }
+
+  const ownerCandidate = [
+    job.clientId,
+    job.ownerId,
+    job.createdBy,
+    job.postedBy,
+  ].find((value) => mongoose.isValidObjectId(String(value || '').trim()));
+
+  return ownerCandidate ? String(ownerCandidate).trim() : '';
+};
+
+const resolveJobOwnerRole = ({ sourceCollection, ownerId, ownerRole }) => {
+  if (ownerRole) return ownerRole;
+  if (!ownerId) return sourceCollection === 'openings' ? 'admin' : 'client';
+  return sourceCollection === 'openings' ? 'admin' : 'client';
+};
+
+const findExternalJobById = async (jobId) => {
+  for (const collectionName of PUBLIC_JOB_COLLECTIONS) {
+    const doc = await JobRequirement.db.collection(collectionName).findOne({
+      _id: new mongoose.Types.ObjectId(jobId),
+    });
+    if (doc) {
+      return { collectionName, job: doc };
+    }
+  }
+
+  return null;
+};
+
+const normalizeApplicationJobRef = (application) => {
+  if (application?.jobId && typeof application.jobId === 'object') {
+    return {
+      _id: String(application.jobId._id),
+      jobTitle: application.jobId.jobTitle || application.jobId.title || application.appliedFor || 'Job',
+      jobLocation: application.jobId.jobLocation || application.jobId.location || 'Location not shared',
+      employmentType: application.jobId.employmentType || application.jobId.type || 'Employment type pending',
+      sourceCollection: 'jobRequirements',
+      sourceLabel: getSourceCollectionLabel('jobRequirements'),
+    };
+  }
+
+  if (application?.sourceJobId || application?.sourceJobSnapshot?.jobTitle) {
+    return {
+      _id: application.sourceJobId || undefined,
+      jobTitle: application.sourceJobSnapshot?.jobTitle || application.appliedFor || 'Job',
+      jobLocation: application.sourceJobSnapshot?.jobLocation || 'Location not shared',
+      employmentType: application.sourceJobSnapshot?.employmentType || 'Employment type pending',
+      sourceCollection: application.sourceCollection || undefined,
+      sourceLabel: getSourceCollectionLabel(application.sourceCollection),
+    };
+  }
+
+  return application?.jobId;
+};
+
+const normalizeApplicationResponse = (application) => {
+  const base = typeof application.toObject === 'function' ? application.toObject() : application;
+  const interviewDetails = deriveInterviewDetailsFromRecord(base);
+  const statusNote = deriveStatusNoteFromRecord(base);
+  return {
+    ...base,
+    statusNote,
+    interviewDetails,
+    jobId: normalizeApplicationJobRef(base),
+  };
+};
+
+const buildApplicationOwnerQuery = (user) => ({
+  _id: { $exists: true },
+  clientId: user.id,
+});
+
+const findOwnedApplication = (applicationId, user) =>
+  Application.findOne({
+    ...buildApplicationOwnerQuery(user),
+    _id: applicationId,
+  });
+
 const getClientJobsMap = async (clientId) => {
-  const jobs = await JobRequirement.find({ clientId }).select('_id jobTitle').lean();
+  const jobs = await JobRequirement.find({ clientId, sourceCollection: { $exists: false } })
+    .select('_id jobTitle')
+    .lean();
   return new Map(jobs.map((job) => [normalizeJobKey(job.jobTitle), job]));
 };
 
@@ -204,32 +344,95 @@ export const findLegacyApplicationForClient = async (clientId, applicationId) =>
   return transformLegacyApplication(legacyDoc, jobsByKey);
 };
 
-const sanitizeInterviewDetails = (details) => {
-  if (!details) return undefined;
+const sanitizeInterviewDetails = (details, fallbackPayload = {}) => {
+  const mergedDetails = {
+    ...(details || {}),
+    ...(fallbackPayload.interviewMode
+      ? { mode: normalizeInterviewMode(fallbackPayload.interviewMode) }
+      : {}),
+    ...(fallbackPayload.interviewLocation
+      ? { locationText: String(fallbackPayload.interviewLocation).trim() }
+      : {}),
+    ...(fallbackPayload.googleMapLocation
+      ? { googleMapsUrl: String(fallbackPayload.googleMapLocation).trim() }
+      : {}),
+    ...(fallbackPayload.contactPerson
+      ? { contactPerson: String(fallbackPayload.contactPerson).trim() }
+      : {}),
+    ...(fallbackPayload.contactEmail
+      ? { contactEmail: String(fallbackPayload.contactEmail).trim() }
+      : {}),
+    ...(fallbackPayload.contactPhone
+      ? { contactPhone: String(fallbackPayload.contactPhone).trim() }
+      : {}),
+    ...(fallbackPayload.reportingNotes
+      ? { reportingNotes: String(fallbackPayload.reportingNotes).trim() }
+      : {}),
+    ...(fallbackPayload.documentsRequired
+      ? { documentsRequired: String(fallbackPayload.documentsRequired).trim() }
+      : {}),
+    ...(fallbackPayload.additionalInstructions
+      ? { additionalInstructions: String(fallbackPayload.additionalInstructions).trim() }
+      : {}),
+  };
+
+  const derivedScheduledAt =
+    mergedDetails.scheduledAt ||
+    parseFlexibleScheduledAt(fallbackPayload.interviewDate, fallbackPayload.interviewTime);
+
+  if (!Object.keys(mergedDetails).length && !derivedScheduledAt) return undefined;
 
   const sanitized = Object.fromEntries(
     Object.entries({
-      ...(details.scheduledAt ? { scheduledAt: new Date(details.scheduledAt) } : {}),
-      ...(details.timezone ? { timezone: details.timezone } : {}),
-      ...(details.mode ? { mode: details.mode } : {}),
-      ...(details.locationText ? { locationText: details.locationText } : {}),
-      ...(details.googleMapsUrl ? { googleMapsUrl: details.googleMapsUrl } : {}),
-      ...(details.meetingLink ? { meetingLink: details.meetingLink } : {}),
-      ...(details.contactPerson ? { contactPerson: details.contactPerson } : {}),
-      ...(details.contactEmail ? { contactEmail: details.contactEmail } : {}),
-      ...(details.contactPhone ? { contactPhone: details.contactPhone } : {}),
-      ...(details.notes ? { notes: details.notes } : {}),
+      ...(derivedScheduledAt ? { scheduledAt: new Date(derivedScheduledAt) } : {}),
+      ...(mergedDetails.timezone ? { timezone: mergedDetails.timezone } : {}),
+      ...(mergedDetails.mode ? { mode: normalizeInterviewMode(mergedDetails.mode) } : {}),
+      ...(mergedDetails.locationText ? { locationText: mergedDetails.locationText } : {}),
+      ...(mergedDetails.googleMapsUrl ? { googleMapsUrl: mergedDetails.googleMapsUrl } : {}),
+      ...(mergedDetails.meetingLink ? { meetingLink: mergedDetails.meetingLink } : {}),
+      ...(mergedDetails.contactPerson ? { contactPerson: mergedDetails.contactPerson } : {}),
+      ...(mergedDetails.contactEmail ? { contactEmail: mergedDetails.contactEmail } : {}),
+      ...(mergedDetails.contactPhone ? { contactPhone: mergedDetails.contactPhone } : {}),
+      ...(mergedDetails.notes ? { notes: mergedDetails.notes } : {}),
+      ...(mergedDetails.reportingNotes ? { reportingNotes: mergedDetails.reportingNotes } : {}),
+      ...(mergedDetails.documentsRequired ? { documentsRequired: mergedDetails.documentsRequired } : {}),
+      ...(mergedDetails.additionalInstructions
+        ? { additionalInstructions: mergedDetails.additionalInstructions }
+        : {}),
     }).filter(([, value]) => value !== undefined && value !== ''),
   );
 
   return Object.keys(sanitized).length ? sanitized : undefined;
 };
 
-const normalizePublicJob = (job) => {
-  const isLegacy = Boolean(!job.clientId && (job.title || job.location || job.type));
+const deriveInterviewDetailsFromRecord = (record = {}) =>
+  sanitizeInterviewDetails(record.interviewDetails, {
+    interviewDate: record.interviewDate,
+    interviewTime: record.interviewTime,
+    interviewMode: record.interviewMode || record.mode,
+    interviewLocation: record.interviewLocation || record.locationText,
+    googleMapLocation: record.googleMapLocation || record.googleMapsUrl,
+    contactPerson: record.contactPerson,
+    contactEmail: record.contactEmail,
+    contactPhone: record.contactPhone,
+    reportingNotes: record.reportingNotes,
+    documentsRequired: record.documentsRequired,
+    additionalInstructions: record.additionalInstructions,
+  });
+
+const deriveStatusNoteFromRecord = (record = {}) =>
+  String(record.statusNote || record.candidateResponse || record.clientNote || record.note || record.notes || '').trim();
+
+const normalizePublicJob = (job, overrides = {}) => {
+  const sourceCollection = overrides.sourceCollection || (job.sourceCollection ? String(job.sourceCollection) : 'jobRequirements');
+  const ownerId = overrides.ownerId || resolveJobOwnerId(job, sourceCollection);
+  const ownerRole = resolveJobOwnerRole({ sourceCollection, ownerId, ownerRole: overrides.ownerRole });
+  const isLegacy = Boolean(!ownerId && (job.title || job.location || job.type));
+  const isActive = isActiveStatus(overrides.status ?? job.status ?? 'active');
+  const isApplyable = overrides.canApply ?? (Boolean(ownerId) && isActive);
 
   return {
-    _id: String(job._id),
+    _id: overrides._id || String(job._id),
     jobTitle: job.jobTitle || job.title || 'Job Opening',
     jobLocation: job.jobLocation || job.location || 'Location not shared',
     employmentType: job.employmentType || job.type || 'Not specified',
@@ -251,10 +454,17 @@ const normalizePublicJob = (job) => {
     salary: job.salary || undefined,
     applicationDeadline: toISOStringSafe(job.applicationDeadline, ''),
     createdAt: toISOStringSafe(job.createdAt, new Date().toISOString()),
-    canApply: Boolean(job.clientId),
-    applyDisabledReason: isLegacy
-      ? 'This opening is visible from older data and cannot accept new applications yet.'
-      : undefined,
+    sourceCollection,
+    sourceLabel: getSourceCollectionLabel(sourceCollection),
+    ownerRole,
+    canApply: isApplyable,
+    applyDisabledReason: isApplyable
+      ? undefined
+      : !isActive
+        ? 'This opening is not active right now, so new applications are paused.'
+      : isLegacy
+        ? 'This opening is visible from older data and cannot accept new applications yet.'
+        : 'This opening is visible, but the employer account is not linked yet so applications are temporarily disabled.',
     isLegacy,
   };
 };
@@ -355,14 +565,42 @@ export const listPublicJobs = asyncHandler(async (req, res) => {
   const skip = (currentPage - 1) * pageLimit;
 
   const [jobRequirements, jobsCollectionDocs, openingsCollectionDocs] = await Promise.all([
-    JobRequirement.find({}).sort({ createdAt: -1 }).lean(),
+    JobRequirement.find({
+      status: 'active',
+      clientId: { $exists: true, $ne: null },
+      sourceCollection: { $exists: false },
+    }).sort({ createdAt: -1 }).lean(),
     JobRequirement.db.collection('jobs').find({}).sort({ createdAt: -1 }).toArray(),
     JobRequirement.db.collection('openings').find({}).sort({ createdAt: -1 }).toArray(),
   ]);
 
-  const normalizedJobs = [...jobRequirements, ...jobsCollectionDocs, ...openingsCollectionDocs]
-    .filter((job) => isActiveStatus(job.status))
-    .map(normalizePublicJob)
+  const externalJobs = [
+    ...jobsCollectionDocs.map((job) => ({ collectionName: 'jobs', job })),
+    ...openingsCollectionDocs.map((job) => ({ collectionName: 'openings', job })),
+  ]
+    .filter(({ job }) => isActiveStatus(job.status));
+
+  const normalizedJobs = [
+    ...jobRequirements.map((job) =>
+      normalizePublicJob(job, {
+        _id: String(job._id),
+        ownerId: resolveJobOwnerId(job, 'jobRequirements'),
+        ownerRole: 'client',
+        canApply: Boolean(resolveJobOwnerId(job, 'jobRequirements')) && isActiveStatus(job.status),
+        status: job.status,
+      }),
+    ),
+    ...externalJobs.map(({ collectionName, job }) =>
+      normalizePublicJob(job, {
+        _id: String(job._id),
+        ownerId: resolveJobOwnerId(job, collectionName),
+        ownerRole: collectionName === 'openings' ? 'admin' : 'client',
+        canApply: Boolean(resolveJobOwnerId(job, collectionName)) && isActiveStatus(job.status),
+        sourceCollection: collectionName,
+        status: job.status,
+      }),
+    ),
+  ]
     .filter((job) => {
       if (q && !job.jobTitle.toLowerCase().includes(String(q).trim().toLowerCase())) return false;
       if (location && !job.jobLocation.toLowerCase().includes(String(location).trim().toLowerCase())) return false;
@@ -382,7 +620,10 @@ export const listPublicJobs = asyncHandler(async (req, res) => {
 });
 
 export const listMyJobs = asyncHandler(async (req, res) => {
-  const jobs = await JobRequirement.find({ clientId: req.user.id }).sort({ createdAt: -1 });
+  const jobs = await JobRequirement.find({
+    clientId: req.user.id,
+    sourceCollection: { $exists: false },
+  }).sort({ createdAt: -1 });
   res.json({ success: true, data: jobs });
 });
 
@@ -448,18 +689,34 @@ export const applyToJob = asyncHandler(async (req, res) => {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid job id');
   }
 
-  const job = await JobRequirement.findOne({ _id: jobId, status: 'active' }).select('_id clientId');
-  if (!job) {
+  const primaryJob = await JobRequirement.findOne({ _id: jobId, status: 'active' })
+    .select('_id clientId jobTitle jobLocation employmentType company')
+    .lean();
+
+  const externalMatch = primaryJob ? null : await findExternalJobById(jobId);
+  const externalJob = externalMatch?.job || null;
+  const sourceCollection = primaryJob ? 'jobRequirements' : externalMatch?.collectionName;
+  const ownerId = primaryJob
+    ? resolveJobOwnerId(primaryJob, 'jobRequirements')
+    : resolveJobOwnerId(externalJob, sourceCollection);
+  const ownerRole = primaryJob
+    ? 'client'
+    : resolveJobOwnerRole({ sourceCollection, ownerId, ownerRole: sourceCollection === 'openings' ? 'admin' : 'client' });
+
+  if (!primaryJob && !externalJob) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Job not found');
   }
-  if (!job.clientId) {
+  if (!ownerId) {
     throw new ApiError(
       StatusCodes.CONFLICT,
       'This job cannot accept applications right now because the employer record is missing.',
     );
   }
 
-  const exists = await Application.findOne({ candidateId: req.user.id, jobId });
+  const duplicateQuery = primaryJob
+    ? { candidateId: req.user.id, jobId }
+    : { candidateId: req.user.id, sourceCollection, sourceJobId: String(jobId) };
+  const exists = await Application.findOne(duplicateQuery);
   if (exists) {
     throw new ApiError(StatusCodes.CONFLICT, 'Already applied to this job');
   }
@@ -471,10 +728,28 @@ export const applyToJob = asyncHandler(async (req, res) => {
 
   const resume = await ensureCandidateResume({ candidateUser, candidateProfile });
 
+  const jobTitle = primaryJob?.jobTitle || externalJob?.jobTitle || externalJob?.title || 'Job Opening';
+  const jobLocation = primaryJob?.jobLocation || externalJob?.jobLocation || externalJob?.location || '';
+  const employmentType =
+    primaryJob?.employmentType || externalJob?.employmentType || externalJob?.type || '';
+  const companyName = primaryJob?.company || externalJob?.company || '';
+
   const application = await Application.create({
     candidateId: req.user.id,
-    clientId: job.clientId,
-    jobId,
+    clientId: ownerId,
+    ...(primaryJob ? { jobId } : {}),
+    ...(!primaryJob
+      ? {
+          sourceCollection,
+          sourceJobId: String(jobId),
+          sourceJobSnapshot: {
+            jobTitle,
+            jobLocation,
+            employmentType,
+            companyName,
+          },
+        }
+      : {}),
     fullName: candidateProfile?.fullName || '',
     email: candidateUser?.email || '',
     phone: candidateUser?.mobile || '',
@@ -492,8 +767,7 @@ export const applyToJob = asyncHandler(async (req, res) => {
     hasCustomResume: resume?.source === 'uploaded',
     submittedAt: new Date(),
     notes: '',
-    appliedFor:
-      (job.jobTitle || job.title || '').trim() || undefined,
+    appliedFor: jobTitle.trim() || undefined,
     statusUpdatedAt: new Date(),
     timeline: [
       {
@@ -517,8 +791,8 @@ export const applyToJob = asyncHandler(async (req, res) => {
   });
 
   publishLiveUpdate({
-    userId: String(job.clientId),
-    role: 'client',
+    userId: String(ownerId),
+    role: ownerRole,
     event: 'application-created',
     payload: {
       applicationId: String(application._id),
@@ -534,26 +808,26 @@ export const listCandidateApplications = asyncHandler(async (req, res) => {
   const applications = await Application.find({ candidateId: req.user.id })
     .populate('jobId')
     .sort({ createdAt: -1 });
-  res.json({ success: true, data: applications });
+  res.json({ success: true, data: applications.map(normalizeApplicationResponse) });
 });
 
 export const listClientApplications = asyncHandler(async (req, res) => {
   const [applications, legacyApplications] = await Promise.all([
-    Application.find({ clientId: req.user.id })
+    Application.find(buildApplicationOwnerQuery(req.user))
       .populate('jobId')
       .populate({
         path: 'candidateId',
         select: 'email mobile',
       })
       .sort({ createdAt: -1 }),
-    fetchLegacyApplicationsForClient(req.user.id),
+    req.user.role === 'client' ? fetchLegacyApplicationsForClient(req.user.id) : Promise.resolve([]),
   ]);
 
   const data = [...applications, ...legacyApplications].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
 
-  res.json({ success: true, data });
+  res.json({ success: true, data: data.map(normalizeApplicationResponse) });
 });
 
 export const getClientApplicationDetails = asyncHandler(async (req, res) => {
@@ -562,7 +836,7 @@ export const getClientApplicationDetails = asyncHandler(async (req, res) => {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid application id');
   }
 
-  const application = await Application.findOne({ _id: applicationId, clientId: req.user.id })
+  const application = await findOwnedApplication(applicationId, req.user)
     .populate('jobId')
     .populate({
       path: 'candidateId',
@@ -570,6 +844,9 @@ export const getClientApplicationDetails = asyncHandler(async (req, res) => {
     });
 
   if (!application) {
+    if (req.user.role !== 'client') {
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Application not found');
+    }
     const legacyApplication = await findLegacyApplicationForClient(req.user.id, applicationId);
     if (!legacyApplication) {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Application not found');
@@ -630,7 +907,7 @@ export const getClientApplicationDetails = asyncHandler(async (req, res) => {
   res.json({
     success: true,
     data: {
-      application,
+      application: normalizeApplicationResponse(application),
       candidateProfile: fallbackCandidateProfile,
       resume: fallbackResume,
     },
@@ -643,11 +920,14 @@ export const downloadClientApplicationResume = asyncHandler(async (req, res) => 
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid application id');
   }
 
-  const application = await Application.findOne({ _id: applicationId, clientId: req.user.id })
+  const application = await findOwnedApplication(applicationId, req.user)
     .select('candidateId')
     .lean();
 
   if (!application) {
+    if (req.user.role !== 'client') {
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Application not found');
+    }
     const legacyApplication = await findLegacyApplicationForClient(req.user.id, applicationId);
     if (!legacyApplication) {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Application not found');
@@ -696,18 +976,23 @@ export const updateApplicationStatus = asyncHandler(async (req, res) => {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid application id');
   }
 
-  const existingApplication = await Application.findOne({ _id: applicationId, clientId: req.user.id });
+  const existingApplication = await findOwnedApplication(applicationId, req.user);
   if (!existingApplication) {
+    if (req.user.role !== 'client') {
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Application not found');
+    }
     const legacyApplication = await findLegacyApplicationForClient(req.user.id, applicationId);
     if (!legacyApplication) {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Application not found');
     }
 
-    const interviewDetails = sanitizeInterviewDetails(req.body.interviewDetails);
+    const responseNote =
+      req.body.note || req.body.candidateResponse || req.body.clientNote || '';
+    const interviewDetails = sanitizeInterviewDetails(req.body.interviewDetails, req.body);
     const currentTimeline = Array.isArray(legacyApplication.timeline) ? legacyApplication.timeline : [];
     const legacyStatusEntry = {
       status: req.body.status,
-      note: req.body.note || (req.body.status === 'interview' ? 'Interview scheduled by client.' : ''),
+      note: responseNote || (req.body.status === 'interview' ? 'Interview scheduled by client.' : ''),
       changedByRole: 'client',
       changedAt: new Date(),
     };
@@ -717,8 +1002,8 @@ export const updateApplicationStatus = asyncHandler(async (req, res) => {
       {
         $set: {
           status: req.body.status,
-          statusNote: req.body.note || '',
-          notes: req.body.note || '',
+          statusNote: responseNote,
+          notes: responseNote,
           statusUpdatedAt: new Date(),
           updatedAt: new Date(),
           ...(interviewDetails ? { interviewDetails } : {}),
@@ -729,7 +1014,7 @@ export const updateApplicationStatus = asyncHandler(async (req, res) => {
 
     publishLiveUpdate({
       userId: req.user.id,
-      role: 'client',
+      role: req.user.role,
       event: 'application-updated',
       payload: {
         applicationId,
@@ -742,7 +1027,7 @@ export const updateApplicationStatus = asyncHandler(async (req, res) => {
       data: {
         ...legacyApplication,
         status: req.body.status,
-        statusNote: req.body.note || '',
+        statusNote: responseNote,
         statusUpdatedAt: new Date().toISOString(),
         interviewDetails: interviewDetails || legacyApplication.interviewDetails,
         timeline: [...currentTimeline, legacyStatusEntry],
@@ -751,7 +1036,9 @@ export const updateApplicationStatus = asyncHandler(async (req, res) => {
     return;
   }
 
-  const interviewDetails = sanitizeInterviewDetails(req.body.interviewDetails);
+  const responseNote =
+    req.body.note || req.body.candidateResponse || req.body.clientNote || '';
+  const interviewDetails = sanitizeInterviewDetails(req.body.interviewDetails, req.body);
   if (req.body.status === 'interview' && !interviewDetails && !existingApplication.interviewDetails) {
     throw new ApiError(
       StatusCodes.BAD_REQUEST,
@@ -760,7 +1047,7 @@ export const updateApplicationStatus = asyncHandler(async (req, res) => {
   }
 
   existingApplication.status = req.body.status;
-  existingApplication.statusNote = req.body.note || '';
+  existingApplication.statusNote = responseNote;
   existingApplication.statusUpdatedAt = new Date();
 
   if (interviewDetails) {
@@ -771,7 +1058,7 @@ export const updateApplicationStatus = asyncHandler(async (req, res) => {
     ...(existingApplication.timeline || []),
     {
       status: req.body.status,
-      note: req.body.note || (req.body.status === 'interview' ? 'Interview scheduled by client.' : ''),
+      note: responseNote || (req.body.status === 'interview' ? 'Interview scheduled by client.' : ''),
       changedByRole: 'client',
       changedAt: new Date(),
     },
@@ -781,7 +1068,7 @@ export const updateApplicationStatus = asyncHandler(async (req, res) => {
 
   publishLiveUpdate({
     userId: req.user.id,
-    role: 'client',
+    role: req.user.role,
     event: 'application-updated',
     payload: {
       applicationId,
@@ -801,4 +1088,3 @@ export const updateApplicationStatus = asyncHandler(async (req, res) => {
 
   res.json({ success: true, data: application });
 });
-

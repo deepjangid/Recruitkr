@@ -12,7 +12,7 @@ const SectorsSection = () => {
         <p className="mb-2 text-sm font-semibold uppercase tracking-widest text-accent">
           Industries
         </p>
-        <h2 className="text-4xl font-extrabold tracking-tight md:text-5xl">
+        <h2 className="bg-[linear-gradient(90deg,rgba(36,70,121,1)_0%,rgba(105,164,79,1)_100%)] bg-clip-text text-4xl font-extrabold tracking-tight text-transparent md:text-5xl">
           Sectors We Serve
         </h2>
       </div>
