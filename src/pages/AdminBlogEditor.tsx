@@ -6,6 +6,7 @@ import "react-quill/dist/quill.snow.css";
 import Footer from "@/components/Footer";
 import Navbar from "@/components/Navbar";
 import { getSession } from "@/lib/auth";
+import { cleanBlogHtml, getPlainTextFromHtml, getRenderableBlogHtml } from "@/lib/blogHtml";
 import {
   createAdminBlogPost,
   fetchAdminBlogPosts,
@@ -15,18 +16,8 @@ import {
   uploadBlogEditorImage,
 } from "@/lib/blog";
 
-const stripBase64Images = (html: string) =>
-  html.replace(/<img[^>]+src="data:image\/[^"]+"[^>]*>/gi, "");
-
-const cleanHtml = (html: string) =>
-  stripBase64Images(html)
-    .replace(/&nbsp;|\u00A0/g, " ")
-    .replace(/\sstyle="[^"]*"/gi, "")
-    .replace(/\sclass="[^"]*"/gi, "")
-    .trim();
-
 const estimateReadingTime = (html: string) => {
-  const plainText = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  const plainText = getPlainTextFromHtml(html);
   const wordCount = plainText ? plainText.split(" ").length : 0;
   return `${Math.max(1, Math.ceil(wordCount / 200))} min read`;
 };
@@ -94,6 +85,10 @@ const AdminBlogEditor = () => {
     if (imageUrl) {
       if (imageUrl.startsWith("data:image/")) {
         setError("Base64 images are not allowed. Please use an uploaded image URL.");
+        return;
+      }
+      if (!/^https?:\/\//i.test(imageUrl) && !imageUrl.startsWith("/api/blogposts/images/")) {
+        setError("Please use a valid image URL starting with https://, http://, or /api/blogposts/images/.");
         return;
       }
       editor.insertEmbed(insertAt, "image", imageUrl, "user");
@@ -197,7 +192,7 @@ const AdminBlogEditor = () => {
       excerpt: blog.excerpt,
       authorName: blog.authorName || "RecruitKr Editorial",
       coverImage: blog.coverImage || "",
-      contentHtml: blog.contentHtml || blog.content.map((paragraph) => `<p>${paragraph}</p>`).join(""),
+      contentHtml: getRenderableBlogHtml(blog.contentHtml, blog.content),
       tags: blog.tags,
       readingTime: blog.readingTime,
       status: blog.status || "draft",
@@ -213,13 +208,17 @@ const AdminBlogEditor = () => {
   };
 
   const handleSave = async () => {
-    const cleanedContentHtml = cleanHtml(form.contentHtml);
+    const cleanedContentHtml = cleanBlogHtml(form.contentHtml);
     if (!cleanedContentHtml) {
       setError("Blog content is required.");
       return;
     }
     if (cleanedContentHtml.includes("data:image/")) {
       setError("Base64 images are not allowed. Please upload images and use their URL.");
+      return;
+    }
+    if (form.coverImage.trim().startsWith("data:image/")) {
+      setError("Base64 cover images are not allowed. Please use a normal image URL.");
       return;
     }
 
@@ -257,13 +256,13 @@ const AdminBlogEditor = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#f7fafc_0%,#ffffff_22%,#f7fbff_100%)]">
+    <div className="min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,#f7fafc_0%,#ffffff_22%,#f7fbff_100%)]">
       <Navbar />
       <main className="pt-28 pb-20">
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-4 sm:px-6">
           <div className="mx-auto max-w-6xl">
             <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[320px_minmax(0,1fr)]">
-              <aside className="rounded-3xl border border-border bg-white p-5 shadow-sm">
+              <aside className="rounded-3xl border border-border bg-white p-4 shadow-sm sm:p-5">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Admin</p>
@@ -309,7 +308,7 @@ const AdminBlogEditor = () => {
                 </div>
               </aside>
 
-              <section className="rounded-3xl border border-border bg-white p-5 shadow-sm">
+              <section className="min-w-0 rounded-3xl border border-border bg-white p-4 shadow-sm sm:p-5">
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className="grid gap-2">
                     <span className="text-sm font-medium text-slate-800">Title</span>
@@ -400,13 +399,13 @@ const AdminBlogEditor = () => {
                   </label>
                 </div>
 
-                <div className="mt-6 overflow-hidden rounded-2xl border border-border">
+                <div className="blog-editor mt-6 overflow-hidden rounded-2xl border border-border bg-white">
                   <ReactQuill
                     ref={quillRef}
                     theme="snow"
                     value={form.contentHtml}
                     onChange={(value) => {
-                      const cleanedValue = cleanHtml(value);
+                      const cleanedValue = cleanBlogHtml(value);
                       setForm((current) => ({
                         ...current,
                         contentHtml: cleanedValue,

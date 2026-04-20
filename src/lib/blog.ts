@@ -1,5 +1,7 @@
 import { apiGet } from "@/lib/api";
 import { apiPatch, apiPost } from "@/lib/api";
+import { API_ROOT } from "@/lib/api";
+import { getRenderableBlogHtml } from "@/lib/blogHtml";
 
 export type BlogPost = {
   _id?: string;
@@ -59,7 +61,11 @@ const normalizeBlogPost = (post: Partial<BlogPost>, index = 0): BlogPost => ({
   excerpt: post.excerpt?.trim() || "No description available.",
   authorName: post.authorName?.trim() || "RecruitKr Editorial",
   coverImage: post.coverImage || null,
-  contentHtml: post.contentHtml?.trim() || "",
+  contentHtml: getRenderableBlogHtml(
+    post.contentHtml,
+    Array.isArray(post.content) ? post.content : [],
+    API_ROOT,
+  ),
   publishedAt: post.publishedAt ?? null,
   readingTime: post.readingTime?.trim() || "5 min read",
   tags: Array.isArray(post.tags) ? post.tags.filter(Boolean) : [],

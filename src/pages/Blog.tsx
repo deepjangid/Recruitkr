@@ -49,29 +49,31 @@ const Blog = () => {
   });
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#f7fafc_0%,#ffffff_22%,#f7fbff_100%)]">
+    <div className="min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,#f7fafc_0%,#ffffff_22%,#f7fbff_100%)]">
       <Navbar />
 
       <main className="pt-28 pb-20">
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-4 sm:px-6">
           <header className="mx-auto max-w-3xl text-center">
             <p className="mb-3 text-sm font-semibold uppercase tracking-[0.22em] text-primary">
               Insights
             </p>
-            <h1 className="text-4xl font-extrabold tracking-tight md:text-5xl">RecruitKr Journal</h1>
+            <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl md:text-5xl">
+              RecruitKr Journal
+            </h1>
             <p className="mt-4 text-sm leading-relaxed text-muted-foreground md:text-base">
               Thoughtful notes on hiring, growth, employer branding, and better teams.
             </p>
           </header>
 
-          <section className="mx-auto mt-10 max-w-6xl rounded-[28px] border border-[#264a7f]/10 bg-white/90 p-4 shadow-[0_24px_80px_rgba(38,74,127,0.08)] backdrop-blur sm:p-5">
+          <section className="mx-auto mt-8 max-w-6xl rounded-[28px] border border-[#264a7f]/10 bg-white/90 p-4 shadow-[0_24px_80px_rgba(38,74,127,0.08)] backdrop-blur sm:mt-10 sm:p-5">
             <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
               <label className="flex items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3">
                 <Search size={18} className="shrink-0 text-muted-foreground" />
                 <input
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Search by title, slug, or excerpt"
+                  placeholder="Search by title"
                   className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                 />
               </label>
@@ -104,16 +106,16 @@ const Blog = () => {
           )}
 
           {loading ? (
-            <div className="mx-auto mt-12 grid max-w-6xl grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+            <div className="mx-auto mt-10 grid max-w-6xl grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 sm:gap-5 lg:gap-6">
               {Array.from({ length: 3 }).map((_, index) => (
                 <div
                   key={index}
-                  className="overflow-hidden rounded-[28px] border border-border bg-card"
+                  className="overflow-hidden rounded-[24px] border border-border bg-card"
                 >
-                  <div className="h-56 animate-pulse bg-muted" />
-                  <div className="space-y-3 p-6">
+                  <div className="h-44 animate-pulse bg-muted" />
+                  <div className="space-y-3 p-4 sm:p-5">
                     <div className="h-3 w-1/3 animate-pulse rounded bg-muted" />
-                    <div className="h-6 w-4/5 animate-pulse rounded bg-muted" />
+                    <div className="h-5 w-4/5 animate-pulse rounded bg-muted" />
                     <div className="h-4 w-full animate-pulse rounded bg-muted" />
                     <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />
                   </div>
@@ -122,7 +124,7 @@ const Blog = () => {
             </div>
           ) : (
             <>
-              <div className="mx-auto mt-8 flex max-w-6xl items-center justify-between gap-3 text-sm text-muted-foreground">
+              <div className="mx-auto mt-8 flex max-w-6xl flex-col items-start justify-between gap-3 text-sm text-muted-foreground sm:flex-row sm:items-center">
                 <p>
                   {filteredBlogs.length} article{filteredBlogs.length === 1 ? "" : "s"} found
                 </p>
@@ -140,7 +142,7 @@ const Blog = () => {
                 )}
               </div>
 
-              <section className="mx-auto mt-6 grid max-w-6xl grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+              <section className="mx-auto mt-6 grid max-w-6xl grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 sm:gap-5 lg:gap-6">
                 {filteredBlogs.map((post) => (
                   <BlogCard key={post.slug} blog={post} />
                 ))}

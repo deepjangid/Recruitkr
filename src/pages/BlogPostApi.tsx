@@ -4,10 +4,11 @@ import { Link, useParams } from "react-router-dom";
 import BlogCard from "@/components/blogCard";
 import Footer from "@/components/Footer";
 import Navbar from "@/components/Navbar";
+import { getRenderableBlogHtml } from "@/lib/blogHtml";
 import { fetchBlogPost, fetchBlogPosts, type BlogPost } from "@/lib/blog";
 
 const detailPlaceholderImageClass =
-  "flex h-80 w-full items-end rounded-xl bg-[radial-gradient(circle_at_top,_rgba(38,74,127,0.96),_rgba(38,74,127,0.82)_42%,_rgba(105,164,79,0.9)_100%)] p-6 text-2xl font-bold leading-tight text-white";
+  "flex w-full items-end rounded-xl bg-[radial-gradient(circle_at_top,_rgba(38,74,127,0.96),_rgba(38,74,127,0.82)_42%,_rgba(105,164,79,0.9)_100%)] p-6 text-2xl font-bold leading-tight text-white";
 
 const BlogPostApi = () => {
   const { slug } = useParams();
@@ -30,6 +31,7 @@ const BlogPostApi = () => {
         setLoading(true);
         setError("");
         const [data, allBlogs] = await Promise.all([fetchBlogPost(slug), fetchBlogPosts()]);
+        console.log("[BlogPostApi] render contentHtml:", data.contentHtml);
         setPost(data);
         setRelatedBlogs(
           allBlogs
@@ -52,11 +54,11 @@ const BlogPostApi = () => {
   }, [slug]);
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#f7fafc_0%,#ffffff_22%,#f7fbff_100%)]">
+    <div className="min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,#f7fafc_0%,#ffffff_22%,#f7fbff_100%)]">
       <Navbar />
 
       <main className="py-6 pt-28">
-        <div className="mx-auto max-w-3xl px-4">
+        <div className="mx-auto max-w-3xl px-4 sm:px-6">
           {loading ? (
             <div className="rounded-xl border border-border bg-white p-8 text-center shadow-sm">
               <p className="text-sm text-muted-foreground">Loading blog post...</p>
@@ -73,28 +75,28 @@ const BlogPostApi = () => {
               </Link>
             </div>
           ) : (
-            <article className="space-y-6">
-              <div className="rounded-xl border border-[#264a7f]/10 bg-white p-4 shadow-sm">
+            <article className="space-y-5 sm:space-y-6">
+              <div className="rounded-2xl border border-[#264a7f]/10 bg-white p-4 shadow-sm sm:p-5">
                 {post.coverImage ? (
                   <img
                     src={post.coverImage}
                     alt={post.title}
-                    className="h-56 w-full rounded-xl object-cover"
+                    className="h-48 w-full rounded-xl object-cover sm:h-56"
                   />
                 ) : (
-                  <div className={detailPlaceholderImageClass}>{post.title}</div>
+                  <div className={`${detailPlaceholderImageClass} h-48 sm:h-56`}>{post.title}</div>
                 )}
 
                 <div className="mt-5">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
                     {post.tags[0] || "RecruitKr Journal"}
                   </p>
-                  <h1 className="mt-3 text-2xl font-bold tracking-tight text-slate-950">
+                  <h1 className="mt-3 text-2xl font-bold tracking-tight text-slate-950 sm:text-[2rem]">
                     {post.title}
                   </h1>
 
                   <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                    <span className="font-medium text-slate-700">RecruitKr Editorial</span>
+                    <span className="font-medium text-slate-700">{post.authorName || "RecruitKr Editorial"}</span>
                     {publishedDate && (
                       <>
                         <span>&bull;</span>
@@ -107,21 +109,17 @@ const BlogPostApi = () => {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
+              <div className="rounded-2xl border border-border bg-white p-4 shadow-sm sm:p-6">
                 {post.excerpt && (
                   <p className="text-sm leading-relaxed text-gray-700">{post.excerpt}</p>
                 )}
 
                 <div
-                  className="prose prose-sm mt-4 max-w-3xl text-slate-700 prose-headings:mt-6 prose-headings:text-slate-900 prose-h2:text-xl prose-h3:text-lg prose-p:mt-4 prose-p:leading-relaxed prose-img:my-4 prose-img:w-full prose-img:rounded-xl prose-img:object-cover md:prose-base"
+                  className="blog-prose prose prose-sm mt-4 max-w-none overflow-hidden break-words text-slate-700 prose-headings:mt-4 prose-headings:scroll-mt-28 prose-headings:font-semibold prose-headings:text-slate-900 prose-h2:text-xl prose-h3:text-lg prose-p:mt-2 prose-p:text-sm prose-p:leading-relaxed prose-ul:mt-3 prose-ul:pl-5 prose-ol:mt-3 prose-ol:pl-5 prose-li:mt-1 prose-img:my-4 prose-img:w-full prose-img:max-w-full prose-img:rounded-xl prose-img:object-contain prose-a:text-primary md:prose-base"
                   dangerouslySetInnerHTML={{
-                    __html: post.contentHtml || post.content.map((paragraph) => `<p>${paragraph}</p>`).join(""),
+                    __html: getRenderableBlogHtml(post.contentHtml, post.content),
                   }}
                 />
-
-                <div className="mt-2 hidden">
-                  {post.content.map((block) => block)}
-                </div>
 
                 <div className="mt-8 border-t border-border pt-6">
                   <Link
@@ -133,7 +131,7 @@ const BlogPostApi = () => {
                 </div>
               </div>
 
-              <section className="rounded-xl border border-border bg-white p-6 shadow-sm">
+              <section className="rounded-2xl border border-border bg-white p-4 shadow-sm sm:p-6">
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="text-lg font-semibold text-slate-900">Related Blogs</h2>
                   <Link
@@ -144,7 +142,7 @@ const BlogPostApi = () => {
                   </Link>
                 </div>
 
-                <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {relatedBlogs.map((relatedBlog) => (
                     <BlogCard key={relatedBlog.slug} blog={relatedBlog} />
                   ))}

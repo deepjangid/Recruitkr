@@ -40,6 +40,8 @@ const cleanHtml = (value = '') =>
     .replace(/\sstyle="[^"]*"/gi, '')
     .replace(/\sclass="[^"]*"/gi, '')
     .replace(/\sid="[^"]*"/gi, '')
+    .replace(/<span>(.*?)<\/span>/gi, '$1')
+    .replace(/<p>\s*<\/p>/gi, '')
     .replace(/\s{2,}/g, ' ')
     .trim();
 
@@ -66,6 +68,9 @@ const normalizePayload = async (payload, existingPost) => {
   const incomingHtml = payload.contentHtml?.trim();
   if (incomingHtml && containsBase64Image(incomingHtml)) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Base64 images are not allowed. Please upload images and use their URL.');
+  }
+  if (payload.coverImage?.trim?.().startsWith('data:image/')) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Base64 cover images are not allowed. Please use an image URL.');
   }
 
   const contentHtml = incomingHtml
@@ -149,6 +154,19 @@ const buildPublishedBlogQuery = () => ({
   ],
 });
 
+const getPublicBaseUrl = (req) => {
+  if (env.BACKEND_PUBLIC_URL) {
+    return env.BACKEND_PUBLIC_URL.replace(/\/$/, '');
+  }
+
+  const forwardedProto = req.get('x-forwarded-proto');
+  const forwardedHost = req.get('x-forwarded-host');
+  const protocol = forwardedProto?.split(',')[0]?.trim() || req.protocol;
+  const host = forwardedHost?.split(',')[0]?.trim() || req.get('host');
+
+  return `${protocol}://${host}`.replace(/\/$/, '');
+};
+
 export const listPublishedBlogPosts = asyncHandler(async (req, res) => {
   const publishedOnly = `${req.query?.published ?? ''}` === 'true';
   const query = publishedOnly ? buildPublishedBlogQuery() : {};
@@ -195,7 +213,7 @@ export const uploadBlogImage = asyncHandler(async (req, res) => {
     uploadedBy: req.user.id,
   });
 
-  const baseUrl = env.NODE_ENV === 'production' ? env.FRONTEND_URL.replace(/\/$/, '') : `${req.protocol}://${req.get('host')}`;
+  const baseUrl = getPublicBaseUrl(req);
   const imageUrl = `${baseUrl}/api/blogposts/images/${asset.id}`;
 
   res.status(StatusCodes.CREATED).json({

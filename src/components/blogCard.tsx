@@ -7,61 +7,60 @@ type BlogCardProps = {
 };
 
 const placeholderImageClass =
-  "flex h-40 w-full items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(38,74,127,0.95),_rgba(38,74,127,0.78)_42%,_rgba(105,164,79,0.92)_100%)] px-4 text-center text-base font-semibold text-white";
+  "flex h-40 w-full items-end bg-[radial-gradient(circle_at_top,_rgba(38,74,127,0.95),_rgba(38,74,127,0.78)_42%,_rgba(105,164,79,0.92)_100%)] px-4 py-5 text-left text-sm font-semibold leading-snug text-white sm:h-44";
 
 function BlogCard({ blog }: BlogCardProps) {
   const navigate = useNavigate();
-  const primaryCategory = blog.tags[0] || "Blog";
+  const primaryCategory = blog.tags[0] || "RecruitKr Journal";
   const publishedDate = blog.publishedAt
     ? new Date(blog.publishedAt).toLocaleDateString()
     : null;
 
   return (
-   <article
-  onClick={() => navigate(`/blog/${blog.slug}`)}
-  className="group cursor-pointer overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition"
->
-  {blog.coverImage ? (
-    <img
-      src={blog.coverImage}
-      alt={blog.title}
-      className="h-49 w-full object-cover"
-    />
-  ) : (
-    <div className="h-36 flex items-center justify-center bg-gray-200 text-sm font-semibold">
-      {blog.title}
-    </div>
-  )}
+    <article
+      onClick={() => navigate(`/blog/${blog.slug}`)}
+      className="group min-w-0 cursor-pointer overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg"
+    >
+      {blog.coverImage ? (
+        <img
+          src={blog.coverImage}
+          alt={blog.title}
+          className="h-40 w-full object-cover sm:h-44"
+        />
+      ) : (
+        <div className={placeholderImageClass}>{blog.title}</div>
+      )}
 
-  <div className="p-3">
-    <div className="flex justify-between text-[10px] text-gray-500">
-      <span>{primaryCategory}</span>
-      <span>{blog.readingTime}</span>
-    </div>
+      <div className="space-y-3 p-4 sm:p-5">
+        <div className="flex items-center justify-between gap-3 text-[11px] font-medium uppercase tracking-[0.14em] text-slate-500">
+          <span className="truncate">{primaryCategory}</span>
+          <span className="shrink-0 normal-case tracking-normal">{blog.readingTime}</span>
+        </div>
 
-    <h3 className="mt-1 text-sm font-semibold text-gray-800 line-clamp-2">
-      {blog.title}
-    </h3>
+        <div className="space-y-2">
+          <h3 className="line-clamp-2 text-base font-semibold leading-snug text-slate-900">
+            {blog.title}
+          </h3>
+          <p className="line-clamp-3 text-sm leading-6 text-slate-600">
+            {blog.excerpt}
+          </p>
+        </div>
 
-    <p className="mt-1 text-xs text-gray-500 line-clamp-2">
-      {blog.excerpt}
-    </p>
-
-    <div className="mt-2 flex justify-between items-center">
-      <span className="text-[10px] text-gray-400">{publishedDate ?? ""}</span>
-
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          navigate(`/blog/${blog.slug}`);
-        }}
-        className="text-xs text-indigo-600 font-medium hover:underline"
-      >
-        Read
-      </button>
-    </div>
-  </div>
-</article>
+        <div className="flex items-center justify-between gap-3 pt-1 text-xs text-slate-500">
+          <span>{publishedDate || "RecruitKr Editorial"}</span>
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              navigate(`/blog/${blog.slug}`);
+            }}
+            className="font-semibold text-primary transition group-hover:text-[#1f3d69] hover:underline"
+          >
+            Read More
+          </button>
+        </div>
+      </div>
+    </article>
   );
 }
 

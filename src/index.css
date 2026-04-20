@@ -75,6 +75,41 @@
     background: var(--brand-gradient);
     @apply text-white;
   }
+
+  .blog-prose :where(h1, h2, h3, h4, h5, h6) {
+    background-image: none;
+    color: rgb(15 23 42);
+  }
+
+  .blog-prose img {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    border-radius: 12px;
+    margin: 16px 0;
+  }
+
+  .blog-prose ul {
+    list-style-type: disc;
+    padding-left: 20px;
+  }
+
+  .blog-editor .ql-toolbar {
+    @apply border-0 border-b border-border bg-slate-50 px-2 py-2;
+  }
+
+  .blog-editor .ql-container {
+    @apply border-0 font-body;
+  }
+
+  .blog-editor .ql-editor {
+    @apply min-h-[260px] px-4 py-4 text-sm leading-relaxed text-slate-700 sm:min-h-[320px] sm:px-5;
+  }
+
+  .blog-editor .ql-editor.ql-blank::before {
+    @apply left-4 right-4 text-sm not-italic text-muted-foreground sm:left-5 sm:right-5;
+  }
 }
 
 @layer utilities {

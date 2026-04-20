@@ -27,6 +27,7 @@ const envSchema = z.object({
   OPENAI_MODEL: z.string().min(3).default('gpt-4o-mini'),
 
   FRONTEND_URL: z.string().url().default('http://localhost:5173'),
+  BACKEND_PUBLIC_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),
   PASSWORD_RESET_EXPIRES_MIN: z.coerce.number().int().positive().default(30),
   SMTP_HOST: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
   SMTP_PORT: z.coerce.number().int().positive().default(587),
