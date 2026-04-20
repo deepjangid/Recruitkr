@@ -1,4 +1,4 @@
-import { ArrowRight, Linkedin, Facebook, Instagram, Mail, Phone } from "lucide-react";
+import { Linkedin, Facebook, Instagram, Mail, Phone } from "lucide-react";
 import { Link } from "react-router-dom";
 import Logo from "../assets/logo.png";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -38,46 +38,47 @@ const Footer = () => {
   const sectorLinks = ["IT", "Healthcare", "Banking", "Retail", "Manufacturing", "Logistics"];
 
   const footerLinkClass =
-    "group flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/90 transition hover:border-primary/60 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep";
+    "flex min-w-0 items-center rounded-xl px-3 py-2.5 text-sm text-white/90 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep";
   const mobileSectionTriggerClass =
-    "rounded-2xl border border-white/10 bg-white/5 px-4 text-left text-sm font-semibold uppercase tracking-[0.16em] text-white/80 no-underline hover:no-underline";
+    "rounded-2xl px-4 text-left text-sm font-semibold uppercase tracking-[0.16em] text-white/80 no-underline hover:no-underline";
+  const contactLinkClass =
+    "flex min-w-0 items-start gap-3 rounded-xl px-3 py-2.5 text-white/90 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep";
 
   return (
     <footer className="border-t border-border bg-navy-deep py-10 text-white sm:py-14">
-      <div className="container mx-auto px-4">
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8 md:grid-cols-12 md:gap-10">
-          <div className="flex flex-col items-center rounded-3xl border border-white/10 bg-white/5 p-5 text-center sm:col-span-2 sm:items-start sm:p-6 sm:text-left md:col-span-4">
-            <div className="flex w-full flex-col items-center gap-5 sm:flex-row sm:items-center sm:justify-between">
-              <a href="/" className="inline-flex items-center">
-                <span className="flex h-14 w-[150px] shrink-0 items-center sm:h-16 sm:w-[180px]">
-                  <img
-                    src={Logo}
-                    alt="RecruitKr"
-                    className="h-full w-full object-contain object-left"
-                  />
-                </span>
-              </a>
-              <div className="flex justify-center gap-3 sm:justify-start">
-                {socialLinks.map(({ icon: Icon, href, label }) => (
-                  <a
-                    key={label}
-                    href={href}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label={label}
-                    className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white transition hover:border-primary/60 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
-                  >
-                    <Icon size={18} />
-                  </a>
-                ))}
-              </div>
+      <div className="container mx-auto px-4 sm:px-6">
+        <div className="rounded-[28px] border border-white/10 bg-white/5 p-5 shadow-[0_18px_60px_rgba(15,23,42,0.12)] sm:p-6">
+          <div className="flex flex-col items-center gap-5 text-center sm:items-center md:flex-row md:justify-between md:text-left">
+            <div className="flex flex-col items-center md:items-start">
+              <span className="flex h-16 w-[180px] items-center rounded-2xl bg-white/5 px-3 py-2 shadow-[0_10px_30px_rgba(0,0,0,0.18)] backdrop-blur-sm sm:h-[72px] sm:w-[210px]">
+                <img
+                  src={Logo}
+                  alt="RecruitKr"
+                  className="h-full w-full object-contain object-left drop-shadow-[0_8px_18px_rgba(255,255,255,0.12)]"
+                />
+              </span>
+              <p className="mt-4 max-w-md text-sm leading-relaxed text-white/80">
+                Your End-to-End Hiring and HR Partner from recruitment to retention.
+              </p>
             </div>
-            <p className="mt-4 max-w-sm text-sm leading-relaxed text-white/85">
-              Your End-to-End Hiring and HR Partner from recruitment to retention.
-            </p>
+
+            <div className="flex flex-wrap justify-center gap-3 md:justify-end">
+              {socialLinks.map(({ icon: Icon, href, label }) => (
+                <a
+                  key={label}
+                  href={href}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={label}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white transition duration-200 hover:bg-white/10 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
+                >
+                  <Icon size={18} />
+                </a>
+              ))}
+            </div>
           </div>
 
-          <div className="md:hidden sm:col-span-2">
+          <div className="mt-8 md:hidden">
             <Accordion type="single" collapsible className="grid gap-3">
               <AccordionItem value="services" className="overflow-hidden rounded-2xl border border-white/10 bg-white/5 px-0">
                 <AccordionTrigger className={mobileSectionTriggerClass}>Services</AccordionTrigger>
@@ -87,7 +88,6 @@ const Footer = () => {
                       item.type === "route" ? (
                         <Link key={item.label} to={item.to} className={footerLinkClass}>
                           <span>{item.label}</span>
-                          <ArrowRight size={16} className="shrink-0 opacity-70 transition group-hover:translate-x-0.5 group-hover:opacity-100" />
                         </Link>
                       ) : null,
                     )}
@@ -102,7 +102,6 @@ const Footer = () => {
                     {sectorLinks.map((s) => (
                       <a key={s} href="/sectors" className={footerLinkClass}>
                         <span>{s}</span>
-                        <ArrowRight size={16} className="shrink-0 opacity-70 transition group-hover:translate-x-0.5 group-hover:opacity-100" />
                       </a>
                     ))}
                   </nav>
@@ -112,12 +111,12 @@ const Footer = () => {
               <AccordionItem value="contact" className="overflow-hidden rounded-2xl border border-white/10 bg-white/5 px-0">
                 <AccordionTrigger className={mobileSectionTriggerClass}>Contact</AccordionTrigger>
                 <AccordionContent className="px-4 pb-4 pt-1">
-                  <div className="grid gap-3 text-sm">
+                  <div className="grid gap-2 text-sm">
                     {contactEmails.map((email) => (
                       <a
                         key={email}
                         href={`mailto:${email}`}
-                        className="flex min-w-0 items-start gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white/90 transition hover:border-primary/60 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
+                        className={contactLinkClass}
                       >
                         <Mail size={16} className="mt-0.5 shrink-0 opacity-90" />
                         <span className="min-w-0 break-words">{email}</span>
@@ -127,7 +126,9 @@ const Footer = () => {
 
                   <div className="mt-4 grid gap-3">
                     <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                      <p className="text-xs font-medium text-white/80">Recruiters / Employers</p>
+                      <p className="text-xs font-medium uppercase tracking-[0.14em] text-white/70">
+                        Recruiters / Employers
+                      </p>
                       <a
                         href="tel:+919001965072"
                         className="mt-2 inline-flex items-center gap-2 text-sm text-white/90 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
@@ -136,7 +137,9 @@ const Footer = () => {
                       </a>
                     </div>
                     <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                      <p className="text-xs font-medium text-white/80">Candidates / Job Seekers</p>
+                      <p className="text-xs font-medium uppercase tracking-[0.14em] text-white/70">
+                        Candidates / Job Seekers
+                      </p>
                       <a
                         href="tel:+919636315150"
                         className="mt-2 inline-flex items-center gap-2 text-sm text-white/90 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
@@ -150,76 +153,79 @@ const Footer = () => {
             </Accordion>
           </div>
 
-          <div className="hidden md:block md:col-span-3">
-            <h4 className="mb-3 text-xs font-semibold uppercase tracking-widest text-white/70">Services</h4>
-            <nav className="grid gap-2">
-              {serviceLinks.map((item) =>
-                item.type === "route" ? (
-                  <Link key={item.label} to={item.to} className={footerLinkClass}>
-                    <span>{item.label}</span>
-                    <ArrowRight size={16} className="shrink-0 opacity-70 transition group-hover:translate-x-0.5 group-hover:opacity-100" />
-                  </Link>
-                ) : null,
-              )}
-            </nav>
-          </div>
-
-          <div className="hidden md:block md:col-span-2">
-            <h4 className="mb-3 text-xs font-semibold uppercase tracking-widest text-white/70">Sectors</h4>
-            <nav className="grid gap-2">
-              {sectorLinks.map((s) => (
-                <a
-                  key={s}
-                  href="/sectors"
-                  className={footerLinkClass}
-                >
-                  <span>{s}</span>
-                  <ArrowRight size={16} className="shrink-0 opacity-70 transition group-hover:translate-x-0.5 group-hover:opacity-100" />
-                </a>
-              ))}
-            </nav>
-          </div>
-
-          <div className="hidden md:block md:col-span-3">
-            <h4 className="mb-3 text-xs font-semibold uppercase tracking-widest text-white/70">Contact</h4>
-            <div className="grid gap-3 text-sm">
-              {contactEmails.map((email) => (
-                <a
-                  key={email}
-                  href={`mailto:${email}`}
-                  className="flex min-w-0 items-start gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white/90 transition hover:border-primary/60 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
-                >
-                  <Mail size={16} className="mt-0.5 shrink-0 opacity-90" />
-                  <span className="min-w-0 break-words">{email}</span>
-                </a>
-              ))}
+          <div className="mt-8 hidden grid-cols-1 gap-6 sm:grid-cols-2 md:grid md:grid-cols-3">
+            <div>
+              <h4 className="mb-3 text-xs font-semibold uppercase tracking-widest text-white/70">Services</h4>
+              <nav className="grid gap-2">
+                {serviceLinks.map((item) =>
+                  item.type === "route" ? (
+                    <Link key={item.label} to={item.to} className={footerLinkClass}>
+                      <span>{item.label}</span>
+                    </Link>
+                  ) : null,
+                )}
+              </nav>
             </div>
 
-            <div className="mt-4 grid gap-3">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <p className="text-xs font-medium text-white/80">Recruiters / Employers</p>
-                <a
-                  href="tel:+919001965072"
-                  className="mt-2 inline-flex items-center gap-2 text-sm text-white/90 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
-                >
-                  <Phone size={16} className="shrink-0 opacity-90" /> +91 90019 65072
-                </a>
+            <div>
+              <h4 className="mb-3 text-xs font-semibold uppercase tracking-widest text-white/70">Sectors</h4>
+              <nav className="grid gap-2">
+                {sectorLinks.map((s) => (
+                  <a
+                    key={s}
+                    href="/sectors"
+                    className={footerLinkClass}
+                  >
+                    <span>{s}</span>
+                  </a>
+                ))}
+              </nav>
+            </div>
+
+            <div>
+              <h4 className="mb-3 text-xs font-semibold uppercase tracking-widest text-white/70">Contact</h4>
+              <div className="grid gap-2 text-sm">
+                {contactEmails.map((email) => (
+                  <a
+                    key={email}
+                    href={`mailto:${email}`}
+                    className={contactLinkClass}
+                  >
+                    <Mail size={16} className="mt-0.5 shrink-0 opacity-90" />
+                    <span className="min-w-0 break-words">{email}</span>
+                  </a>
+                ))}
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <p className="text-xs font-medium text-white/80">Candidates / Job Seekers</p>
-                <a
-                  href="tel:+919636315150"
-                  className="mt-2 inline-flex items-center gap-2 text-sm text-white/90 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
-                >
-                  <Phone size={16} className="shrink-0 opacity-90" /> +91 96363 15150
-                </a>
+
+              <div className="mt-4 grid gap-3">
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <p className="text-xs font-medium uppercase tracking-[0.14em] text-white/70">
+                    Recruiters / Employers
+                  </p>
+                  <a
+                    href="tel:+919001965072"
+                    className="mt-2 inline-flex items-center gap-2 text-sm text-white/90 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
+                  >
+                    <Phone size={16} className="shrink-0 opacity-90" /> +91 90019 65072
+                  </a>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <p className="text-xs font-medium uppercase tracking-[0.14em] text-white/70">
+                    Candidates / Job Seekers
+                  </p>
+                  <a
+                    href="tel:+919636315150"
+                    className="mt-2 inline-flex items-center gap-2 text-sm text-white/90 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-deep"
+                  >
+                    <Phone size={16} className="shrink-0 opacity-90" /> +91 96363 15150
+                  </a>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-
-        <div className="mt-10 border-t border-white/10 pt-6 text-center text-xs text-white/75">
-          &copy; {new Date().getFullYear()} RecruitKr. All rights reserved.
+          <div className="mt-8 border-t border-white/10 pt-6 text-center text-xs leading-relaxed text-white/70">
+            &copy; {new Date().getFullYear()} RecruitKr. All rights reserved.
+          </div>
         </div>
       </div>
     </footer>

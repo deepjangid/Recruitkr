@@ -22,6 +22,22 @@ const blogPostSchema = new mongoose.Schema(
       trim: true,
       maxlength: 320,
     },
+    authorName: {
+      type: String,
+      trim: true,
+      default: 'RecruitKr Editorial',
+      maxlength: 120,
+    },
+    coverImage: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    contentHtml: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     content: {
       type: [String],
       required: true,

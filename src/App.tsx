@@ -14,6 +14,7 @@ import Contact from "./pages/Contact";
 import FAQs from "./pages/FAQs";
 import Blog from "./pages/Blog";
 import BlogPostApi from "./pages/BlogPostApi";
+import AdminBlogEditor from "./pages/AdminBlogEditor";
 import NotFound from "./pages/NotFound";
 import CandidateRegister from "./pages/CandidateRegister";
 import ClientRegister from "./pages/ClientRegister";
@@ -39,10 +40,12 @@ const App = () => (
           <Route path="/sectors" element={<Sectors />} />
           <Route path="/process" element={<Process />} />
           <Route path="/why-us" element={<WhyUs />} />
+          <Route path="/about" element={<WhyUs />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/faqs" element={<FAQs />} />
           <Route path="/blog" element={<Blog />} />
           <Route path="/blog/:slug" element={<BlogPostApi />} />
+          <Route path="/dashboard/admin/blogs" element={<AdminBlogEditor />} />
           <Route path="/register/candidate" element={<CandidateRegister />} />
           <Route path="/register/client" element={<ClientRegister />} />
           <Route path="/login" element={<Login />} />

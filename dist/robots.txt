@@ -1,20 +1,3 @@
 User-agent: *
 Allow: /
-Disallow: /dashboard/
-Disallow: /register/
-Disallow: /login
-
-# Explicitly allow common AI crawlers (covered by "*" above; listed for clarity)
-User-agent: GPTBot
-Allow: /
-
-User-agent: ChatGPT-User
-Allow: /
-
-User-agent: Google-Extended
-Allow: /
-
-User-agent: CCBot
-Allow: /
-
-Sitemap: https://recruitkr.com/sitemap.xml
+Sitemap: https://www.recruitkr.com/sitemap.xml

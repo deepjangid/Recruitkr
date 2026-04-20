@@ -1,6 +1,7 @@
 import { getSession, updateSessionTokens } from "@/lib/auth";
 
 const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000/api/v1").replace(/\/$/, "");
+const API_ROOT = API_BASE.replace(/\/api\/v\d+$/, "").replace(/\/$/, "");
 
 type ApiErrorPayload = {
   message?: string;
@@ -61,17 +62,40 @@ export const apiRequest = async <T>(path: string, options: ApiOptions = {}): Pro
   const session = getSession();
   const authHeader = auth && session?.accessToken ? { Authorization: `Bearer ${session.accessToken}` } : {};
   const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
+  const isAbsoluteApiPath = path.startsWith("/api/");
+  const url = isAbsoluteApiPath ? `${API_ROOT}${path}` : `${API_BASE}${path}`;
+  const isBlogRequest = path.startsWith("/blogs") || path.startsWith("/api/blogposts");
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    method,
-    credentials: "include",
-    headers: {
-      ...(isFormData ? {} : { "Content-Type": "application/json" }),
-      ...authHeader,
-      ...headers,
-    }, 
-    body: body ? (isFormData ? (body as FormData) : JSON.stringify(body)) : undefined,
-  });
+  if (isBlogRequest) {
+    console.info("[apiRequest] sending request", {
+      method,
+      url,
+      auth,
+    });
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method,
+      credentials: "include",
+      headers: {
+        ...(isFormData ? {} : { "Content-Type": "application/json" }),
+        ...authHeader,
+        ...headers,
+      },
+      body: body ? (isFormData ? (body as FormData) : JSON.stringify(body)) : undefined,
+    });
+  } catch (error) {
+    if (isBlogRequest) {
+      console.error("[apiRequest] network failure", {
+        method,
+        url,
+        error,
+      });
+    }
+    throw new Error("Backend server is not reachable. Please start the API server and try again.");
+  }
 
   if (res.status === 401 && auth && retryOn401) {
     const newToken = await refreshAccessToken();
@@ -88,6 +112,15 @@ export const apiRequest = async <T>(path: string, options: ApiOptions = {}): Pro
   }
 
   const json = await parseJsonSafe<T & ApiErrorPayload>(res);
+  if (isBlogRequest) {
+    console.info("[apiRequest] received response", {
+      method,
+      url,
+      ok: res.ok,
+      status: res.status,
+      hasJson: Boolean(json),
+    });
+  }
   if (!res.ok) {
     const detailsMessage = (json as ApiErrorPayload | null)?.details
       ?.map((detail) => {
@@ -101,6 +134,15 @@ export const apiRequest = async <T>(path: string, options: ApiOptions = {}): Pro
       (json as ApiErrorPayload | null)?.message ||
       (json as ApiErrorPayload | null)?.error?.message ||
       "Request failed";
+    if (isBlogRequest) {
+      console.error("[apiRequest] blog request failed", {
+        method,
+        url,
+        status: res.status,
+        message,
+        payload: json ?? null,
+      });
+    }
     throw new Error(message);
   }
 
@@ -126,7 +168,8 @@ export const createSseUrl = (path: string) => {
   }
 
   const separator = path.includes("?") ? "&" : "?";
-  return `${API_BASE}${path}${separator}token=${encodeURIComponent(session.accessToken)}`;
+  const url = path.startsWith("/api/") ? `${API_ROOT}${path}` : `${API_BASE}${path}`;
+  return `${url}${separator}token=${encodeURIComponent(session.accessToken)}`;
 };
 
-export { API_BASE };
+export { API_BASE, API_ROOT };
