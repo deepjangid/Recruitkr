@@ -31,7 +31,6 @@ const BlogPostApi = () => {
         setLoading(true);
         setError("");
         const [data, allBlogs] = await Promise.all([fetchBlogPost(slug), fetchBlogPosts()]);
-        console.log("[BlogPostApi] render contentHtml:", data.contentHtml);
         setPost(data);
         setRelatedBlogs(
           allBlogs
@@ -81,6 +80,11 @@ const BlogPostApi = () => {
                   <img
                     src={post.coverImage}
                     alt={post.title}
+                    width={1200}
+                    height={675}
+                    loading="eager"
+                    fetchPriority="high"
+                    decoding="async"
                     className="h-48 w-full rounded-xl object-cover sm:h-56"
                   />
                 ) : (

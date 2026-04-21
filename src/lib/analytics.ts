@@ -8,6 +8,18 @@ declare global {
 const GA_MEASUREMENT_ID = import.meta.env.VITE_GA_MEASUREMENT_ID?.trim();
 
 let analyticsLoaded = false;
+let analyticsScheduled = false;
+const pendingPageViews: string[] = [];
+const runWhenIdle = (callback: () => void) => {
+  if (typeof window === "undefined") return;
+
+  if ("requestIdleCallback" in window) {
+    window.requestIdleCallback(callback, { timeout: 1500 });
+    return;
+  }
+
+  window.setTimeout(callback, 250);
+};
 
 const injectAnalyticsScript = () => {
   if (!GA_MEASUREMENT_ID || analyticsLoaded || typeof document === "undefined") return;
@@ -35,16 +47,45 @@ const injectAnalyticsScript = () => {
   });
 
   analyticsLoaded = true;
+
+  while (pendingPageViews.length) {
+    const path = pendingPageViews.shift();
+    if (!path) continue;
+
+    window.gtag?.("event", "page_view", {
+      page_path: path,
+      page_location: `${window.location.origin}${path}`,
+      page_title: document.title,
+    });
+  }
 };
 
 export const initializeAnalytics = () => {
-  injectAnalyticsScript();
+  if (!GA_MEASUREMENT_ID || analyticsLoaded || analyticsScheduled || typeof window === "undefined") return;
+
+  analyticsScheduled = true;
+  const scheduleLoad = () => runWhenIdle(injectAnalyticsScript);
+
+  if (document.readyState === "complete") {
+    scheduleLoad();
+    return;
+  }
+
+  const onLoad = () => {
+    window.removeEventListener("load", onLoad);
+    scheduleLoad();
+  };
+
+  window.addEventListener("load", onLoad, { once: true });
 };
 
 export const trackPageView = (path: string) => {
   if (!GA_MEASUREMENT_ID) return;
 
-  injectAnalyticsScript();
+  if (!analyticsLoaded) {
+    pendingPageViews.push(path);
+    return;
+  }
 
   window.gtag?.("event", "page_view", {
     page_path: path,

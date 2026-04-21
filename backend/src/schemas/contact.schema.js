@@ -13,3 +13,9 @@ export const contactSchema = z
     message: z.string().trim().min(10).max(3000),
   })
   .strict();
+
+export const contactStatusSchema = z
+  .object({
+    status: z.enum(['unread', 'read']),
+  })
+  .strict();

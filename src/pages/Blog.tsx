@@ -18,10 +18,6 @@ const Blog = () => {
       setLoading(true);
       setError("");
       const response = await fetchBlogPosts();
-      console.info("[BlogPage] setting blogs state", {
-        count: response.length,
-        titles: response.map((post) => post.title),
-      });
       setBlogs(response);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to load blog posts";

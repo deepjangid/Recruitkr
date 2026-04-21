@@ -50,7 +50,14 @@ export const normalizeBlogImageUrls = (html: string, assetBaseUrl = "") =>
       }
     }
 
-    return `<img${beforeSrc}src=${quote}${normalizedSrc}${quote}${afterSrc}>`;
+    const normalizedAttributes = `${beforeSrc}${afterSrc}`
+      .replace(/\sloading=(["']).*?\1/gi, "")
+      .replace(/\sdecoding=(["']).*?\1/gi, "")
+      .replace(/\sfetchpriority=(["']).*?\1/gi, "")
+      .replace(/\swidth=(["']).*?\1/gi, "")
+      .replace(/\sheight=(["']).*?\1/gi, "");
+
+    return `<img${normalizedAttributes} src=${quote}${normalizedSrc}${quote} loading="lazy" decoding="async" width="1200" height="675">`;
   });
 
 export const getRenderableBlogHtml = (contentHtml?: string, content: string[] = [], assetBaseUrl = "") =>

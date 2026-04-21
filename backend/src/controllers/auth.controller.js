@@ -128,6 +128,7 @@ export const registerCandidate = asyncHandler(async (req, res) => {
     email: payload.email,
     mobile: payload.mobile,
     passwordHash,
+    passwordChangedAt: new Date(),
   });
 
   const candidateProfile = await CandidateProfile.create({
@@ -245,6 +246,7 @@ export const registerClient = asyncHandler(async (req, res) => {
     email: payload.email,
     mobile: payload.mobile,
     passwordHash,
+    passwordChangedAt: new Date(),
   });
 
   const clientProfile = await ClientProfile.create({

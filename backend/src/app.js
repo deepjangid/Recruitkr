@@ -12,6 +12,7 @@ import { getDynamicSitemap } from './controllers/seo.controller.js';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js';
 import { globalLimiter } from './middlewares/rateLimiter.js';
 import blogRoutes from './routes/blog.routes.js';
+import contactRoutes from './routes/contact.routes.js';
 import apiRoutes from './routes/index.js';
 
 const app = express();
@@ -45,7 +46,6 @@ app.use(cookieParser());
 app.use((req, _res, next) => {
   if (req.body) mongoSanitize.sanitize(req.body);
   if (req.params) mongoSanitize.sanitize(req.params);
-  if (req.headers) mongoSanitize.sanitize(req.headers);
   if (req.query) mongoSanitize.sanitize(req.query);
   next();
 });
@@ -67,6 +67,7 @@ app.use(['/api/v1/blogs', '/api/blogposts'], (req, _res, next) => {
 
 app.use('/api/v1', apiRoutes);
 app.use('/api/blogposts', blogRoutes);
+app.use('/api/contact', contactRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

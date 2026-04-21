@@ -268,13 +268,21 @@ const AdminBlogEditor = () => {
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Admin</p>
                     <h1 className="mt-2 text-2xl font-bold text-slate-900">Blog Editor</h1>
                   </div>
-                  <button
-                    type="button"
-                    onClick={resetForm}
-                    className="rounded-lg border border-border px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-700 transition hover:bg-slate-50"
-                  >
-                    New
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <Link
+                      to="/dashboard/admin/inbox"
+                      className="rounded-lg border border-border px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-700 transition hover:bg-slate-50"
+                    >
+                      Inbox
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={resetForm}
+                      className="rounded-lg border border-border px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-700 transition hover:bg-slate-50"
+                    >
+                      New
+                    </button>
+                  </div>
                 </div>
 
                 <div className="mt-6">

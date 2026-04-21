@@ -7,7 +7,7 @@ const SectorsSection = () => {
   const doubled = [...sectors, ...sectors];
 
   return (
-    <section id="sectors" className="overflow-hidden border-y border-border py-16">
+    <section id="sectors" className="content-auto overflow-hidden border-y border-border py-16">
       <div className="container mx-auto mb-10 px-4 text-center">
         <p className="mb-2 text-sm font-semibold uppercase tracking-widest text-accent">
           Industries
@@ -17,8 +17,8 @@ const SectorsSection = () => {
         </h2>
       </div>
 
-      <div className="relative">
-        <div className="flex animate-ticker gap-4">
+      <div className="relative hidden md:block">
+        <div className="flex animate-ticker gap-4 will-change-transform">
           {doubled.map((sector, i) => (
             <span
               key={`${sector}-${i}`}
@@ -28,6 +28,17 @@ const SectorsSection = () => {
             </span>
           ))}
         </div>
+      </div>
+
+      <div className="container mx-auto grid grid-cols-2 gap-3 px-4 md:hidden">
+        {sectors.map((sector) => (
+          <span
+            key={sector}
+            className="inline-flex items-center justify-center rounded-full border border-border bg-card px-4 py-3 text-sm font-semibold text-foreground"
+          >
+            {sector}
+          </span>
+        ))}
       </div>
     </section>
   );

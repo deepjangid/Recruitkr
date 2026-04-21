@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import OptimizedLogo from "@/components/OptimizedLogo";
 import { API_BASE, apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
 import { clearSession, getSession } from "@/lib/auth";
 import { useServerEvents, type SseConnectionStatus } from "@/hooks/useServerEvents";
 import { tryAutoLogin } from "@/lib/autoLogin";
-import Logo from "@/assets/logo.png";
 
 type ApplicationStatus =
   | "applied"
@@ -1508,10 +1508,11 @@ const ClientDashboard = () => {
           <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4">
             <div className="flex min-w-0 items-center gap-3 sm:gap-4" aria-label="RecruitKr home">
               <span className="flex h-11 w-[136px] shrink-0 items-center sm:h-12 sm:w-[152px] md:h-14 md:w-[186px]">
-                <img
-                  src={Logo}
-                  alt="RecruitKr"
-                  className="h-full w-full object-contain object-left"
+                <OptimizedLogo
+                  loading="eager"
+                  fetchPriority="high"
+                  className="block h-full w-full"
+                  imgClassName="h-full w-full object-contain object-left"
                 />
               </span>
               <div className="hidden min-w-0 md:block">

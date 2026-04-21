@@ -23,7 +23,7 @@ const panels = [
 
 const WhoWeHelpSection = () => {
   return (
-    <section className="py-24">
+    <section className="content-auto py-24">
       <div className="container mx-auto px-4">
         <div className="mb-16 text-center">
           <p className="mb-2 text-sm font-semibold uppercase tracking-widest text-primary">

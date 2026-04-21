@@ -9,7 +9,7 @@ type ServicesSectionProps = {
 
 const ServicesSection = ({ showHeading = true, className }: ServicesSectionProps) => {
   return (
-    <section id="services" className={cn("py-24", className)}>
+    <section id="services" className={cn("content-auto py-24", className)}>
       <div className="container mx-auto px-4">
         {showHeading && (
           <div className="mb-16 text-center">

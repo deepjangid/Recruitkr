@@ -1,63 +1,63 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import AnalyticsTracker from "@/components/AnalyticsTracker";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
-import Services from "./pages/Services";
-import ServiceDetails from "./pages/ServiceDetails";
-import Sectors from "./pages/Sectors";
-import Process from "./pages/Process";
-import WhyUs from "./pages/WhyUs";
-import Contact from "./pages/Contact";
-import FAQs from "./pages/FAQs";
-import Blog from "./pages/Blog";
-import BlogPostApi from "./pages/BlogPostApi";
-import AdminBlogEditor from "./pages/AdminBlogEditor";
-import NotFound from "./pages/NotFound";
-import CandidateRegister from "./pages/CandidateRegister";
-import ClientRegister from "./pages/ClientRegister";
-import Login from "./pages/Login";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import CandidateDashboard from "./pages/CandidateDashboard";
-import ClientDashboard from "./pages/ClientDashboard";
+import { lazy, Suspense } from "react";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
 
-const queryClient = new QueryClient();
+const Index = lazy(() => import("./pages/Index"));
+const Services = lazy(() => import("./pages/Services"));
+const ServiceDetails = lazy(() => import("./pages/ServiceDetails"));
+const Sectors = lazy(() => import("./pages/Sectors"));
+const Process = lazy(() => import("./pages/Process"));
+const WhyUs = lazy(() => import("./pages/WhyUs"));
+const Contact = lazy(() => import("./pages/Contact"));
+const FAQs = lazy(() => import("./pages/FAQs"));
+const Blog = lazy(() => import("./pages/Blog"));
+const BlogPostApi = lazy(() => import("./pages/BlogPostApi"));
+const AdminBlogEditor = lazy(() => import("./pages/AdminBlogEditor"));
+const AdminInbox = lazy(() => import("./pages/AdminInbox"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const CandidateRegister = lazy(() => import("./pages/CandidateRegister"));
+const ClientRegister = lazy(() => import("./pages/ClientRegister"));
+const Login = lazy(() => import("./pages/Login"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const CandidateDashboard = lazy(() => import("./pages/CandidateDashboard"));
+const ClientDashboard = lazy(() => import("./pages/ClientDashboard"));
+
+const routeFallback = (
+  <div className="flex min-h-screen items-center justify-center bg-background px-4 text-sm text-muted-foreground">
+    Loading page...
+  </div>
+);
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AnalyticsTracker />
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/services" element={<Services />} />
-          <Route path="/services/:id" element={<ServiceDetails />} />
-          <Route path="/sectors" element={<Sectors />} />
-          <Route path="/process" element={<Process />} />
-          <Route path="/why-us" element={<WhyUs />} />
-          <Route path="/about" element={<WhyUs />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="/faqs" element={<FAQs />} />
-          <Route path="/blog" element={<Blog />} />
-          <Route path="/blog/:slug" element={<BlogPostApi />} />
-          <Route path="/dashboard/admin/blogs" element={<AdminBlogEditor />} />
-          <Route path="/register/candidate" element={<CandidateRegister />} />
-          <Route path="/register/client" element={<ClientRegister />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/dashboard/candidate" element={<CandidateDashboard />} />
-          <Route path="/dashboard/client" element={<ClientDashboard />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+  <BrowserRouter>
+    <AnalyticsTracker />
+    <Suspense fallback={routeFallback}>
+      <Routes>
+        <Route path="/" element={<Index />} />
+        <Route path="/services" element={<Services />} />
+        <Route path="/services/:id" element={<ServiceDetails />} />
+        <Route path="/sectors" element={<Sectors />} />
+        <Route path="/process" element={<Process />} />
+        <Route path="/why-us" element={<WhyUs />} />
+        <Route path="/about" element={<WhyUs />} />
+        <Route path="/contact" element={<Contact />} />
+        <Route path="/faqs" element={<FAQs />} />
+        <Route path="/blog" element={<Blog />} />
+        <Route path="/blog/:slug" element={<BlogPostApi />} />
+        <Route path="/dashboard/admin/blogs" element={<AdminBlogEditor />} />
+        <Route path="/dashboard/admin/inbox" element={<AdminInbox />} />
+        <Route path="/register/candidate" element={<CandidateRegister />} />
+        <Route path="/register/client" element={<ClientRegister />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/dashboard/candidate" element={<CandidateDashboard />} />
+        <Route path="/dashboard/client" element={<ClientDashboard />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Suspense>
+  </BrowserRouter>
 );
 
 export default App;

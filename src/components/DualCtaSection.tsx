@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 
 const DualCtaSection = () => {
   return (
-    <section id="cta" className="py-24">
+    <section id="cta" className="content-auto py-24">
       <div className="container mx-auto px-4">
         <div className="grid gap-6 md:grid-cols-2">
           {/* Employers */}

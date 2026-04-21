@@ -10,7 +10,7 @@ const usps = [
 
 const WhyRecruitkrSection = () => {
   return (
-    <section id="why-us" className="py-24">
+    <section id="why-us" className="content-auto py-24">
       <div className="container mx-auto px-4">
         <div className="mb-16 text-center">
           <p className="mb-2 text-sm font-semibold uppercase tracking-widest text-primary">
