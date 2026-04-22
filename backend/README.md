@@ -169,6 +169,11 @@ If `resume` is omitted in candidate registration:
 - Add `Authorization: Bearer <accessToken>` for protected APIs.
 - Call `/auth/refresh` on `401` and retry once.
 
+For production deployments:
+- frontend must be built with `VITE_API_URL=https://your-backend-domain/api/v1` if backend and frontend use different domains
+- backend `CORS_ORIGIN` must include the deployed frontend origin, for example `https://your-frontend.vercel.app`
+- verify backend is live at `GET /api/v1/health` before testing the frontend
+
 ## 7. Security Features Included
 
 - Argon2id password hashing

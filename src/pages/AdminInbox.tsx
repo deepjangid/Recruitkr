@@ -1,6 +1,7 @@
 import Footer from "@/components/Footer";
 import Navbar from "@/components/Navbar";
 import { getSession } from "@/lib/auth";
+import { getErrorMessage } from "@/lib/apiError";
 import {
   fetchAdminContactMessages,
   updateAdminContactMessageStatus,
@@ -30,6 +31,7 @@ const AdminInbox = () => {
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
     const session = getSession();
@@ -51,14 +53,14 @@ const AdminInbox = () => {
         setMessages(data);
         setSelectedMessageId((current) => current || data[0]?._id || null);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load inbox");
+        setError(getErrorMessage(err, "We couldn't load your inbox right now. Please try again."));
       } finally {
         setLoading(false);
       }
     };
 
     void loadMessages();
-  }, [sessionChecked]);
+  }, [reloadCount, sessionChecked]);
 
   const selectedMessage = useMemo(
     () => messages.find((message) => message._id === selectedMessageId) ?? null,
@@ -76,7 +78,7 @@ const AdminInbox = () => {
         current.map((item) => (item._id === updated._id ? updated : item)),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update message status");
+      setError(getErrorMessage(err, "We couldn't update that message right now. Please try again."));
     } finally {
       setUpdatingId(null);
     }
@@ -107,8 +109,16 @@ const AdminInbox = () => {
             </div>
 
             {error && (
-              <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {error}
+              <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-sm text-red-700">
+                <p>{error}</p>
+                <button
+                  type="button"
+                  onClick={() => setReloadCount((current) => current + 1)}
+                  disabled={loading}
+                  className="mt-3 inline-flex rounded-xl border border-red-200 bg-white px-4 py-2 font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {loading ? "Retrying..." : "Retry"}
+                </button>
               </div>
             )}
 
@@ -122,7 +132,10 @@ const AdminInbox = () => {
                 </div>
 
                 {loading ? (
-                  <p className="py-6 text-sm text-muted-foreground">Loading inbox...</p>
+                  <div className="py-6 text-sm text-muted-foreground">
+                    <p>Loading inbox...</p>
+                    <p className="mt-1">We're fetching the latest messages for you.</p>
+                  </div>
                 ) : messages.length === 0 ? (
                   <p className="py-6 text-sm text-muted-foreground">No contact messages yet.</p>
                 ) : (

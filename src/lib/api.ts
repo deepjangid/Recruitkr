@@ -1,6 +1,28 @@
 import { getSession, updateSessionTokens } from "@/lib/auth";
+import {
+  buildApiError,
+  DEFAULT_API_ERROR_MESSAGE,
+  getFriendlyApiMessage,
+  isAbortError,
+} from "@/lib/apiError";
 
-const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000/api/v1").replace(/\/$/, "");
+const trimTrailingSlash = (value: string) => value.replace(/\/$/, "");
+const API_TIMEOUT_MS = 15000;
+
+const getApiBase = () => {
+  const configuredUrl = import.meta.env.VITE_API_URL?.trim();
+  if (configuredUrl) {
+    return trimTrailingSlash(configuredUrl);
+  }
+
+  if (import.meta.env.DEV) {
+    return "http://localhost:5000/api/v1";
+  }
+
+  return `${window.location.origin}/api/v1`;
+};
+
+const API_BASE = getApiBase();
 const API_ROOT = API_BASE.replace(/\/api\/v\d+$/, "").replace(/\/$/, "");
 
 type ApiErrorPayload = {
@@ -20,6 +42,7 @@ type ApiOptions = {
   headers?: Record<string, string>;
   auth?: boolean;
   retryOn401?: boolean;
+  timeoutMs?: number;
 };
 
 const parseJsonSafe = async <T>(res: Response): Promise<T | null> => {
@@ -30,24 +53,47 @@ const parseJsonSafe = async <T>(res: Response): Promise<T | null> => {
   }
 };
 
+const fetchWithTimeout = async (input: RequestInfo | URL, init: RequestInit = {}, timeoutMs = API_TIMEOUT_MS) => {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal,
+    });
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+};
+
 const refreshAccessToken = async (): Promise<string | null> => {
   const session = getSession();
   if (!session?.refreshToken) return null;
 
-  const res = await fetch(`${API_BASE}/auth/refresh`, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refreshToken: session.refreshToken }),
-  });
+  try {
+    const res = await fetchWithTimeout(
+      `${API_BASE}/auth/refresh`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken: session.refreshToken }),
+      },
+      API_TIMEOUT_MS,
+    );
 
-  const json = await parseJsonSafe<{ success?: boolean; data?: { accessToken?: string; refreshToken?: string } }>(res);
-  if (!res.ok || !json?.success || !json.data?.accessToken) {
+    const json = await parseJsonSafe<{ success?: boolean; data?: { accessToken?: string; refreshToken?: string } }>(res);
+    if (!res.ok || !json?.success || !json.data?.accessToken) {
+      return null;
+    }
+
+    updateSessionTokens(json.data.accessToken, json.data.refreshToken);
+    return json.data.accessToken;
+  } catch (error) {
+    console.error("[api] token refresh failed", { url: `${API_BASE}/auth/refresh`, error });
     return null;
   }
-
-  updateSessionTokens(json.data.accessToken, json.data.refreshToken);
-  return json.data.accessToken;
 };
 
 export const apiRequest = async <T>(path: string, options: ApiOptions = {}): Promise<T> => {
@@ -57,6 +103,7 @@ export const apiRequest = async <T>(path: string, options: ApiOptions = {}): Pro
     headers = {},
     auth = false,
     retryOn401 = true,
+    timeoutMs = API_TIMEOUT_MS,
   } = options;
 
   const session = getSession();
@@ -76,25 +123,29 @@ export const apiRequest = async <T>(path: string, options: ApiOptions = {}): Pro
 
   let res: Response;
   try {
-    res = await fetch(url, {
-      method,
-      credentials: "include",
-      headers: {
-        ...(isFormData ? {} : { "Content-Type": "application/json" }),
-        ...authHeader,
-        ...headers,
-      },
-      body: body ? (isFormData ? (body as FormData) : JSON.stringify(body)) : undefined,
-    });
-  } catch (error) {
-    if (isBlogRequest) {
-      console.error("[apiRequest] network failure", {
+    res = await fetchWithTimeout(
+      url,
+      {
         method,
-        url,
-        error,
-      });
-    }
-    throw new Error("Backend server is not reachable. Please start the API server and try again.");
+        credentials: "include",
+        headers: {
+          ...(isFormData ? {} : { "Content-Type": "application/json" }),
+          ...authHeader,
+          ...headers,
+        },
+        body: body ? (isFormData ? (body as FormData) : JSON.stringify(body)) : undefined,
+      },
+      timeoutMs,
+    );
+  } catch (error) {
+    throw buildApiError({
+      context: isAbortError(error) ? "request timed out" : "request failed before response",
+      method,
+      url,
+      error,
+      timeout: isAbortError(error),
+      fallbackMessage: DEFAULT_API_ERROR_MESSAGE,
+    });
   }
 
   if (res.status === 401 && auth && retryOn401) {
@@ -107,6 +158,7 @@ export const apiRequest = async <T>(path: string, options: ApiOptions = {}): Pro
           Authorization: `Bearer ${newToken}`,
         },
         retryOn401: false,
+        timeoutMs,
       });
     }
   }
@@ -129,21 +181,20 @@ export const apiRequest = async <T>(path: string, options: ApiOptions = {}): Pro
       })
       .filter(Boolean)
       .join("; ");
-    const message =
+    const serverMessage =
       detailsMessage ||
       (json as ApiErrorPayload | null)?.message ||
       (json as ApiErrorPayload | null)?.error?.message ||
-      "Request failed";
-    if (isBlogRequest) {
-      console.error("[apiRequest] blog request failed", {
-        method,
-        url,
-        status: res.status,
-        message,
-        payload: json ?? null,
-      });
-    }
-    throw new Error(message);
+      null;
+    throw buildApiError({
+      context: "request returned an error response",
+      method,
+      url,
+      status: res.status,
+      serverMessage,
+      payload: json ?? null,
+      fallbackMessage: getFriendlyApiMessage(res.status, null, DEFAULT_API_ERROR_MESSAGE),
+    });
   }
 
   return json as T;
@@ -173,6 +224,38 @@ export const createSseUrl = (path: string) => {
   const separator = path.includes("?") ? "&" : "?";
   const url = path.startsWith("/api/") ? `${API_ROOT}${path}` : `${API_BASE}${path}`;
   return `${url}${separator}token=${encodeURIComponent(session.accessToken)}`;
+};
+
+export const checkApiHealth = async () => {
+  try {
+    const res = await fetchWithTimeout(`${API_BASE}/health`, {
+      method: "GET",
+      credentials: "include",
+    });
+
+    if (!res.ok) {
+      throw buildApiError({
+        context: "health check failed",
+        method: "GET",
+        url: `${API_BASE}/health`,
+        status: res.status,
+      });
+    }
+
+    return parseJsonSafe<{ success?: boolean; message?: string }>(res);
+  } catch (error) {
+    if (error instanceof Error && error.name === "ApiClientError") {
+      throw error;
+    }
+
+    throw buildApiError({
+      context: "health check request failed",
+      method: "GET",
+      url: `${API_BASE}/health`,
+      error,
+      timeout: isAbortError(error),
+    });
+  }
 };
 
 export { API_BASE, API_ROOT };
