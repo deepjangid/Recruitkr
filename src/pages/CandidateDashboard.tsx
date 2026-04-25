@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, BriefcaseBusiness, Building2, Filter, MapPin, Search, Sparkles, X } from "lucide-react";
+import { ArrowLeft, BriefcaseBusiness, Building2, Camera, CheckCircle2, ChevronDown, Clock3, FileText, Filter, MapPin, Pencil, Search, Sparkles, UserCircle2, X, XCircle } from "lucide-react";
 import OptimizedLogo from "@/components/OptimizedLogo";
 import { API_BASE, apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
 import { clearSession, getSession } from "@/lib/auth";
@@ -82,6 +82,26 @@ const LIVE_STATUS_META: Record<SseConnectionStatus, { label: string; className: 
   connected: { label: "Live connected", className: "border-emerald-200 bg-emerald-50 text-emerald-700" },
   reconnecting: { label: "Live reconnecting", className: "border-sky-200 bg-sky-50 text-sky-700" },
   disconnected: { label: "Live disconnected", className: "border-slate-200 bg-slate-100 text-slate-600" },
+};
+
+const PROFILE_STATUS_LABELS: Record<ApplicationStatus, string> = {
+  applied: "Applied",
+  "under-review": "Under Review",
+  screening: "Shortlisted",
+  interview: "Interview Scheduled",
+  offer: "Offer",
+  hired: "Hired",
+  rejected: "Rejected",
+};
+
+const PROFILE_STATUS_BADGE_CLASSNAMES: Record<ApplicationStatus, string> = {
+  applied: "border-slate-200 bg-slate-100 text-slate-700",
+  "under-review": "border-sky-200 bg-sky-50 text-sky-700",
+  screening: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  interview: "border-violet-200 bg-violet-50 text-violet-700",
+  offer: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  hired: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  rejected: "border-red-200 bg-red-50 text-red-700",
 };
 
 const formatStatusLabel = (status: string) =>
@@ -391,6 +411,17 @@ type JobsResponse = {
   };
 };
 
+type EditableProfileField =
+  | "fullName"
+  | "highestQualification"
+  | "experienceStatus"
+  | "preferredRole"
+  | "preferredLocation"
+  | "summary"
+  | "linkedinUrl"
+  | "portfolioUrl"
+  | "workModes";
+
 const CandidateDashboard = () => {
   const navigate = useNavigate();
   const [tab, setTab] = useState<"overview" | "jobs" | "applications" | "resume" | "profile">("jobs");
@@ -410,6 +441,7 @@ const CandidateDashboard = () => {
   const [applyLoadingJobId, setApplyLoadingJobId] = useState<string | null>(null);
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
   const [expandedApplicationId, setExpandedApplicationId] = useState<string | null>(null);
+  const [expandedProfileApplicationId, setExpandedProfileApplicationId] = useState<string | null>(null);
   const [resumeSaving, setResumeSaving] = useState(false);
   const [resumeDownloading, setResumeDownloading] = useState(false);
   const [resumeNotice, setResumeNotice] = useState("");
@@ -450,6 +482,16 @@ const CandidateDashboard = () => {
     certifications: [],
     referral: "",
   });
+  const [activeProfileField, setActiveProfileField] = useState<EditableProfileField | null>(null);
+  const [inlineProfileDrafts, setInlineProfileDrafts] = useState({
+    fullName: "",
+    linkedinUrl: "",
+    portfolioUrl: "",
+  });
+  const [profilePhotoPreviewUrl, setProfilePhotoPreviewUrl] = useState<string | null>(null);
+  const [inlineSavingField, setInlineSavingField] = useState<EditableProfileField | null>(null);
+  const profilePhotoInputRef = useRef<HTMLInputElement | null>(null);
+  const profilePhotoPreviewObjectUrlRef = useRef<string | null>(null);
 
   const refreshDashboard = async () => {
     const dashboardRes = await apiGet<CandidateDashboardResponse>("/dashboards/candidate", true);
@@ -498,6 +540,32 @@ const CandidateDashboard = () => {
       referral: profileData?.referral || "",
     });
   };
+
+  useEffect(() => {
+    setInlineProfileDrafts({
+      fullName: profile?.fullName || "",
+      linkedinUrl: profile?.linkedinUrl || "",
+      portfolioUrl: profile?.portfolioUrl || "",
+    });
+  }, [profile]);
+
+  useEffect(() => {
+    if (!profilePhotoUrl || !profilePhotoPreviewUrl) return;
+
+    if (profilePhotoPreviewObjectUrlRef.current) {
+      URL.revokeObjectURL(profilePhotoPreviewObjectUrlRef.current);
+      profilePhotoPreviewObjectUrlRef.current = null;
+    }
+    setProfilePhotoPreviewUrl(null);
+  }, [profilePhotoPreviewUrl, profilePhotoUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (profilePhotoPreviewObjectUrlRef.current) {
+        URL.revokeObjectURL(profilePhotoPreviewObjectUrlRef.current);
+      }
+    };
+  }, []);
 
   const refreshLiveData = useCallback(async () => {
     try {
@@ -750,38 +818,126 @@ const CandidateDashboard = () => {
       const res = await apiPatch<CandidateProfileResponse>("/users/candidate/me", payload, true);
 
       setProfile(res.data);
-      setResumeForm({
-        highestQualification: res.data?.highestQualification || "",
-        experienceStatus: res.data?.experienceStatus || "fresher",
-        experienceDetails: {
-          currentCompany: res.data?.experienceDetails?.currentCompany || "",
-          designation: res.data?.experienceDetails?.designation || "",
-          totalExperience: res.data?.experienceDetails?.totalExperience || "",
-          industry: res.data?.experienceDetails?.industry || "",
-        },
-        preferences: {
-          preferredRole: res.data?.preferences?.preferredRole || "",
-          preferredLocation: res.data?.preferences?.preferredLocation || "",
-          preferredIndustry: res.data?.preferences?.preferredIndustry || "",
-          workModes: res.data?.preferences?.workModes || [],
-        },
-        summary: res.data?.summary || "",
-        skillsText: (res.data?.skills || []).join(", "),
-        projects: (res.data?.projects || []).map((p) => ({
-          name: p?.name || "",
-          description: p?.description || "",
-        })),
-        certifications: (res.data?.certifications || []).map((c) => ({
-          name: c?.name || "",
-          institute: c?.institute || "",
-        })),
-        referral: res.data?.referral || "",
-      });
+      syncResumeFormFromProfile(res.data);
       setResumeNotice("Resume saved successfully.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save resume");
     } finally {
       setResumeSaving(false);
+    }
+  };
+
+  const saveInlineProfile = async (
+    field: EditableProfileField,
+    payload: Partial<CandidateProfileResponse["data"]> & {
+      preferences?: CandidateProfileResponse["data"]["preferences"];
+    },
+  ) => {
+    setInlineSavingField(field);
+    setError("");
+    setResumeNotice("");
+    try {
+      const res = await apiPatch<CandidateProfileResponse>("/users/candidate/me", payload, true);
+      setProfile(res.data);
+      syncResumeFormFromProfile(res.data);
+      setActiveProfileField(null);
+      setResumeNotice("Resume saved successfully.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save profile");
+    } finally {
+      setInlineSavingField(null);
+    }
+  };
+
+  const commitResumeField = async (field: EditableProfileField) => {
+    if (inlineSavingField) return;
+
+    if (
+      field === "highestQualification" &&
+      (resumeForm.highestQualification || "") === (profile?.highestQualification || "")
+    ) {
+      setActiveProfileField(null);
+      return;
+    }
+
+    if (
+      field === "experienceStatus" &&
+      (resumeForm.experienceStatus || "") === (profile?.experienceStatus || "")
+    ) {
+      setActiveProfileField(null);
+      return;
+    }
+
+    if (
+      field === "preferredRole" &&
+      (resumeForm.preferences.preferredRole || "") === (profile?.preferences?.preferredRole || "")
+    ) {
+      setActiveProfileField(null);
+      return;
+    }
+
+    if (
+      field === "preferredLocation" &&
+      (resumeForm.preferences.preferredLocation || "") === (profile?.preferences?.preferredLocation || "")
+    ) {
+      setActiveProfileField(null);
+      return;
+    }
+
+    if (field === "summary" && (resumeForm.summary || "") === (profile?.summary || "")) {
+      setActiveProfileField(null);
+      return;
+    }
+
+    if (
+      field === "workModes" &&
+      JSON.stringify(resumeForm.preferences.workModes || []) ===
+        JSON.stringify(profile?.preferences?.workModes || [])
+    ) {
+      setActiveProfileField(null);
+      return;
+    }
+
+    await saveResume();
+    setActiveProfileField(null);
+  };
+
+  const commitInlineProfileField = async (field: "fullName" | "linkedinUrl" | "portfolioUrl") => {
+    if (inlineSavingField) return;
+
+    const nextValue = inlineProfileDrafts[field];
+    const currentValue = profile?.[field] || "";
+    if (nextValue === currentValue) {
+      setActiveProfileField(null);
+      return;
+    }
+
+    await saveInlineProfile(field, { [field]: nextValue } as Partial<CandidateProfileResponse["data"]>);
+  };
+
+  const displayedProfilePhotoUrl = profilePhotoPreviewUrl || profilePhotoUrl;
+
+  const handleProfilePhotoSelect = async (file?: File) => {
+    if (!file) return;
+
+    if (profilePhotoPreviewObjectUrlRef.current) {
+      URL.revokeObjectURL(profilePhotoPreviewObjectUrlRef.current);
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    profilePhotoPreviewObjectUrlRef.current = previewUrl;
+    setProfilePhotoPreviewUrl(previewUrl);
+    await uploadProfilePhoto(file);
+  };
+
+  const handleInlineInputKeyDown = (
+    event: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
+    onCommit: () => void | Promise<void>,
+  ) => {
+    if (event.key === "Enter" && !event.shiftKey && event.currentTarget.tagName !== "TEXTAREA") {
+      event.preventDefault();
+      void onCommit();
+      event.currentTarget.blur();
     }
   };
 
@@ -991,6 +1147,94 @@ const CandidateDashboard = () => {
     { key: "profile", label: "Profile" },
     { key: "resume", label: "My Resume" },
   ];
+
+  const profileSummaryCards = [
+    {
+      key: "total",
+      label: "Total Applications",
+      value: applications.length,
+      icon: FileText,
+      tone: "border-[#264a7f]/10 bg-white text-[#264a7f]",
+      helper: "All jobs you have applied to",
+    },
+    {
+      key: "completion",
+      label: "Profile Completion",
+      value: `${dashboard?.stats.profileCompletion || 0}%`,
+      icon: UserCircle2,
+      tone: "border-[#264a7f]/10 bg-white text-[#264a7f]",
+      helper: "Profile readiness score",
+    },
+    {
+      key: "active",
+      label: "Active Applications",
+      value: applications.filter((application) => !["rejected", "hired"].includes(application.status)).length,
+      icon: Clock3,
+      tone: "border-sky-200 bg-white text-sky-700",
+      helper: "Still in progress",
+    },
+    {
+      key: "rejected",
+      label: "Rejected Applications",
+      value: applications.filter((application) => application.status === "rejected").length,
+      icon: XCircle,
+      tone: "border-red-200 bg-white text-red-700",
+      helper: "Closed by employer",
+    },
+    {
+      key: "shortlisted",
+      label: "Shortlisted / Interview",
+      value: applications.filter((application) =>
+        ["screening", "interview", "offer"].includes(application.status),
+      ).length,
+      icon: CheckCircle2,
+      tone: "border-emerald-200 bg-white text-emerald-700",
+      helper: "Promising opportunities",
+    },
+  ];
+
+  const recentApplicationUpdates = [...applications]
+    .flatMap((application) => {
+      const timeline =
+        application.timeline && application.timeline.length
+          ? application.timeline
+          : [
+              {
+                status: application.status,
+                changedAt: application.statusUpdatedAt || application.createdAt,
+                note: application.statusNote,
+              },
+            ];
+
+      return timeline.map((item, index) => ({
+        id: `${application._id}-${item.status}-${index}`,
+        applicationId: application._id,
+        jobTitle: application.jobId?.jobTitle || application.appliedFor || "Job application",
+        companyName: application.jobId?.sourceLabel || application.jobId?.sourceCollection || "RecruitKr",
+        status: item.status,
+        changedAt: item.changedAt || application.statusUpdatedAt || application.createdAt,
+        message:
+          item.note ||
+          (item.status === "under-review"
+            ? "Your application has been reviewed."
+            : item.status === "screening"
+              ? "You have been shortlisted for the next stage."
+              : item.status === "interview"
+                ? "Interview scheduled. Please review the latest details."
+                : item.status === "offer"
+                  ? "An offer update has been shared with you."
+                  : item.status === "rejected"
+                    ? "This application has been marked as closed."
+                    : "Your application was submitted successfully."),
+      }));
+    })
+    .sort((a, b) => new Date(b.changedAt).getTime() - new Date(a.changedAt).getTime())
+    .slice(0, 6);
+
+  const selectedProfileApplicationId =
+    expandedProfileApplicationId && applications.some((application) => application._id === expandedProfileApplicationId)
+      ? expandedProfileApplicationId
+      : applications[0]?._id || null;
 
   return (
     <div className={dashboardShellClass}>
@@ -1347,7 +1591,37 @@ const CandidateDashboard = () => {
             </div>
 
             {(applications || []).length > 0 ? (
-              <div className="grid gap-0 lg:grid-cols-[300px,minmax(0,1fr)]">
+              <>
+                <div className="grid gap-3 border-b border-[#264a7f]/10 bg-white px-4 py-4 sm:grid-cols-2 xl:grid-cols-4 sm:px-6">
+                  <div className="rounded-2xl border border-[#264a7f]/10 bg-slate-50 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#264a7f]">Total Applications</p>
+                    <p className="mt-3 text-3xl font-bold text-slate-900">{applications.length}</p>
+                    <p className="mt-1 text-sm text-slate-500">All jobs you have applied to</p>
+                  </div>
+                  <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Active</p>
+                    <p className="mt-3 text-3xl font-bold text-slate-900">
+                      {applications.filter((item) => !["rejected", "hired"].includes(item.status)).length}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-500">Applications currently moving</p>
+                  </div>
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Shortlisted / Interview</p>
+                    <p className="mt-3 text-3xl font-bold text-slate-900">
+                      {applications.filter((item) => ["screening", "interview", "offer"].includes(item.status)).length}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-500">Best opportunities in progress</p>
+                  </div>
+                  <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-700">Rejected</p>
+                    <p className="mt-3 text-3xl font-bold text-slate-900">
+                      {applications.filter((item) => item.status === "rejected").length}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-500">Closed applications</p>
+                  </div>
+                </div>
+
+              <div className="grid gap-0 lg:grid-cols-[320px,minmax(0,1fr)]">
                 <div
                   className={`border-b border-[#264a7f]/10 bg-slate-50/70 p-2 lg:max-h-[calc(100vh-16rem)] lg:overflow-y-auto lg:border-b-0 lg:border-r ${
                     mobileApplicationOpen ? "hidden lg:block" : "block"
@@ -1373,7 +1647,7 @@ const CandidateDashboard = () => {
                           key={application._id}
                           type="button"
                           onClick={() => setExpandedApplicationId(application._id)}
-                          className={`w-full rounded-2xl border px-3 py-2.5 text-left transition ${
+                          className={`w-full rounded-2xl border p-4 text-left transition ${
                             isActive
                               ? "border-[#264a7f]/20 bg-white shadow-sm"
                               : "border-transparent bg-white/80 hover:border-[#264a7f]/10 hover:bg-white"
@@ -1381,44 +1655,53 @@ const CandidateDashboard = () => {
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <p className="truncate text-sm font-semibold text-slate-900">
+                              <p className="truncate text-base font-semibold text-slate-900">
                                 {application.jobId?.jobTitle || "Job"}
                               </p>
-                              <p className="mt-0.5 truncate text-[11px] text-slate-500">
-                                {application.jobId?.jobLocation || "Location not shared"} {" - "} {application.jobId?.employmentType || "Type pending"}
+                              <p className="mt-1 truncate text-sm text-slate-500">
+                                {application.jobId?.sourceLabel ||
+                                  (application.jobId?.sourceCollection === "openings"
+                                    ? "RecruitKr Hiring"
+                                    : application.jobId?.sourceCollection
+                                      ? "Client Requirement"
+                                      : "Hiring Team")}
                               </p>
                             </div>
-                            <span className="rounded-full bg-[#264a7f]/8 px-2 py-1 text-[10px] font-semibold text-[#264a7f]">
-                              {formatStatusLabel(application.status)}
+                            <span
+                              className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                                PROFILE_STATUS_BADGE_CLASSNAMES[application.status]
+                              }`}
+                            >
+                              {PROFILE_STATUS_LABELS[application.status]}
                             </span>
                           </div>
 
-                          <div className="mt-1.5 flex items-center gap-2">
-                            <span className="h-2.5 w-2.5 rounded-full bg-[#69a44f]" />
-                            <p className="line-clamp-1 text-[11px] leading-5 text-slate-600">
+                          <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-slate-500">
+                            <span className="rounded-full bg-slate-50 px-2.5 py-1">
+                              {application.jobId?.jobLocation || "Location pending"}
+                            </span>
+                            <span className="rounded-full bg-slate-50 px-2.5 py-1">
+                              Applied {new Date(application.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+
+                          <div className="mt-3 rounded-xl bg-slate-50 p-3">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                              Latest update
+                            </p>
+                            <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-700">
                               {applicationResponse.statusNote
                                 ? applicationResponse.statusNote
                                 : applicationResponse.interviewDetails?.scheduledAt
                                   ? `Interview ${formatInterviewDate(applicationResponse.interviewDetails.scheduledAt)} at ${formatInterviewTime(applicationResponse.interviewDetails.scheduledAt)}`
-                                  : "Open this card to read all client updates."}
+                                  : "Open this application to read all recruiter updates."}
                             </p>
                           </div>
 
-                          <div className="mt-1.5 flex items-center justify-between text-[10px] text-slate-500">
-                            <span>{timelineItems.length} updates</span>
+                          <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500">
+                            <span>{timelineItems.length} update{timelineItems.length > 1 ? "s" : ""}</span>
                             <span>
-                              {new Date(
-                                application.statusUpdatedAt || application.createdAt,
-                              ).toLocaleDateString()}
-                            </span>
-                          </div>
-
-                          <div className="mt-1.5 grid grid-cols-2 gap-2 text-[10px] text-slate-500">
-                            <span className="rounded-full bg-slate-50 px-2.5 py-1">
-                              {new Date(application.createdAt).toLocaleDateString()}
-                            </span>
-                            <span className="rounded-full bg-slate-50 px-2.5 py-1">
-                              {application.qualification || "Qualification not shared"}
+                              Updated {new Date(application.statusUpdatedAt || application.createdAt).toLocaleDateString()}
                             </span>
                           </div>
                         </button>
@@ -1434,7 +1717,7 @@ const CandidateDashboard = () => {
                         selectedApplication as Record<string, any>,
                       );
                       return (
-                    <div className="rounded-2xl border border-[#264a7f]/10 bg-white">
+                    <div className="rounded-2xl border border-[#264a7f]/10 bg-white shadow-sm">
                       <div className="border-b border-[#264a7f]/10 px-4 py-3 lg:hidden">
                         <button
                           type="button"
@@ -1469,8 +1752,12 @@ const CandidateDashboard = () => {
                           </div>
 
                           <div className="flex flex-wrap gap-2">
-                            <span className="rounded-full bg-[#264a7f] px-3 py-1.5 text-xs font-semibold text-white">
-                              {formatStatusLabel(selectedApplication.status)}
+                            <span
+                              className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                                PROFILE_STATUS_BADGE_CLASSNAMES[selectedApplication.status]
+                              }`}
+                            >
+                              {PROFILE_STATUS_LABELS[selectedApplication.status]}
                             </span>
                             <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600">
                               Applied {new Date(selectedApplication.createdAt).toLocaleDateString()}
@@ -1479,39 +1766,39 @@ const CandidateDashboard = () => {
                         </div>
                       </div>
 
-                      <div className="hidden">
-                        <div className="rounded-2xl bg-slate-50 px-3 py-2.5">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                            Latest update
-                          </p>
-                          <p className="mt-2 text-sm font-medium text-slate-900">
-                            {selectedApplication.statusNote || "No written note yet"}
-                          </p>
-                        </div>
-                        <div className="rounded-2xl bg-slate-50 px-3 py-2.5">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                            Last changed
-                          </p>
-                          <p className="mt-2 text-sm font-medium text-slate-900">
-                            {new Date(
-                              selectedApplication.statusUpdatedAt || selectedApplication.createdAt,
-                            ).toLocaleString()}
-                          </p>
-                        </div>
-                        <div className="rounded-2xl bg-slate-50 px-3 py-2.5">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                            Interview state
-                          </p>
-                          <p className="mt-2 text-sm font-medium text-slate-900">
-                            {getInterviewTimingMeta(selectedApplication.interviewDetails?.scheduledAt).label}
-                          </p>
-                        </div>
-                      </div>
-
                       <div className="space-y-3 px-4 py-4 sm:px-5">
-                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Current status</p>
+                            <p className="mt-2 text-sm font-semibold text-slate-900">
+                              {PROFILE_STATUS_LABELS[selectedApplication.status]}
+                            </p>
+                          </div>
+                          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Applied on</p>
+                            <p className="mt-2 text-sm font-semibold text-slate-900">
+                              {new Date(selectedApplication.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Last changed</p>
+                            <p className="mt-2 text-sm font-semibold text-slate-900">
+                              {new Date(
+                                selectedApplication.statusUpdatedAt || selectedApplication.createdAt,
+                              ).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Interview state</p>
+                            <p className="mt-2 text-sm font-semibold text-slate-900">
+                              {getInterviewTimingMeta(selectedApplication.interviewDetails?.scheduledAt).label}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                           <p className="text-xs font-semibold text-slate-500">Latest update</p>
-                          <p className="mt-1 text-sm text-slate-900">
+                          <p className="mt-2 break-words text-sm leading-6 text-slate-900">
                             {selectedResponse.statusNote || "No written update yet."}
                           </p>
                           <p className="mt-2 text-xs text-slate-500">
@@ -1614,13 +1901,13 @@ const CandidateDashboard = () => {
                           }>;
 
                           return (
-                            <div className="rounded-xl border border-[#264a7f]/10 bg-[#f8fbff] p-3">
+                            <div className="rounded-xl border border-[#264a7f]/10 bg-[#f8fbff] p-4">
                               <p className="text-sm font-semibold text-slate-900">Client response</p>
-                              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                              <div className="mt-3 grid gap-3 md:grid-cols-2">
                                 {responseItems.map((item) => (
                                   <div
                                     key={item.label}
-                                    className={`rounded-xl bg-white p-3 ${
+                                    className={`min-w-0 rounded-xl bg-white p-3 ${
                                       item.label === "Contact email" ||
                                       item.label === "Google map location" ||
                                       item.label === "Reporting notes" ||
@@ -1632,7 +1919,7 @@ const CandidateDashboard = () => {
                                   >
                                     <p className="text-xs font-semibold text-slate-500">{item.label}</p>
                                     <div className="mt-1 flex flex-wrap items-center gap-2">
-                                      <p className="break-all text-sm text-slate-900">{item.value}</p>
+                                      <p className="break-words text-sm leading-6 text-slate-900">{item.value}</p>
                                       {item.href && (
                                         <a
                                           href={item.href}
@@ -1651,74 +1938,64 @@ const CandidateDashboard = () => {
                           );
                         })()}
 
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          <div className="rounded-xl border border-slate-200 p-3">
-                            <p className="text-xs font-semibold text-slate-500">Applied on</p>
-                            <p className="mt-1 text-sm text-slate-900">
-                              {new Date(selectedApplication.createdAt).toLocaleDateString()}
-                            </p>
+                        <div className="grid gap-3 lg:grid-cols-2">
+                          <div className="rounded-xl border border-slate-200 p-4">
+                            <p className="mb-3 text-sm font-semibold text-slate-900">Application Information</p>
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              <div className="rounded-xl bg-slate-50 p-3">
+                                <p className="text-xs font-semibold text-slate-500">Applied for</p>
+                                <p className="mt-1 text-sm text-slate-900">
+                                  {selectedApplication.appliedFor || selectedApplication.jobId?.jobTitle || "Job"}
+                                </p>
+                              </div>
+                              <div className="rounded-xl bg-slate-50 p-3">
+                                <p className="text-xs font-semibold text-slate-500">Qualification</p>
+                                <p className="mt-1 text-sm text-slate-900">
+                                  {selectedApplication.qualification || "Not shared"}
+                                </p>
+                              </div>
+                              <div className="rounded-xl bg-slate-50 p-3">
+                                <p className="text-xs font-semibold text-slate-500">Experience</p>
+                                <p className="mt-1 text-sm text-slate-900">
+                                  {selectedApplication.experience?.[0]?.jobProfile || "Not shared"}
+                                </p>
+                              </div>
+                              <div className="rounded-xl bg-slate-50 p-3">
+                                <p className="text-xs font-semibold text-slate-500">Source</p>
+                                <p className="mt-1 text-sm text-slate-900">
+                                  {selectedApplication.jobId?.sourceLabel || "RecruitKr"}
+                                </p>
+                              </div>
+                            </div>
                           </div>
-                          <div className="rounded-xl border border-slate-200 p-3">
-                            <p className="text-xs font-semibold text-slate-500">Qualification</p>
-                            <p className="mt-1 text-sm text-slate-900">
-                              {selectedApplication.qualification || "Not shared"}
-                            </p>
-                          </div>
-                        </div>
 
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          <div className="rounded-xl border border-slate-200 p-3">
-                            <p className="text-xs font-semibold text-slate-500">Candidate name</p>
-                            <p className="mt-1 text-sm text-slate-900">
-                              {selectedApplication.fullName || profile?.fullName || "Not shared"}
-                            </p>
-                          </div>
-                          <div className="rounded-xl border border-slate-200 p-3">
-                            <p className="text-xs font-semibold text-slate-500">Email</p>
-                            <p className="mt-1 break-all text-sm text-slate-900">
-                              {selectedApplication.email || "No email"}
-                            </p>
-                          </div>
-                          <div className="rounded-xl border border-slate-200 p-3">
-                            <p className="text-xs font-semibold text-slate-500">Phone</p>
-                            <p className="mt-1 text-sm text-slate-900">
-                              {selectedApplication.phone || "No phone"}
-                            </p>
-                          </div>
-                          <div className="rounded-xl border border-slate-200 p-3">
-                            <p className="text-xs font-semibold text-slate-500">Current city</p>
-                            <p className="mt-1 text-sm text-slate-900">
-                              {selectedApplication.currentCity || "Not shared"}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="rounded-xl border border-slate-200 p-3">
-                          <p className="text-sm font-semibold text-slate-900">Your submitted application</p>
-                          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                            <div className="rounded-xl bg-slate-50 p-3">
-                              <p className="text-xs font-semibold text-slate-500">Applied for</p>
-                              <p className="mt-1 text-sm text-slate-900">
-                                {selectedApplication.appliedFor || selectedApplication.jobId?.jobTitle || "Job"}
-                              </p>
-                            </div>
-                            <div className="rounded-xl bg-slate-50 p-3">
-                              <p className="text-xs font-semibold text-slate-500">Experience</p>
-                              <p className="mt-1 text-sm text-slate-900">
-                                {selectedApplication.experience?.[0]?.jobProfile || "Not shared"}
-                              </p>
-                            </div>
-                            <div className="rounded-xl bg-slate-50 p-3">
-                              <p className="text-xs font-semibold text-slate-500">Applied on</p>
-                              <p className="mt-1 text-sm text-slate-900">
-                                {new Date(selectedApplication.createdAt).toLocaleString()}
-                              </p>
-                            </div>
-                            <div className="rounded-xl bg-slate-50 p-3">
-                              <p className="text-xs font-semibold text-slate-500">Source</p>
-                              <p className="mt-1 text-sm text-slate-900">
-                                {selectedApplication.jobId?.sourceLabel || "RecruitKr"}
-                              </p>
+                          <div className="rounded-xl border border-slate-200 p-4">
+                            <p className="mb-3 text-sm font-semibold text-slate-900">Candidate Details</p>
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              <div className="rounded-xl bg-slate-50 p-3">
+                                <p className="text-xs font-semibold text-slate-500">Candidate name</p>
+                                <p className="mt-1 text-sm text-slate-900">
+                                  {selectedApplication.fullName || profile?.fullName || "Not shared"}
+                                </p>
+                              </div>
+                              <div className="rounded-xl bg-slate-50 p-3">
+                                <p className="text-xs font-semibold text-slate-500">Email</p>
+                                <p className="mt-1 break-all text-sm text-slate-900">
+                                  {selectedApplication.email || "No email"}
+                                </p>
+                              </div>
+                              <div className="rounded-xl bg-slate-50 p-3">
+                                <p className="text-xs font-semibold text-slate-500">Phone</p>
+                                <p className="mt-1 text-sm text-slate-900">
+                                  {selectedApplication.phone || "No phone"}
+                                </p>
+                              </div>
+                              <div className="rounded-xl bg-slate-50 p-3">
+                                <p className="text-xs font-semibold text-slate-500">Current city</p>
+                                <p className="mt-1 text-sm text-slate-900">
+                                  {selectedApplication.currentCity || "Not shared"}
+                                </p>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -1734,7 +2011,7 @@ const CandidateDashboard = () => {
                             selectedResponse.interviewDetails.reportingNotes ||
                             selectedResponse.interviewDetails.documentsRequired ||
                             selectedResponse.interviewDetails.additionalInstructions) && (
-                          <div className="rounded-xl border border-sky-200 bg-sky-50 p-3">
+                          <div className="rounded-xl border border-sky-200 bg-sky-50 p-4">
                             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                               <div>
                                 <div className="flex flex-wrap items-center gap-2">
@@ -1747,22 +2024,22 @@ const CandidateDashboard = () => {
                                     {getInterviewTimingMeta(selectedResponse.interviewDetails.scheduledAt).label}
                                   </span>
                                 </div>
-                                <p className="mt-2 text-sm text-slate-600">
+                                <p className="mt-2 text-sm leading-6 text-slate-600">
                                   {selectedResponse.interviewDetails.scheduledAt
                                     ? `${formatInterviewDate(selectedResponse.interviewDetails.scheduledAt)} at ${formatInterviewTime(selectedResponse.interviewDetails.scheduledAt)}${selectedResponse.interviewDetails.timezone ? ` (${selectedResponse.interviewDetails.timezone})` : ""}`
                                     : "The client moved your application to interview and timing details are still pending."}
                                 </p>
                               </div>
 
-                              <div className="hidden rounded-2xl bg-white/80 px-4 py-3 text-sm text-slate-700 shadow-sm">
+                              <div className="rounded-2xl bg-white/80 px-4 py-3 text-sm text-slate-700 shadow-sm">
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                                   Next step
                                 </p>
-                                <p className="mt-2">{getInterviewTimingMeta(selectedResponse.interviewDetails.scheduledAt).hint}</p>
+                                <p className="mt-2 leading-6">{getInterviewTimingMeta(selectedResponse.interviewDetails.scheduledAt).hint}</p>
                               </div>
                             </div>
 
-                            <div className="mt-3 grid gap-3">
+                            <div className="mt-3 grid gap-3 lg:grid-cols-2">
                               <div className="rounded-xl bg-white p-3">
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                                   Meeting setup
@@ -1770,7 +2047,7 @@ const CandidateDashboard = () => {
                                 <div className="mt-2 space-y-2 text-sm text-slate-700">
                                   <p>Mode: {selectedResponse.interviewDetails.mode ? INTERVIEW_MODE_LABELS[selectedResponse.interviewDetails.mode] : "Not shared yet"}</p>
                                   <p>Contact: {selectedResponse.interviewDetails.contactPerson || "Will be shared by client"}</p>
-                                  {selectedResponse.interviewDetails.locationText && <p>{selectedResponse.interviewDetails.locationText}</p>}
+                                  {selectedResponse.interviewDetails.locationText && <p className="break-words">{selectedResponse.interviewDetails.locationText}</p>}
                                 </div>
                                 <div className="mt-3 flex flex-wrap gap-2">
                                   {selectedResponse.interviewDetails.meetingLink && (
@@ -1810,7 +2087,7 @@ const CandidateDashboard = () => {
                                   <div className="space-y-2">
                                     <div className="rounded-xl bg-slate-50 px-3 py-2 text-slate-600">
                                       <p className="text-xs font-semibold text-slate-500">Candidate message</p>
-                                      <p className="mt-1">
+                                      <p className="mt-1 break-words leading-6">
                                         {selectedResponse.interviewDetails.notes || "No extra note shared yet."}
                                       </p>
                                     </div>
@@ -1818,21 +2095,21 @@ const CandidateDashboard = () => {
                                     {selectedResponse.interviewDetails.reportingNotes && (
                                       <div className="rounded-xl bg-slate-50 px-3 py-2 text-slate-600">
                                         <p className="text-xs font-semibold text-slate-500">Reporting notes</p>
-                                        <p className="mt-1">{selectedResponse.interviewDetails.reportingNotes}</p>
+                                        <p className="mt-1 break-words leading-6">{selectedResponse.interviewDetails.reportingNotes}</p>
                                       </div>
                                     )}
 
                                     {selectedResponse.interviewDetails.documentsRequired && (
                                       <div className="rounded-xl bg-slate-50 px-3 py-2 text-slate-600">
                                         <p className="text-xs font-semibold text-slate-500">Documents required</p>
-                                        <p className="mt-1">{selectedResponse.interviewDetails.documentsRequired}</p>
+                                        <p className="mt-1 break-words leading-6">{selectedResponse.interviewDetails.documentsRequired}</p>
                                       </div>
                                     )}
 
                                     {selectedResponse.interviewDetails.additionalInstructions && (
                                       <div className="rounded-xl bg-slate-50 px-3 py-2 text-slate-600">
                                         <p className="text-xs font-semibold text-slate-500">Additional instructions</p>
-                                        <p className="mt-1">{selectedResponse.interviewDetails.additionalInstructions}</p>
+                                        <p className="mt-1 break-words leading-6">{selectedResponse.interviewDetails.additionalInstructions}</p>
                                       </div>
                                     )}
                                   </div>
@@ -1842,18 +2119,45 @@ const CandidateDashboard = () => {
                           </div>
                         )}
 
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <div className="rounded-xl border border-slate-200 p-3">
+                            <p className="text-xs font-semibold text-slate-500">Candidate name</p>
+                            <p className="mt-1 text-sm text-slate-900">
+                              {selectedApplication.fullName || profile?.fullName || "Not shared"}
+                            </p>
+                          </div>
+                          <div className="rounded-xl border border-slate-200 p-3">
+                            <p className="text-xs font-semibold text-slate-500">Email</p>
+                            <p className="mt-1 break-all text-sm text-slate-900">
+                              {selectedApplication.email || "No email"}
+                            </p>
+                          </div>
+                          <div className="rounded-xl border border-slate-200 p-3">
+                            <p className="text-xs font-semibold text-slate-500">Phone</p>
+                            <p className="mt-1 text-sm text-slate-900">
+                              {selectedApplication.phone || "No phone"}
+                            </p>
+                          </div>
+                          <div className="rounded-xl border border-slate-200 p-3">
+                            <p className="text-xs font-semibold text-slate-500">Current city</p>
+                            <p className="mt-1 text-sm text-slate-900">
+                              {selectedApplication.currentCity || "Not shared"}
+                            </p>
+                          </div>
+                        </div>
+
                         <div className="rounded-xl border border-slate-200 bg-white p-3">
                           <div className="flex items-center justify-between gap-3">
                             <div>
-                              <p className="text-sm font-semibold text-slate-900">Status history</p>
-                              <p className="mt-1 text-xs text-slate-500">Simple list of all updates.</p>
+                              <p className="text-sm font-semibold text-slate-900">Status Timeline</p>
+                              <p className="mt-1 text-xs text-slate-500">Follow each step of this application.</p>
                             </div>
                             <span className="hidden rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600 sm:inline-flex">
                               Live thread
                             </span>
                           </div>
 
-                          <div className="mt-3 space-y-2">
+                          <div className="mt-4 space-y-4">
                             {(selectedApplication.timeline && selectedApplication.timeline.length
                               ? selectedApplication.timeline
                               : [
@@ -1869,35 +2173,48 @@ const CandidateDashboard = () => {
                               const isClient = item.changedByRole === "client";
 
                               return (
-                                <div
-                                  key={`${selectedApplication._id}-${item.status}-${index}`}
-                                  className="rounded-xl border border-slate-200 p-3"
-                                >
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div className="min-w-0">
-                                      <p className="text-sm font-semibold text-slate-900">
-                                        {formatStatusLabel(item.status)}
-                                      </p>
-                                      <p className="mt-1 text-xs text-slate-500">
-                                        {isClient
-                                          ? "Client / RecruitKr"
-                                          : isCandidate
-                                            ? "You"
-                                            : "System"}
+                                <div key={`${selectedApplication._id}-${item.status}-${index}`} className="flex gap-3">
+                                  <div className="flex flex-col items-center">
+                                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#264a7f] text-xs font-semibold text-white">
+                                      {index + 1}
+                                    </span>
+                                    {index < (selectedApplication.timeline && selectedApplication.timeline.length
+                                      ? selectedApplication.timeline.length
+                                      : 1) - 1 && <span className="mt-1 h-full w-px bg-[#264a7f]/20" />}
+                                  </div>
+                                  <div className="min-w-0 flex-1 rounded-xl border border-slate-200 p-3">
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div className="min-w-0">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                          <p className="text-sm font-semibold text-slate-900">
+                                            {PROFILE_STATUS_LABELS[item.status] || formatStatusLabel(item.status)}
+                                          </p>
+                                          <span
+                                            className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                                              PROFILE_STATUS_BADGE_CLASSNAMES[item.status]
+                                            }`}
+                                          >
+                                            {isClient
+                                              ? "Recruiter update"
+                                              : isCandidate
+                                                ? "Your update"
+                                                : "System"}
+                                          </span>
+                                        </div>
+                                      </div>
+                                      <p className="text-xs text-slate-500">
+                                        {item.changedAt
+                                          ? new Date(item.changedAt).toLocaleDateString()
+                                          : "Recently updated"}
                                       </p>
                                     </div>
-                                    <p className="text-xs text-slate-500">
-                                      {item.changedAt
-                                        ? new Date(item.changedAt).toLocaleDateString()
-                                        : "Recently updated"}
+                                    <p className="mt-2 text-sm leading-6 text-slate-700">
+                                      {item.note ||
+                                        (item.status === "applied"
+                                          ? "Your application was submitted."
+                                          : "Status changed with no extra note yet.")}
                                     </p>
                                   </div>
-                                  <p className="mt-2 text-sm leading-6 text-slate-700">
-                                    {item.note ||
-                                      (item.status === "applied"
-                                        ? "Your application was submitted."
-                                        : "Status changed with no extra note yet.")}
-                                  </p>
                                 </div>
                               );
                             })}
@@ -1910,6 +2227,7 @@ const CandidateDashboard = () => {
                   </div>
                 )}
               </div>
+              </>
             ) : (
               <div className="px-4 py-8 text-center text-sm text-slate-500 sm:px-6">
                 No applications yet.
@@ -1919,115 +2237,424 @@ const CandidateDashboard = () => {
         )}
 
         {tab === "profile" && (
-          <div className="grid gap-6 lg:grid-cols-[1.2fr,0.8fr]">
-            <div className="rounded-xl border border-border bg-card p-6">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <h2 className="font-heading text-xl font-semibold">Candidate Profile</h2>
-                  <p className="text-sm text-muted-foreground">
+          <section className="w-full">
+            <div className="mx-auto w-full max-w-screen-xl px-4 md:px-8 lg:px-12">
+              <div className="space-y-6 rounded-2xl bg-slate-50 py-2">
+                <div className="rounded-lg border border-[#264a7f]/10 bg-white p-5 text-center shadow-sm sm:p-6 md:text-left">
+                  <h2 className="font-heading text-2xl font-bold text-slate-900">Candidate Profile</h2>
+                  <p className="mt-2 text-sm text-slate-500">
                     Your basic profile details and job preferences in one place.
                   </p>
+                  {resumeNotice && <p className="mt-3 text-sm text-green-600">{resumeNotice}</p>}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setTab("resume")}
-                  className="rounded-lg border border-border bg-background px-4 py-2 text-sm"
-                >
-                  Edit profile
-                </button>
-              </div>
 
-              <div className="mt-6 flex items-center gap-4 rounded-2xl border border-border bg-background/70 p-4">
-                {profilePhotoUrl ? (
-                  <img
-                    src={profilePhotoUrl}
-                    alt={profile?.fullName || "Candidate profile"}
-                    className="h-20 w-20 rounded-2xl border border-border object-cover"
-                  />
-                ) : (
-                  <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-dashed border-border bg-background text-2xl font-bold text-muted-foreground">
-                    {(profile?.fullName || sessionState?.user.email || "C").trim().charAt(0).toUpperCase()}
+                <div className="rounded-lg border border-[#264a7f]/10 bg-white p-5 shadow-sm sm:p-6">
+                  <div className="flex flex-col items-center gap-5 text-center md:flex-row md:items-center md:text-left">
+                    <button
+                      type="button"
+                      onClick={() => profilePhotoInputRef.current?.click()}
+                      className="group relative h-28 w-28 shrink-0 overflow-hidden rounded-full border border-[#264a7f]/10 bg-slate-100 shadow-sm transition hover:border-[#264a7f]/25"
+                    >
+                      {displayedProfilePhotoUrl ? (
+                        <img
+                          src={displayedProfilePhotoUrl}
+                          alt={profile?.fullName || "Candidate profile"}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-4xl font-bold text-slate-500">
+                          {(profile?.fullName || sessionState?.user.email || "C").trim().charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="absolute inset-0 flex items-end justify-center bg-gradient-to-t from-slate-900/55 via-slate-900/10 to-transparent opacity-100 transition group-hover:from-slate-900/65">
+                        <span className="mb-3 inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-slate-700">
+                          <Camera size={14} />
+                          Edit Photo
+                        </span>
+                      </div>
+                    </button>
+
+                    <input
+                      ref={profilePhotoInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        void handleProfilePhotoSelect(file);
+                        e.currentTarget.value = "";
+                      }}
+                    />
+
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Profile Info</p>
+
+                      <div
+                        className="group mt-3 rounded-lg border border-transparent px-1 py-1 transition hover:border-[#264a7f]/10 hover:bg-slate-50"
+                        onClick={() => setActiveProfileField("fullName")}
+                      >
+                        <div className="flex flex-col items-center gap-2 md:flex-row md:items-start md:justify-between md:gap-3">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Name</p>
+                            {activeProfileField === "fullName" ? (
+                              <input
+                                autoFocus
+                                value={inlineProfileDrafts.fullName}
+                                onChange={(e) =>
+                                  setInlineProfileDrafts((prev) => ({ ...prev, fullName: e.target.value }))
+                                }
+                                onBlur={() => void commitInlineProfileField("fullName")}
+                                onKeyDown={(e) => handleInlineInputKeyDown(e, () => commitInlineProfileField("fullName"))}
+                                className="mt-2 w-full rounded-lg border border-[#264a7f]/15 bg-white px-3 py-2 text-center text-xl font-bold text-slate-900 outline-none ring-0 md:text-left"
+                              />
+                            ) : (
+                              <p className="mt-2 break-words text-2xl font-bold text-slate-900 md:truncate">
+                                {profile?.fullName || "Not added"}
+                              </p>
+                            )}
+                          </div>
+                          <Pencil size={16} className="hidden shrink-0 text-slate-400 opacity-0 transition group-hover:opacity-100 md:mt-6 md:block" />
+                        </div>
+                      </div>
+
+                      <div className="mt-3 rounded-lg bg-slate-50 px-4 py-3 text-center md:text-left">
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Email</p>
+                        <p className="mt-1 break-all text-base font-medium text-slate-800">
+                          {sessionState?.user.email || "Not added"}
+                        </p>
+                      </div>
+
+                      <p className="mt-3 text-sm text-slate-500">Upload a profile photo from the Resume tab.</p>
+                    </div>
                   </div>
-                )}
-                <div>
-                  <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Profile image</p>
-                  <p className="mt-1 text-base font-semibold">{profile?.fullName || "Candidate"}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {profilePhotoUrl ? "Your uploaded profile photo." : "Upload a profile photo from the Resume tab."}
-                  </p>
                 </div>
-              </div>
 
-              <div className="mt-6 grid gap-4 md:grid-cols-2">
-                <div className="rounded-xl border border-border bg-background/70 p-4 md:col-span-2">
-                  <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Full name</p>
-                  <p className="mt-2 text-base font-semibold">{profile?.fullName || "Not added"}</p>
-                </div>
-                <div className="rounded-xl border border-border bg-background/70 p-4">
-                  <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Qualification</p>
-                  <p className="mt-2 text-base font-semibold">{profile?.highestQualification || "Not added"}</p>
-                </div>
-                <div className="rounded-xl border border-border bg-background/70 p-4">
-                  <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Experience</p>
-                  <p className="mt-2 text-base font-semibold capitalize">{profile?.experienceStatus || "Not added"}</p>
-                </div>
-                <div className="rounded-xl border border-border bg-background/70 p-4">
-                  <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Preferred role</p>
-                  <p className="mt-2 text-base font-semibold">{profile?.preferences?.preferredRole || "Not added"}</p>
-                </div>
-                <div className="rounded-xl border border-border bg-background/70 p-4">
-                  <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Preferred location</p>
-                  <p className="mt-2 text-base font-semibold">{profile?.preferences?.preferredLocation || "Not added"}</p>
-                </div>
-                <div className="rounded-xl border border-border bg-background/70 p-4 md:col-span-2">
-                  <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Professional summary</p>
-                  <p className="mt-2 text-sm text-slate-700">{profile?.summary || "No summary added yet."}</p>
+                <div className="grid gap-6 xl:grid-cols-[1.7fr_1fr]">
+                  <div className="space-y-6">
+                    <div className="rounded-lg border border-[#264a7f]/10 bg-white p-5 shadow-sm sm:p-6">
+                      <h3 className="text-center text-lg font-bold text-slate-900 md:text-left">Basic Details</h3>
+                      <div className="mt-5 grid gap-4 md:grid-cols-2">
+                        <div
+                          className="group rounded-lg border border-gray-200 bg-slate-50 p-4 transition hover:border-[#264a7f]/15 hover:bg-white"
+                          onClick={() => setActiveProfileField("highestQualification")}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Qualification</p>
+                              {activeProfileField === "highestQualification" ? (
+                                <input
+                                  autoFocus
+                                  value={resumeForm.highestQualification}
+                                  onChange={(e) =>
+                                    setResumeForm((p) => ({ ...p, highestQualification: e.target.value }))
+                                  }
+                                  onBlur={() => void commitResumeField("highestQualification")}
+                                  onKeyDown={(e) =>
+                                    handleInlineInputKeyDown(e, () => commitResumeField("highestQualification"))
+                                  }
+                                  className="mt-2 w-full rounded-lg border border-[#264a7f]/15 bg-white px-3 py-2 text-base font-semibold text-slate-900 outline-none"
+                                />
+                              ) : (
+                                <p className="mt-2 text-base font-semibold text-slate-900">
+                                  {profile?.highestQualification || "Not added"}
+                                </p>
+                              )}
+                            </div>
+                            <Pencil size={15} className="shrink-0 text-slate-400 opacity-0 transition group-hover:opacity-100" />
+                          </div>
+                        </div>
+
+                        <div
+                          className="group rounded-lg border border-gray-200 bg-slate-50 p-4 transition hover:border-[#264a7f]/15 hover:bg-white"
+                          onClick={() => setActiveProfileField("experienceStatus")}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Experience</p>
+                              {activeProfileField === "experienceStatus" ? (
+                                <div className="relative mt-2">
+                                  <select
+                                    autoFocus
+                                    value={resumeForm.experienceStatus}
+                                    onChange={(e) =>
+                                      setResumeForm((p) => ({
+                                        ...p,
+                                        experienceStatus: e.target.value === "experienced" ? "experienced" : "fresher",
+                                      }))
+                                    }
+                                    onBlur={() => void commitResumeField("experienceStatus")}
+                                    onKeyDown={(e) =>
+                                      handleInlineInputKeyDown(e, () => commitResumeField("experienceStatus"))
+                                    }
+                                    className="w-full appearance-none rounded-lg border border-[#264a7f]/15 bg-white px-3 py-2 text-base font-semibold capitalize text-slate-900 outline-none"
+                                  >
+                                    <option value="fresher">Fresher</option>
+                                    <option value="experienced">Experienced</option>
+                                  </select>
+                                  <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                </div>
+                              ) : (
+                                <p className="mt-2 text-base font-semibold capitalize text-slate-900">
+                                  {profile?.experienceStatus || "Not added"}
+                                </p>
+                              )}
+                            </div>
+                            <Pencil size={15} className="shrink-0 text-slate-400 opacity-0 transition group-hover:opacity-100" />
+                          </div>
+                        </div>
+
+                        <div
+                          className="group rounded-lg border border-gray-200 bg-slate-50 p-4 transition hover:border-[#264a7f]/15 hover:bg-white"
+                          onClick={() => setActiveProfileField("preferredRole")}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Preferred Role</p>
+                              {activeProfileField === "preferredRole" ? (
+                                <input
+                                  autoFocus
+                                  value={resumeForm.preferences.preferredRole}
+                                  onChange={(e) =>
+                                    setResumeForm((p) => ({
+                                      ...p,
+                                      preferences: { ...p.preferences, preferredRole: e.target.value },
+                                    }))
+                                  }
+                                  onBlur={() => void commitResumeField("preferredRole")}
+                                  onKeyDown={(e) => handleInlineInputKeyDown(e, () => commitResumeField("preferredRole"))}
+                                  className="mt-2 w-full rounded-lg border border-[#264a7f]/15 bg-white px-3 py-2 text-base font-semibold text-slate-900 outline-none"
+                                />
+                              ) : (
+                                <p className="mt-2 text-base font-semibold text-slate-900">
+                                  {profile?.preferences?.preferredRole || "Not added"}
+                                </p>
+                              )}
+                            </div>
+                            <Pencil size={15} className="shrink-0 text-slate-400 opacity-0 transition group-hover:opacity-100" />
+                          </div>
+                        </div>
+
+                        <div
+                          className="group rounded-lg border border-gray-200 bg-slate-50 p-4 transition hover:border-[#264a7f]/15 hover:bg-white"
+                          onClick={() => setActiveProfileField("preferredLocation")}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Preferred Location</p>
+                              {activeProfileField === "preferredLocation" ? (
+                                <input
+                                  autoFocus
+                                  value={resumeForm.preferences.preferredLocation}
+                                  onChange={(e) =>
+                                    setResumeForm((p) => ({
+                                      ...p,
+                                      preferences: { ...p.preferences, preferredLocation: e.target.value },
+                                    }))
+                                  }
+                                  onBlur={() => void commitResumeField("preferredLocation")}
+                                  onKeyDown={(e) =>
+                                    handleInlineInputKeyDown(e, () => commitResumeField("preferredLocation"))
+                                  }
+                                  className="mt-2 w-full rounded-lg border border-[#264a7f]/15 bg-white px-3 py-2 text-base font-semibold text-slate-900 outline-none"
+                                />
+                              ) : (
+                                <p className="mt-2 text-base font-semibold text-slate-900">
+                                  {profile?.preferences?.preferredLocation
+                                    ? profile.preferences.preferredLocation.replace(/^jaypur$/i, "Jaipur")
+                                    : "Not added"}
+                                </p>
+                              )}
+                            </div>
+                            <Pencil size={15} className="shrink-0 text-slate-400 opacity-0 transition group-hover:opacity-100" />
+                          </div>
+                        </div>
+
+                        <div
+                          className="group rounded-lg border border-gray-200 bg-slate-50 p-4 transition hover:border-[#264a7f]/15 hover:bg-white md:col-span-2"
+                          onClick={() => setActiveProfileField("summary")}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Professional Summary</p>
+                              {activeProfileField === "summary" ? (
+                                <textarea
+                                  autoFocus
+                                  rows={5}
+                                  value={resumeForm.summary}
+                                  onChange={(e) => setResumeForm((p) => ({ ...p, summary: e.target.value }))}
+                                  onBlur={() => void commitResumeField("summary")}
+                                  className="mt-2 w-full rounded-lg border border-[#264a7f]/15 bg-white px-3 py-2 text-sm leading-6 text-slate-700 outline-none"
+                                />
+                              ) : (
+                                <p className="mt-2 text-sm leading-6 text-slate-700">
+                                  {profile?.summary || "No summary added yet."}
+                                </p>
+                              )}
+                            </div>
+                            <Pencil size={15} className="mt-0.5 shrink-0 text-slate-400 opacity-0 transition group-hover:opacity-100" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-[#264a7f]/10 bg-white p-5 shadow-sm sm:p-6">
+                      <h3 className="text-center text-lg font-bold text-slate-900 md:text-left">Contact &amp; Links</h3>
+                      <div className="mt-5 grid gap-4 md:grid-cols-2">
+                        <div className="rounded-lg border border-gray-200 bg-slate-50 p-4">
+                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Email</p>
+                          <p className="mt-2 break-all text-base font-semibold text-slate-900">
+                            {sessionState?.user.email || "Not added"}
+                          </p>
+                        </div>
+
+                        <div
+                          className="group rounded-lg border border-gray-200 bg-slate-50 p-4 transition hover:border-[#264a7f]/15 hover:bg-white"
+                          onClick={() => setActiveProfileField("linkedinUrl")}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">LinkedIn</p>
+                              {activeProfileField === "linkedinUrl" ? (
+                                <input
+                                  autoFocus
+                                  value={inlineProfileDrafts.linkedinUrl}
+                                  onChange={(e) =>
+                                    setInlineProfileDrafts((prev) => ({ ...prev, linkedinUrl: e.target.value }))
+                                  }
+                                  onBlur={() => void commitInlineProfileField("linkedinUrl")}
+                                  onKeyDown={(e) => handleInlineInputKeyDown(e, () => commitInlineProfileField("linkedinUrl"))}
+                                  className="mt-2 w-full rounded-lg border border-[#264a7f]/15 bg-white px-3 py-2 text-base font-semibold text-slate-900 outline-none"
+                                />
+                              ) : (
+                                <p className="mt-2 break-all text-base font-semibold text-slate-900">
+                                  {profile?.linkedinUrl || "Not added"}
+                                </p>
+                              )}
+                            </div>
+                            <Pencil size={15} className="shrink-0 text-slate-400 opacity-0 transition group-hover:opacity-100" />
+                          </div>
+                        </div>
+
+                        <div
+                          className="group rounded-lg border border-gray-200 bg-slate-50 p-4 transition hover:border-[#264a7f]/15 hover:bg-white md:col-span-2"
+                          onClick={() => setActiveProfileField("portfolioUrl")}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Portfolio</p>
+                              {activeProfileField === "portfolioUrl" ? (
+                                <input
+                                  autoFocus
+                                  value={inlineProfileDrafts.portfolioUrl}
+                                  onChange={(e) =>
+                                    setInlineProfileDrafts((prev) => ({ ...prev, portfolioUrl: e.target.value }))
+                                  }
+                                  onBlur={() => void commitInlineProfileField("portfolioUrl")}
+                                  onKeyDown={(e) => handleInlineInputKeyDown(e, () => commitInlineProfileField("portfolioUrl"))}
+                                  className="mt-2 w-full rounded-lg border border-[#264a7f]/15 bg-white px-3 py-2 text-base font-semibold text-slate-900 outline-none"
+                                />
+                              ) : (
+                                <p className="mt-2 break-all text-base font-semibold text-slate-900">
+                                  {profile?.portfolioUrl || "Not added"}
+                                </p>
+                              )}
+                            </div>
+                            <Pencil size={15} className="shrink-0 text-slate-400 opacity-0 transition group-hover:opacity-100" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-[#264a7f]/10 bg-white p-5 shadow-sm sm:p-6">
+                      <h3 className="text-center text-lg font-bold text-slate-900 md:text-left">Work Mode</h3>
+                      <div
+                        className="group mt-5 rounded-lg border border-gray-200 bg-slate-50 p-4 transition hover:border-[#264a7f]/15 hover:bg-white"
+                        onClick={() => setActiveProfileField("workModes")}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Preferred Work Mode</p>
+                            {activeProfileField === "workModes" ? (
+                              <div className="relative mt-2">
+                                <select
+                                  autoFocus
+                                  value={resumeForm.preferences.workModes[0] || ""}
+                                  onChange={(e) =>
+                                    setResumeForm((p) => ({
+                                      ...p,
+                                      preferences: {
+                                        ...p.preferences,
+                                        workModes: e.target.value ? [e.target.value as "On-site" | "Hybrid" | "Remote"] : [],
+                                      },
+                                    }))
+                                  }
+                                  onBlur={() => void commitResumeField("workModes")}
+                                  onKeyDown={(e) => handleInlineInputKeyDown(e, () => commitResumeField("workModes"))}
+                                  className="w-full appearance-none rounded-lg border border-[#264a7f]/15 bg-white px-3 py-2 text-base font-semibold text-slate-900 outline-none"
+                                >
+                                  <option value="">Select work mode</option>
+                                  <option value="On-site">On-site</option>
+                                  <option value="Hybrid">Hybrid</option>
+                                  <option value="Remote">Remote</option>
+                                </select>
+                                <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                              </div>
+                            ) : (
+                              <p className="mt-2 text-base font-semibold text-slate-900">
+                                {profile?.preferences?.workModes?.length
+                                  ? profile.preferences.workModes.join(", ")
+                                  : "Not added"}
+                              </p>
+                            )}
+                          </div>
+                          <Pencil size={15} className="shrink-0 text-slate-400 opacity-0 transition group-hover:opacity-100" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-6">
+                    <div className="rounded-lg border border-[#264a7f]/10 bg-white p-5 shadow-sm sm:p-6">
+                      <h3 className="text-center text-lg font-bold text-slate-900 md:text-left">Quick Snapshot</h3>
+                      <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
+                        <div className="rounded-lg border border-gray-200 bg-slate-50 p-5">
+                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Applications</p>
+                          <p className="mt-3 text-3xl font-bold text-slate-900">
+                            {dashboard?.stats.applicationsSent || 0}
+                          </p>
+                          <p className="mt-1 text-sm text-slate-500">Roles you have already applied for</p>
+                        </div>
+
+                        <div className="rounded-lg border border-gray-200 bg-slate-50 p-5">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Profile Completion</p>
+                            <span className="text-sm font-semibold text-[#264a7f]">
+                              {dashboard?.stats.profileCompletion || 0}%
+                            </span>
+                          </div>
+                          <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-slate-200">
+                            <div
+                              className="h-full rounded-full bg-[#264a7f] transition-all"
+                              style={{ width: `${Math.max(0, Math.min(100, dashboard?.stats.profileCompletion || 0))}%` }}
+                            />
+                          </div>
+                          <p className="mt-3 text-sm text-slate-500">
+                            Complete more details to strengthen your candidate profile.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {(inlineSavingField || resumeSaving || profilePhotoLoading) && (
+                      <div className="rounded-lg border border-[#264a7f]/10 bg-white p-4 text-sm text-slate-500 shadow-sm">
+                        Saving your latest profile updates...
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
-
-            <div className="space-y-6">
-              <div className="rounded-xl border border-border bg-card p-6">
-                <h3 className="font-heading text-lg font-semibold">Contact and Links</h3>
-                <div className="mt-4 space-y-4">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Email</p>
-                    <p className="mt-1 text-sm font-medium break-all">{sessionState?.user.email || "Not added"}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">LinkedIn</p>
-                    <p className="mt-1 text-sm font-medium break-all">{profile?.linkedinUrl || "Not added"}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Portfolio</p>
-                    <p className="mt-1 text-sm font-medium break-all">{profile?.portfolioUrl || "Not added"}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Work modes</p>
-                    <p className="mt-1 text-sm font-medium">
-                      {profile?.preferences?.workModes?.length
-                        ? profile.preferences.workModes.join(", ")
-                        : "Not added"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-border bg-card p-6">
-                <h3 className="font-heading text-lg font-semibold">Quick Snapshot</h3>
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <div className="rounded-lg border border-border bg-background/70 p-4">
-                    <p className="text-2xl font-bold">{dashboard?.stats.applicationsSent || 0}</p>
-                    <p className="text-xs text-muted-foreground">Applications</p>
-                  </div>
-                  <div className="rounded-lg border border-border bg-background/70 p-4">
-                    <p className="text-2xl font-bold">{dashboard?.stats.profileCompletion || 0}%</p>
-                    <p className="text-xs text-muted-foreground">Profile completion</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          </section>
         )}
 
         {tab === "resume" && (
