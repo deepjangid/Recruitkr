@@ -25,8 +25,9 @@ Use `.env.example` as template:
 - `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET` (64+ chars)
 - `BCRYPT_OR_ARGON2_PEPPER` (random secret)
 - `CORS_ORIGIN` (frontend URL, comma-separated if multiple)
-- `FRONTEND_URL` (used to generate password reset link)
+- `FRONTEND_URL` or `CLIENT_URL` (used to generate password reset link)
 - SMTP (for password reset emails): `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, optional `SMTP_FROM`
+- Zoho Mail example: `SMTP_HOST=smtp.zoho.in`, `SMTP_PORT=587`, `SMTP_USER=connect@recruitkr.com`, `SMTP_PASS=<Zoho App Password>`
 
 ## 3. Base URL
 
@@ -45,7 +46,7 @@ Use `.env.example` as template:
 - `POST /auth/logout`
 - `POST /auth/change-password` (auth required)
 - `POST /auth/forgot-password`
-- `POST /auth/reset-password`
+- `POST /auth/reset-password/:token`
 
 ### Users/Profile
 - `GET /users/me` (auth required)
@@ -173,6 +174,7 @@ For production deployments:
 - frontend must be built with `VITE_API_URL=https://your-backend-domain/api/v1` if backend and frontend use different domains
 - backend `CORS_ORIGIN` must include the deployed frontend origin, for example `https://your-frontend.vercel.app`
 - verify backend is live at `GET /api/v1/health` before testing the frontend
+- for Zoho Mail SMTP, use an app password rather than the normal mailbox password
 
 ## 7. Security Features Included
 

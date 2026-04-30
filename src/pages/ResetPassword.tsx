@@ -1,12 +1,16 @@
 import { useMemo, useState, type FormEvent } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import Navbar from "@/components/Navbar";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+
 import Footer from "@/components/Footer";
+import Navbar from "@/components/Navbar";
 import { apiPost } from "@/lib/api";
+import { getErrorMessage } from "@/lib/apiError";
+import { toast } from "@/hooks/use-toast";
 
 const ResetPassword = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const params = useParams<{ token?: string }>();
   const [newPassword, setNewPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
@@ -16,7 +20,10 @@ const ResetPassword = () => {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const token = useMemo(() => new URLSearchParams(location.search).get("token") || "", [location.search]);
+  const token = useMemo(
+    () => params.token || new URLSearchParams(location.search).get("token") || "",
+    [location.search, params.token],
+  );
 
   const inputClass =
     "w-full rounded-lg border border-border bg-secondary/50 px-4 py-3 text-sm text-foreground placeholder-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors";
@@ -27,7 +34,7 @@ const ResetPassword = () => {
     setConfirmError("");
 
     if (!token) {
-      setPasswordError("Missing reset token. Please use the link from your email.");
+      setPasswordError("This reset link is invalid or incomplete. Please request a new one.");
       return;
     }
 
@@ -38,14 +45,18 @@ const ResetPassword = () => {
 
     setLoading(true);
     try {
-      await apiPost<{ success: boolean; message?: string }>("/auth/reset-password", {
-        token,
-        newPassword,
-      });
+      await apiPost<{ success: boolean; message?: string }>(
+        `/auth/reset-password/${encodeURIComponent(token)}`,
+        { newPassword, confirmPassword: confirm },
+      );
       setDone(true);
-      setTimeout(() => navigate("/login"), 1200);
+      toast({
+        title: "Password updated",
+        description: "Your password has been reset successfully.",
+      });
+      window.setTimeout(() => navigate("/login"), 1200);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Reset failed";
+      const message = getErrorMessage(err, "We couldn't reset your password. Please try again.");
       if (/match/i.test(message)) {
         setConfirmError(message);
       } else {
@@ -59,19 +70,19 @@ const ResetPassword = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <div className="pt-28 pb-20 min-h-screen flex items-center">
+      <div className="flex min-h-screen items-center pt-28 pb-20">
         <div className="container mx-auto max-w-md px-4">
           <div className="rounded-2xl border border-border bg-card p-8 shadow-2xl">
-            <div className="text-center mb-8">
+            <div className="mb-8 text-center">
               <Link to="/" className="font-heading text-3xl font-bold">
                 Recruit<span style={{ color: "#264a7f" }}>kr</span>
               </Link>
-              <p className="mt-2 text-muted-foreground text-sm">Choose a new password</p>
+              <p className="mt-2 text-sm text-muted-foreground">Choose a new password</p>
             </div>
 
             {done ? (
               <div className="space-y-4 text-center">
-                <p className="text-sm text-foreground">Password updated. Redirecting to login…</p>
+                <p className="text-sm text-foreground">Password updated. Redirecting to login...</p>
                 <Link to="/login" className="text-sm font-medium hover:underline" style={{ color: "#264a7f" }}>
                   Go to Login
                 </Link>
@@ -79,7 +90,7 @@ const ResetPassword = () => {
             ) : (
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div>
-                  <label className="block mb-1.5 text-sm font-medium text-foreground">New Password</label>
+                  <label className="mb-1.5 block text-sm font-medium text-foreground">New Password</label>
                   <div className="relative">
                     <input
                       type={showNewPassword ? "text" : "password"}
@@ -103,8 +114,9 @@ const ResetPassword = () => {
                   </div>
                   {passwordError && <p className="mt-1.5 text-xs text-red-500">{passwordError}</p>}
                 </div>
+
                 <div>
-                  <label className="block mb-1.5 text-sm font-medium text-foreground">Confirm Password</label>
+                  <label className="mb-1.5 block text-sm font-medium text-foreground">Confirm Password</label>
                   <div className="relative">
                     <input
                       type={showConfirmPassword ? "text" : "password"}
@@ -138,8 +150,8 @@ const ResetPassword = () => {
                 </button>
 
                 {!token && (
-                  <p className="text-xs text-muted-foreground text-center">
-                    This page needs a valid reset link (token) from your email.
+                  <p className="text-center text-xs text-muted-foreground">
+                    This page needs a valid reset link from your email.
                   </p>
                 )}
 
@@ -159,4 +171,3 @@ const ResetPassword = () => {
 };
 
 export default ResetPassword;
-

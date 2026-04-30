@@ -18,6 +18,7 @@ import {
   clientRegisterSchema,
   loginSchema,
   refreshSchema,
+  resetPasswordParamsSchema,
   resetPasswordSchema,
 } from '../schemas/auth.schema.js';
 import { validate } from '../middlewares/validate.js';
@@ -31,7 +32,12 @@ router.post('/refresh', validate(refreshSchema), refresh);
 router.post('/logout', logout);
 router.post('/change-password', requireAuth, validate(changePasswordSchema), changePassword);
 router.post('/forgot-password', validate(forgotPasswordSchema), forgotPassword);
-router.post('/reset-password', validate(resetPasswordSchema), resetPassword);
+router.post(
+  '/reset-password/:token',
+  validate(resetPasswordParamsSchema, 'params'),
+  validate(resetPasswordSchema),
+  resetPassword,
+);
 
 export default router;
 

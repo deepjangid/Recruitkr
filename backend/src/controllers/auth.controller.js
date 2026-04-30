@@ -68,7 +68,7 @@ const issueTokensAndPersistRefresh = async (user) => {
 
 const buildResetPasswordUrl = (token) => {
   const base = env.FRONTEND_URL.replace(/\/$/, '');
-  return `${base}/reset-password?token=${encodeURIComponent(token)}`;
+  return `${base}/reset-password/${encodeURIComponent(token)}`;
 };
 
 const syncCandidateLegacyFields = ({ profile, user, resumeFileName = '' }) => {
@@ -397,29 +397,34 @@ export const changePassword = asyncHandler(async (req, res) => {
 
 export const forgotPassword = asyncHandler(async (req, res) => {
   const { email } = req.body;
-  let resetUrl;
-  let emailDelivery = 'sent';
 
   const user = await User.findOne({ email })
-    .select('+resetPasswordTokenHash +resetPasswordExpiresAt')
+    .select('+resetToken +resetTokenExpire')
     .exec();
 
   if (user) {
+    // Generate a cryptographically strong token for the reset link and hash it before saving.
     const rawToken = crypto.randomBytes(32).toString('hex');
-    user.resetPasswordTokenHash = hashToken(rawToken);
-    user.resetPasswordExpiresAt = new Date(Date.now() + env.PASSWORD_RESET_EXPIRES_MIN * 60 * 1000);
+    user.resetToken = hashToken(rawToken);
+    user.resetTokenExpire = new Date(Date.now() + env.PASSWORD_RESET_EXPIRES_MIN * 60 * 1000);
     await user.save();
 
-    resetUrl = buildResetPasswordUrl(rawToken);
+    const resetUrl = buildResetPasswordUrl(rawToken);
 
     try {
-      await sendPasswordResetEmail({ to: email, resetUrl });
+      await sendPasswordResetEmail({
+        to: email,
+        resetUrl,
+        expiresInMinutes: env.PASSWORD_RESET_EXPIRES_MIN,
+      });
     } catch (error) {
-      emailDelivery = 'manual';
+      console.error('Password reset email failed:', error);
+
       if (env.NODE_ENV !== 'production') {
-        console.warn('Password reset email could not be sent. Use this reset URL manually:', resetUrl);
-      } else {
-        console.error('Password reset email failed:', error?.message || error);
+        throw new ApiError(
+          StatusCodes.BAD_GATEWAY,
+          'Unable to send reset email in development. Check the Resend configuration.',
+        );
       }
     }
   }
@@ -428,19 +433,20 @@ export const forgotPassword = asyncHandler(async (req, res) => {
   res.json({
     success: true,
     message: 'If an account exists for this email, a password reset link has been sent.',
-    ...(emailDelivery === 'manual' && resetUrl ? { resetUrl, delivery: emailDelivery } : {}),
   });
 });
 
 export const resetPassword = asyncHandler(async (req, res) => {
-  const { token, newPassword } = req.body;
+  const { token } = req.params;
+  const { newPassword } = req.body;
   const tokenHash = hashToken(token);
 
+  // Only accept a matching hashed token that has not expired.
   const user = await User.findOne({
-    resetPasswordTokenHash: tokenHash,
-    resetPasswordExpiresAt: { $gt: new Date() },
+    resetToken: tokenHash,
+    resetTokenExpire: { $gt: new Date() },
   })
-    .select('+passwordHash +resetPasswordTokenHash +resetPasswordExpiresAt +refreshTokenHash +refreshTokenJti +refreshTokenExpiresAt')
+    .select('+passwordHash +resetToken +resetTokenExpire +refreshTokenHash +refreshTokenJti +refreshTokenExpiresAt')
     .exec();
 
   if (!user) {
@@ -449,8 +455,8 @@ export const resetPassword = asyncHandler(async (req, res) => {
 
   user.passwordHash = await hashPassword(newPassword);
   user.passwordChangedAt = new Date();
-  user.resetPasswordTokenHash = undefined;
-  user.resetPasswordExpiresAt = undefined;
+  user.resetToken = undefined;
+  user.resetTokenExpire = undefined;
   user.refreshTokenHash = undefined;
   user.refreshTokenJti = undefined;
   user.refreshTokenExpiresAt = undefined;

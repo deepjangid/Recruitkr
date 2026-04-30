@@ -134,7 +134,20 @@ export const forgotPasswordSchema = z
 
 export const resetPasswordSchema = z
   .object({
-    token: z.string().min(20),
     newPassword: password,
+    confirmPassword: z.string().min(6).optional(),
+  })
+  .refine(
+    (data) => !data.confirmPassword || data.newPassword === data.confirmPassword,
+    {
+      message: 'Confirm password must match new password',
+      path: ['confirmPassword'],
+    },
+  )
+  .strict();
+
+export const resetPasswordParamsSchema = z
+  .object({
+    token: z.string().min(20),
   })
   .strict();

@@ -6,13 +6,14 @@ import mongoSanitize from 'express-mongo-sanitize';
 import helmet from 'helmet';
 import hpp from 'hpp';
 import morgan from 'morgan';
-
+import teamRoutes from "./routes/teamRoutes.js";
 import { env } from './config/env.js';
 import { getDynamicSitemap } from './controllers/seo.controller.js';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js';
 import { globalLimiter } from './middlewares/rateLimiter.js';
 import blogRoutes from './routes/blog.routes.js';
 import contactRoutes from './routes/contact.routes.js';
+import authRoutes from './routes/auth.routes.js';
 import apiRoutes from './routes/index.js';
 
 const app = express();
@@ -28,6 +29,7 @@ app.use(
     allowedHeaders: ['Content-Type', 'Authorization'],
   }),
 );
+
 app.use(helmet());
 app.use(
   compression({
@@ -54,6 +56,8 @@ if (env.NODE_ENV === 'production') {
   app.use(globalLimiter);
 }
 app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+
+
 app.get('/sitemap.xml', getDynamicSitemap);
 app.get('/api/sitemap.xml', getDynamicSitemap);
 app.use(['/api/v1/blogs', '/api/blogposts'], (req, _res, next) => {
@@ -66,8 +70,13 @@ app.use(['/api/v1/blogs', '/api/blogposts'], (req, _res, next) => {
 });
 
 app.use('/api/v1', apiRoutes);
+// Backwards-compatible auth alias for clients expecting /api/auth/... instead of /api/v1/auth/...
+app.use('/api/auth', authRoutes);
 app.use('/api/blogposts', blogRoutes);
 app.use('/api/contact', contactRoutes);
+
+
+app.use("/api/team", teamRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

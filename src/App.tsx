@@ -1,4 +1,5 @@
 import AnalyticsTracker from "@/components/AnalyticsTracker";
+import { Toaster } from "@/components/ui/toaster";
 import { lazy, Suspense } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 
@@ -8,6 +9,7 @@ const ServiceDetails = lazy(() => import("./pages/ServiceDetails"));
 const Sectors = lazy(() => import("./pages/Sectors"));
 const Process = lazy(() => import("./pages/Process"));
 const WhyUs = lazy(() => import("./pages/WhyUs"));
+const OurTeam = lazy(() => import("./pages/OurTeam"));
 const Contact = lazy(() => import("./pages/Contact"));
 const FAQs = lazy(() => import("./pages/FAQs"));
 const Blog = lazy(() => import("./pages/Blog"));
@@ -41,6 +43,7 @@ const App = () => (
         <Route path="/process" element={<Process />} />
         <Route path="/why-us" element={<WhyUs />} />
         <Route path="/about" element={<WhyUs />} />
+        <Route path="/our-team" element={<OurTeam />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/faqs" element={<FAQs />} />
         <Route path="/blog" element={<Blog />} />
@@ -51,12 +54,14 @@ const App = () => (
         <Route path="/register/client" element={<ClientRegister />} />
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password/:token" element={<ResetPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/dashboard/candidate" element={<CandidateDashboard />} />
         <Route path="/dashboard/client" element={<ClientDashboard />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>
+    <Toaster />
   </BrowserRouter>
 );
 

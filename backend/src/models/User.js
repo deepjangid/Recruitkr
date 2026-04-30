@@ -50,11 +50,12 @@ const userSchema = new mongoose.Schema(
       type: Date,
       select: false,
     },
-    resetPasswordTokenHash: {
+    // Store only the hashed token so raw reset links are never persisted.
+    resetToken: {
       type: String,
       select: false,
     },
-    resetPasswordExpiresAt: {
+    resetTokenExpire: {
       type: Date,
       select: false,
     },
