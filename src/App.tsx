@@ -1,4 +1,5 @@
 import AnalyticsTracker from "@/components/AnalyticsTracker";
+import ApiKeepAlive from "@/components/ApiKeepAlive";
 import { Toaster } from "@/components/ui/toaster";
 import { lazy, Suspense } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
@@ -34,6 +35,7 @@ const routeFallback = (
 const App = () => (
   <BrowserRouter>
     <AnalyticsTracker />
+    <ApiKeepAlive />
     <Suspense fallback={routeFallback}>
       <Routes>
         <Route path="/" element={<Index />} />

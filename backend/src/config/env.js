@@ -42,6 +42,9 @@ const envSchema = z.object({
   BCRYPT_OR_ARGON2_PEPPER: z.string().min(16),
   OPENAI_API_KEY: z.preprocess(emptyToUndefined, z.string().min(20).optional()),
   OPENAI_MODEL: z.string().min(3).default('gpt-4o-mini'),
+  IMAGEKIT_PUBLIC_KEY: z.string().min(10),
+  IMAGEKIT_PRIVATE_KEY: z.string().min(10),
+  IMAGEKIT_URL_ENDPOINT: z.string().url(),
 
   FRONTEND_URL: z.preprocess(
     () => envValue('FRONTEND_URL', 'CLIENT_URL'),

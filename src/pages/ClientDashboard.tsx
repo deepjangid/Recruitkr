@@ -221,6 +221,8 @@ type ClientApplicationDetailsResponse = {
     };
     resume?: {
       _id: string;
+      resumeId?: string;
+      resumeUrl?: string;
       fileName?: string;
       mimeType?: string;
       source?: string;
@@ -233,6 +235,7 @@ type ClientResumesResponse = {
   success: boolean;
   data: Array<{
     _id: string;
+    resumeId?: string;
     applicationId: string;
     candidateName: string;
     candidateEmail?: string;
@@ -240,6 +243,7 @@ type ClientResumesResponse = {
     fileName?: string;
     mimeType?: string;
     source?: string;
+    resumeUrl?: string;
     updatedAt?: string;
     isLegacy?: boolean;
   }>;
@@ -841,12 +845,32 @@ const ClientDashboard = () => {
     }
   };
 
-  const downloadResume = async (applicationId: string, fileName?: string) => {
+  const downloadResume = async (
+    resumeId?: string,
+    applicationId?: string,
+    fileName?: string,
+    source?: string,
+    resumeUrl?: string,
+  ) => {
     try {
       const session = getSession();
       if (!session?.accessToken) throw new Error("Not authenticated");
 
-      const res = await fetch(`${API_BASE}/jobs/applications/${applicationId}/resume`, {
+      if (source === "uploaded") {
+        if (!resumeUrl) throw new Error("Resume URL is missing");
+        window.open(resumeUrl, "_blank", "noopener,noreferrer");
+        return;
+      }
+
+      const endpoint = resumeId
+        ? `${API_BASE}/resume/download/${resumeId}`
+        : applicationId
+          ? `${API_BASE}/jobs/applications/${applicationId}/resume`
+          : "";
+
+      if (!endpoint) throw new Error("Resume record is missing");
+
+      const res = await fetch(endpoint, {
         method: "GET",
         credentials: "include",
         headers: { Authorization: `Bearer ${session.accessToken}` },
@@ -939,7 +963,15 @@ const ClientDashboard = () => {
               <div className="flex flex-col gap-2 sm:flex-row">
                 <button
                   type="button"
-                  onClick={() => void downloadResume(resume.applicationId, resume.fileName)}
+                  onClick={() =>
+                    void downloadResume(
+                      resume.resumeId,
+                      resume.applicationId,
+                      resume.fileName,
+                      resume.source,
+                      resume.resumeUrl,
+                    )
+                  }
                   className="rounded-lg border border-border bg-white px-4 py-2 text-sm font-medium text-slate-700"
                 >
                   Download Resume
@@ -1053,13 +1085,16 @@ const ClientDashboard = () => {
                       {selectedApplicationDetails.resume.fileName || "Candidate resume"}
                     </p>
                     <button
-                      className="mt-3 rounded-lg border border-border bg-card px-4 py-2 text-sm"
-                      onClick={() =>
-                        void downloadResume(
-                          selectedApplicationDetails.application._id,
-                          selectedApplicationDetails.resume?.fileName,
-                        )
-                      }
+                        className="mt-3 rounded-lg border border-border bg-card px-4 py-2 text-sm"
+                        onClick={() =>
+                          void downloadResume(
+                            selectedApplicationDetails.resume?.resumeId,
+                            selectedApplicationDetails.application._id,
+                            selectedApplicationDetails.resume?.fileName,
+                            selectedApplicationDetails.resume?.source,
+                            selectedApplicationDetails.resume?.resumeUrl,
+                          )
+                        }
                     >
                       Download Resume
                     </button>

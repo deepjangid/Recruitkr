@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { env } from '../config/env.js';
 import puppeteer from 'puppeteer';
-import { generateResumeHTML } from '../utils/resumeBuilder.js';
+import { generateResumeHTML as generateProfileResumeHTML } from '../utils/resumeBuilder.js';
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -16,6 +16,36 @@ const MOBILE_REGEX = /(?:\+?91[-\s]?)?([6-9](?:[\s-]?\d){9})/;
 const URL_REGEX = /(?:https?:\/\/)?(?:www\.)?[A-Za-z0-9.-]+\.[A-Za-z]{2,}[^\s)]*/gi;
 const PINCODE_REGEX = /\b\d{6}\b/;
 const EXPERIENCE_REGEX = /\b(\d+(?:\.\d+)?\+?)\s*(?:years?|yrs?|year|yr)\b/i;
+const COMMON_SKILLS = [
+  'javascript',
+  'typescript',
+  'react',
+  'node.js',
+  'nodejs',
+  'express',
+  'mongodb',
+  'mysql',
+  'postgresql',
+  'html',
+  'css',
+  'tailwind',
+  'java',
+  'python',
+  'c++',
+  'c#',
+  'php',
+  'sales',
+  'operations',
+  'recruitment',
+  'excel',
+  'communication',
+  'leadership',
+  'customer service',
+  'problem solving',
+  'aws',
+  'docker',
+  'git',
+];
 const MONTHS = {
   jan: '01',
   january: '01',
@@ -302,6 +332,54 @@ const extractQualification = (text) => {
   return '';
 };
 
+const normalizeSkillLabel = (value = '') =>
+  value
+    .split(/[,|/]/)
+    .map((item) => clean(item))
+    .filter(Boolean);
+
+const extractSkills = (text) => {
+  const lines = text
+    .split('\n')
+    .map((line) => clean(line))
+    .filter(Boolean);
+
+  const skillSet = new Set();
+  const headingRegex = /\b(skills|technical skills|key skills|core skills|competencies)\b/i;
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (!headingRegex.test(line)) continue;
+
+    const directMatch = line.match(/\b(?:skills|technical skills|key skills|core skills|competencies)\b\s*[:\-]?\s*(.+)$/i);
+    const directValues = normalizeSkillLabel(directMatch?.[1] || '');
+    directValues.forEach((skill) => skillSet.add(skill));
+
+    if (directValues.length === 0) {
+      const nextLines = lines.slice(i + 1, i + 5);
+      nextLines.forEach((entry) => {
+        if (/^[A-Z][A-Z\s]{3,}$/.test(entry) || /\b(education|experience|project|profile|summary)\b/i.test(entry)) {
+          return;
+        }
+        normalizeSkillLabel(entry).forEach((skill) => skillSet.add(skill));
+      });
+    }
+  }
+
+  const plain = normalizeInline(text).toLowerCase();
+  COMMON_SKILLS.forEach((skill) => {
+    const escaped = escapeRegex(skill.toLowerCase());
+    if (new RegExp(`(^|[^a-z])${escaped}([^a-z]|$)`, 'i').test(plain)) {
+      skillSet.add(skill);
+    }
+  });
+
+  return [...skillSet]
+    .map((skill) => clean(skill))
+    .filter(Boolean)
+    .slice(0, 20);
+};
+
 const extractExperienceStatus = (text) => {
   const t = text.toLowerCase();
   if (/\bfresh(?:er)?\b/.test(t)) return 'fresher';
@@ -500,6 +578,11 @@ const coerceHints = (parsed = {}) => {
     preferredIndustry: safe(parsed.preferredIndustry),
     preferredRole: safe(parsed.preferredRole),
     workModes,
+    skills: Array.isArray(parsed.skills)
+      ? parsed.skills.map((item) => safe(item)).filter(Boolean)
+      : typeof parsed.skills === 'string'
+        ? parsed.skills.split(',').map((item) => safe(item)).filter(Boolean)
+        : [],
   };
 };
 
@@ -551,8 +634,9 @@ const parseResumeToCandidateHintsHeuristic = (text) => {
     lastWorkingDay: normalizeDateToInput(extractByLabel(text, ['last working day', 'lwd'])),
     preferredLocation: extractByLabel(text, ['preferred location', 'location preference']),
     preferredIndustry: extractByLabel(text, ['preferred industry']),
-    preferredRole: extractByLabel(text, ['preferred role', 'desired role']),
+    preferredRole: extractByLabel(text, ['preferred role', 'desired role', 'job title']) || experienceDetails.designation,
     workModes: extractWorkModes(text),
+    skills: extractSkills(text),
     ...experienceDetails,
   };
 };
@@ -561,12 +645,13 @@ const parseResumeToCandidateHintsWithOpenAi = async (text) => {
   if (!env.OPENAI_API_KEY) return null;
 
   const prompt = `Extract candidate details from resume text into JSON with exactly these keys:
-fullName, dateOfBirth, gender, address, pincode, mobile, email, linkedinUrl, portfolioUrl, highestQualification, experienceStatus, currentCompany, designation, totalExperience, industry, currentCtcLpa, expectedCtcLpa, minimumCtcLpa, noticePeriod, lastWorkingDay, preferredLocation, preferredIndustry, preferredRole, workModes.
+fullName, dateOfBirth, gender, address, pincode, mobile, email, linkedinUrl, portfolioUrl, highestQualification, experienceStatus, currentCompany, designation, totalExperience, industry, currentCtcLpa, expectedCtcLpa, minimumCtcLpa, noticePeriod, lastWorkingDay, preferredLocation, preferredIndustry, preferredRole, workModes, skills.
 Rules:
-- return string values for all fields except workModes, which must be an array
+- return string values for all fields except workModes and skills, which must be arrays
 - date fields must be yyyy-mm-dd when available
 - experienceStatus must be "fresher" or "experienced"
 - workModes values can only be "On-site", "Hybrid", "Remote"
+- skills should be a short array of concrete skills only
 - if unknown use empty string or empty array
 - do not include extra keys`;
 
@@ -644,6 +729,89 @@ export const extractResumeText = async ({ mimeType, buffer }) => {
   throw new Error('Unsupported resume file type');
 };
 
+export const buildGeneratedResumeData = (input = {}) => {
+  const providedEducation = Array.isArray(input.resumeData?.education)
+    ? input.resumeData.education
+    : [];
+  const providedExperience = Array.isArray(input.resumeData?.experience)
+    ? input.resumeData.experience
+    : [];
+  const providedSkills = Array.isArray(input.resumeData?.skills)
+    ? input.resumeData.skills
+    : Array.isArray(input.skills)
+      ? input.skills
+      : [];
+
+  const derivedEducation =
+    providedEducation.length > 0
+      ? providedEducation
+      : [
+          {
+            degree: clean(input.highestQualification),
+            institution: '',
+            year: '',
+            description: '',
+          },
+        ].filter((item) => item.degree);
+
+  const derivedExperience =
+    providedExperience.length > 0
+      ? providedExperience
+      : input.experienceStatus === 'experienced'
+        ? [
+            {
+              title: clean(input.experienceDetails?.designation),
+              company: clean(input.experienceDetails?.currentCompany),
+              duration: clean(input.experienceDetails?.totalExperience),
+              description: clean(input.experienceDetails?.industry),
+            },
+          ].filter((item) => item.title || item.company || item.duration || item.description)
+        : [];
+
+  return {
+    name: clean(input.resumeData?.name || input.fullName || input.name),
+    summary: clean(input.resumeData?.summary || input.summary),
+    skills: [...new Set(providedSkills.map((item) => clean(item)).filter(Boolean))],
+    education: derivedEducation
+      .map((item) => ({
+        degree: clean(item?.degree),
+        institution: clean(item?.institution),
+        year: clean(item?.year),
+        description: clean(item?.description),
+      }))
+      .filter((item) => item.degree || item.institution || item.year || item.description),
+    experience: derivedExperience
+      .map((item) => ({
+        title: clean(item?.title),
+        company: clean(item?.company),
+        duration: clean(item?.duration),
+        description: clean(item?.description),
+      }))
+      .filter((item) => item.title || item.company || item.duration || item.description),
+  };
+};
+
+export const generateResumeHTML = (resumeData = {}) => {
+  const normalized = buildGeneratedResumeData({ resumeData });
+  return generateProfileResumeHTML({
+    fullName: normalized.name,
+    summary: normalized.summary,
+    skills: normalized.skills,
+    educationEntries: normalized.education,
+    experienceEntries: normalized.experience,
+    experienceStatus: normalized.experience.length ? 'experienced' : 'fresher',
+    preferences: {
+      preferredRole: normalized.experience[0]?.title || '',
+      preferredLocation: '',
+      preferredIndustry: '',
+      workModes: [],
+    },
+    certifications: [],
+    projects: [],
+    referral: '',
+  });
+};
+
 const generateBasicResumePdfBuffer = (profile = {}) =>
   new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 42 });
@@ -672,6 +840,34 @@ const generateBasicResumePdfBuffer = (profile = {}) =>
     const projects = Array.isArray(profile.projects)
       ? profile.projects
           .map((item) => [clean(item?.name), clean(item?.description)].filter(Boolean).join(' - '))
+          .filter(Boolean)
+      : [];
+    const educationEntries = Array.isArray(profile.educationEntries)
+      ? profile.educationEntries
+          .map((item) =>
+            [
+              clean(item?.degree),
+              clean(item?.institution),
+              clean(item?.year),
+              clean(item?.description),
+            ]
+              .filter(Boolean)
+              .join(' - '),
+          )
+          .filter(Boolean)
+      : [];
+    const experienceEntries = Array.isArray(profile.experienceEntries)
+      ? profile.experienceEntries
+          .map((item) =>
+            [
+              clean(item?.title),
+              clean(item?.company),
+              clean(item?.duration),
+              clean(item?.description),
+            ]
+              .filter(Boolean)
+              .join(' - '),
+          )
           .filter(Boolean)
       : [];
     const certifications = Array.isArray(profile.certifications)
@@ -721,6 +917,8 @@ const generateBasicResumePdfBuffer = (profile = {}) =>
       ]);
     }
 
+    pushSection('Education', educationEntries);
+    pushSection('Professional Experience', experienceEntries);
     pushSection('Skills', skills);
     pushSection('Projects', projects);
     pushSection('Certifications', certifications);
@@ -733,12 +931,7 @@ const generateBasicResumePdfBuffer = (profile = {}) =>
     doc.end();
   });
 
-
-
-export const generateResumePdfBuffer = async (profile) => {
-  const enhancedProfile = profile;
-  const html = generateResumeHTML(enhancedProfile);
-
+const getPuppeteerLaunchOptions = () => {
   const isLinux = process.platform === 'linux';
   const isRootUser = typeof process.getuid === 'function' && process.getuid() === 0;
   const shouldDisableSandbox =
@@ -771,6 +964,12 @@ export const generateResumePdfBuffer = async (profile) => {
   if (launchOptions.userDataDir) {
     fs.mkdirSync(launchOptions.userDataDir, { recursive: true });
   }
+
+  return { configuredUserDataDir, resolvedUserDataDir, launchOptions };
+};
+
+export const generatePDF = async (html) => {
+  const { configuredUserDataDir, resolvedUserDataDir, launchOptions } = getPuppeteerLaunchOptions();
 
   let browser;
 
@@ -807,4 +1006,15 @@ export const generateResumePdfBuffer = async (profile) => {
       fs.rmSync(resolvedUserDataDir, { recursive: true, force: true });
     }
   }
+};
+
+export const generateStructuredResumePdfBuffer = async (resumeData = {}) => {
+  const html = generateResumeHTML(resumeData);
+  return generatePDF(html);
+};
+
+export const generateResumePdfBuffer = async (profile) => {
+  const enhancedProfile = profile;
+  const html = generateProfileResumeHTML(enhancedProfile);
+  return generatePDF(html);
 };

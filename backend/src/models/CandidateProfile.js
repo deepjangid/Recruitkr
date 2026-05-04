@@ -50,6 +50,8 @@ const candidateProfileSchema = new mongoose.Schema(
       default: [],
     },
     referral: { type: String, trim: true, default: '' },
+    profilePhotoUrl: { type: String, trim: true, default: '' },
+    profilePhotoFileId: { type: String, trim: true, default: '' },
     about: { type: String, trim: true, default: '' },
     city: { type: String, trim: true, default: '' },
     currentCity: { type: String, trim: true, default: '' },

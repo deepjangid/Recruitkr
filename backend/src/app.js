@@ -17,19 +17,30 @@ import authRoutes from './routes/auth.routes.js';
 import apiRoutes from './routes/index.js';
 
 const app = express();
+const allowedOrigins = env.CORS_ORIGIN.split(',').map((v) => v.trim()).filter(Boolean);
 
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
 
 app.use(
   cors({
-    origin: env.CORS_ORIGIN.split(',').map((v) => v.trim()),
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error('CORS origin not allowed'));
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   }),
 );
 
+app.use((req, _res, next) => {
+  console.log('Request:', req.method, req.url);
+  next();
+});
 app.use(helmet());
 app.use(
   compression({

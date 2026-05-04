@@ -9,7 +9,7 @@ const allowedMimeTypes = new Set([
 
 export const resumeUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  limits: { fileSize: 2 * 1024 * 1024, files: 1 },
   fileFilter: (_req, file, cb) => {
     if (!allowedMimeTypes.has(file.mimetype)) {
       return cb(new ApiError(400, 'Only PDF and DOCX resumes are supported'));
@@ -22,7 +22,7 @@ const allowedPhotoMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp'])
 
 export const profilePhotoUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 2 * 1024 * 1024, files: 1 },
+  limits: { fileSize: 500 * 1024, files: 1 },
   fileFilter: (_req, file, cb) => {
     if (!allowedPhotoMimeTypes.has(file.mimetype)) {
       return cb(new ApiError(400, 'Only JPG, PNG, or WEBP images are supported'));
@@ -53,7 +53,7 @@ export const certificateUpload = multer({
 
 export const blogImageUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  limits: { fileSize: 500 * 1024, files: 1 },
   fileFilter: (_req, file, cb) => {
     if (!allowedBlogImageMimeTypes.has(file.mimetype)) {
       return cb(new ApiError(400, 'Only JPG, PNG, WEBP, or GIF blog images are supported'));

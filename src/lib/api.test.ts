@@ -7,7 +7,9 @@ vi.mock("@/lib/auth", () => ({
 
 import { apiGet, apiRequest } from "@/lib/api";
 import {
+  API_MISCONFIGURED_MESSAGE,
   DEFAULT_API_ERROR_MESSAGE,
+  SERVER_API_ERROR_MESSAGE,
   TIMEOUT_API_ERROR_MESSAGE,
   getErrorMessage,
   getFriendlyApiMessage,
@@ -20,6 +22,7 @@ describe("api error handling", () => {
     vi.restoreAllMocks();
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.spyOn(console, "info").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -30,13 +33,25 @@ describe("api error handling", () => {
   it("shows a friendly message when the backend is unreachable", async () => {
     global.fetch = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
 
-    await expect(apiGet("/blogs")).rejects.toThrow(DEFAULT_API_ERROR_MESSAGE);
+    await expect(apiGet("/blogs", { retries: 0 })).rejects.toThrow(SERVER_API_ERROR_MESSAGE);
     expect(console.error).toHaveBeenCalledWith(
-      "[api] request failed before response",
+      "API ERROR:",
+      "Failed to fetch",
+      expect.stringContaining("/blogs"),
+    );
+  });
+
+  it("retries twice before failing on a network issue", async () => {
+    const onRetry = vi.fn();
+    global.fetch = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
+
+    await expect(apiRequest("/blogs", { onRetry })).rejects.toThrow(SERVER_API_ERROR_MESSAGE);
+    expect(global.fetch).toHaveBeenCalledTimes(3);
+    expect(onRetry).toHaveBeenCalledWith(
       expect.objectContaining({
-        method: "GET",
-        url: expect.stringContaining("/blogs"),
-        error: expect.any(TypeError),
+        attempt: 1,
+        maxAttempts: 3,
+        reason: "network",
       }),
     );
   });
@@ -53,34 +68,50 @@ describe("api error handling", () => {
       });
     });
 
-    const request = apiRequest("/blogs", { timeoutMs: 25 });
+    const request = apiRequest("/blogs", { timeoutMs: 25, retries: 0 });
+    const expectation = expect(request).rejects.toThrow(TIMEOUT_API_ERROR_MESSAGE);
     await vi.advanceTimersByTimeAsync(25);
 
-    await expect(request).rejects.toThrow(TIMEOUT_API_ERROR_MESSAGE);
+    await expectation;
     expect(console.error).toHaveBeenCalledWith(
-      "[api] request timed out",
-      expect.objectContaining({
-        timeout: true,
-        method: "GET",
-      }),
+      "API ERROR:",
+      expect.anything(),
+      expect.stringContaining("/blogs"),
     );
   });
 
   it("hides technical server messages from users", async () => {
+    global.fetch = vi.fn().mockImplementation(
+      () =>
+        Promise.resolve(
+          new Response(JSON.stringify({ message: "Check VITE_API_URL and CORS_ORIGIN" }), {
+            status: 503,
+            headers: { "Content-Type": "application/json" },
+          }),
+        ),
+    );
+
+    await expect(apiGet("/blogs")).rejects.toThrow(SERVER_API_ERROR_MESSAGE);
+    expect(console.error).toHaveBeenCalledWith(
+      "API ERROR:",
+      "Check VITE_API_URL and CORS_ORIGIN",
+      expect.stringContaining("/blogs"),
+    );
+  });
+
+  it("treats unexpected HTML responses as an API deployment problem", async () => {
     global.fetch = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ message: "Check VITE_API_URL and CORS_ORIGIN" }), {
-        status: 503,
-        headers: { "Content-Type": "application/json" },
+      new Response("<!doctype html><html><body>App shell</body></html>", {
+        status: 200,
+        headers: { "Content-Type": "text/html" },
       }),
     );
 
-    await expect(apiGet("/blogs")).rejects.toThrow("We're having trouble on our side. Please try again in a moment.");
+    await expect(apiGet("/blogs")).rejects.toThrow(API_MISCONFIGURED_MESSAGE);
     expect(console.error).toHaveBeenCalledWith(
-      "[api] request returned an error response",
-      expect.objectContaining({
-        status: 503,
-        serverMessage: "Check VITE_API_URL and CORS_ORIGIN",
-      }),
+      "API ERROR:",
+      API_MISCONFIGURED_MESSAGE,
+      expect.stringContaining("/blogs"),
     );
   });
 

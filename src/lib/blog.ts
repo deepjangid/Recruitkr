@@ -2,6 +2,7 @@ import { apiGet } from "@/lib/api";
 import { apiPatch, apiPost } from "@/lib/api";
 import { API_ROOT } from "@/lib/api";
 import { getRenderableBlogHtml } from "@/lib/blogHtml";
+import { uploadFile } from "@/lib/uploadFile";
 
 export type BlogPost = {
   _id?: string;
@@ -123,18 +124,6 @@ export const updateAdminBlogPost = async (blogId: string, payload: Partial<BlogE
 };
 
 export const uploadBlogEditorImage = async (file: File) => {
-  const formData = new FormData();
-  formData.append("image", file);
-
-  const response = await apiPost<{ success: boolean; data?: { imageUrl?: string } }>(
-    "/api/blogposts/images",
-    formData,
-    true,
-  );
-
-  if (!response.success || !response.data?.imageUrl) {
-    throw new Error("Failed to upload image");
-  }
-
-  return response.data.imageUrl;
+  const asset = await uploadFile(file, "blogs");
+  return asset.url;
 };
