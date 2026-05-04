@@ -14,6 +14,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const [formError, setFormError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
@@ -27,6 +28,7 @@ const Login = () => {
     e.preventDefault();
     setEmailError("");
     setPasswordError("");
+    setFormError("");
 
     if (!email.trim()) {
       setEmailError("Email is required.");
@@ -67,10 +69,14 @@ const Login = () => {
       navigate(userType === "candidate" ? "/dashboard/candidate" : "/dashboard/client");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Login failed";
-      if (/email/i.test(message)) {
+      if (/not registered|sign up first/i.test(message)) {
         setEmailError(message);
-      } else {
+      } else if (/password/i.test(message)) {
         setPasswordError(message);
+      } else if (/registered as|correct login type/i.test(message)) {
+        setFormError(message);
+      } else {
+        setFormError(message);
       }
     } finally {
       setLoading(false);
@@ -121,6 +127,7 @@ const Login = () => {
                   onChange={(e) => {
                     setEmail(e.target.value);
                     setEmailError("");
+                    setFormError("");
                   }}
                   className={inputClass}
                   placeholder="your@email.com"
@@ -145,6 +152,7 @@ const Login = () => {
                     onChange={(e) => {
                       setPassword(e.target.value);
                       setPasswordError("");
+                      setFormError("");
                     }}
                     className={`${inputClass} pr-20`}
                     placeholder="Enter your password"
@@ -159,6 +167,8 @@ const Login = () => {
                 </div>
                 {passwordError && <p className="mt-1.5 text-xs text-red-500">{passwordError}</p>}
               </div>
+
+              {formError && <p className="text-xs text-red-500">{formError}</p>}
 
               <button
                 type="submit"

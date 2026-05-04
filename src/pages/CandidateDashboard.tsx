@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, BriefcaseBusiness, Building2, Camera, CheckCircle2, ChevronDown, Clock3, FileText, Filter, MapPin, Pencil, Search, Sparkles, UserCircle2, X, XCircle } from "lucide-react";
 import OptimizedLogo from "@/components/OptimizedLogo";
@@ -6,6 +6,7 @@ import { API_BASE, apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
 import { clearSession, getSession } from "@/lib/auth";
 import { useServerEvents, type SseConnectionStatus } from "@/hooks/useServerEvents";
 import { tryAutoLogin } from "@/lib/autoLogin";
+import { uploadFile, uploadRules, validateUploadFile } from "@/lib/uploadFile";
 
 const JOBS_PAGE_LIMIT = 20;
 const LIVE_REFRESH_MS = 5000;
@@ -353,6 +354,8 @@ type CandidateProfileResponse = {
     projects?: Array<{ name?: string; description?: string }>;
     certifications?: Array<{ name?: string; institute?: string }>;
     referral?: string;
+    profilePhotoUrl?: string;
+    profilePhotoFileId?: string;
   };
 };
 
@@ -445,6 +448,14 @@ const CandidateDashboard = () => {
   const [resumeSaving, setResumeSaving] = useState(false);
   const [resumeDownloading, setResumeDownloading] = useState(false);
   const [resumeNotice, setResumeNotice] = useState("");
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [resumeMeta, setResumeMeta] = useState<{
+    resumeType: "uploaded" | "generated";
+    resumeId?: string;
+    resumeUrl?: string;
+    resumeFileId?: string;
+    fileName?: string;
+  } | null>(null);
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [profilePhotoLoading, setProfilePhotoLoading] = useState(false);
   const [certificates, setCertificates] = useState<CandidateCertificatesResponse["data"]>([]);
@@ -498,6 +509,24 @@ const CandidateDashboard = () => {
     setDashboard(dashboardRes.data);
   };
 
+  const refreshResumeMeta = async () => {
+    try {
+      const resumeRes = await apiGet<{
+        success: boolean;
+        data: {
+          resumeType: "uploaded" | "generated";
+          resumeId?: string;
+          resumeUrl?: string;
+          resumeFileId?: string;
+          fileName?: string;
+        };
+      }>("/resumes/mine", true);
+      setResumeMeta(resumeRes.data);
+    } catch {
+      setResumeMeta(null);
+    }
+  };
+
   const refreshApplications = async () => {
     const appsRes = await apiGet<CandidateApplicationsResponse>("/jobs/applications/mine", true);
     setApplications(appsRes.data);
@@ -512,9 +541,13 @@ const CandidateDashboard = () => {
   const syncResumeFormFromProfile = (profileData?: CandidateProfileResponse["data"] | null) => {
     if (!profileData) return;
 
-    setResumeForm({
-      highestQualification: profileData?.highestQualification || "",
-      experienceStatus: profileData?.experienceStatus || "fresher",
+    setResumeForm((prev) => ({
+      highestQualification:
+        activeProfileField === "highestQualification" ? prev.highestQualification : profileData?.highestQualification || "",
+      experienceStatus:
+        activeProfileField === "experienceStatus"
+          ? prev.experienceStatus
+          : profileData?.experienceStatus || "fresher",
       experienceDetails: {
         currentCompany: profileData?.experienceDetails?.currentCompany || "",
         designation: profileData?.experienceDetails?.designation || "",
@@ -522,12 +555,21 @@ const CandidateDashboard = () => {
         industry: profileData?.experienceDetails?.industry || "",
       },
       preferences: {
-        preferredRole: profileData?.preferences?.preferredRole || "",
-        preferredLocation: profileData?.preferences?.preferredLocation || "",
+        preferredRole:
+          activeProfileField === "preferredRole"
+            ? prev.preferences.preferredRole
+            : profileData?.preferences?.preferredRole || "",
+        preferredLocation:
+          activeProfileField === "preferredLocation"
+            ? prev.preferences.preferredLocation
+            : profileData?.preferences?.preferredLocation || "",
         preferredIndustry: profileData?.preferences?.preferredIndustry || "",
-        workModes: profileData?.preferences?.workModes || [],
+        workModes:
+          activeProfileField === "workModes"
+            ? prev.preferences.workModes
+            : profileData?.preferences?.workModes || [],
       },
-      summary: profileData?.summary || "",
+      summary: activeProfileField === "summary" ? prev.summary : profileData?.summary || "",
       skillsText: (profileData?.skills || []).join(", "),
       projects: (profileData?.projects || []).map((p) => ({
         name: p?.name || "",
@@ -538,7 +580,7 @@ const CandidateDashboard = () => {
         institute: c?.institute || "",
       })),
       referral: profileData?.referral || "",
-    });
+    }));
   };
 
   useEffect(() => {
@@ -583,8 +625,9 @@ const CandidateDashboard = () => {
       const nextProfile = profileRes?.data || dashboardRes.data?.profile || null;
       if (nextProfile) {
         setProfile(nextProfile);
-        syncResumeFormFromProfile(nextProfile);
+        void loadProfilePhoto(nextProfile);
       }
+      void refreshResumeMeta();
     } catch {
       // Keep the current UI stable if a background refresh fails.
     }
@@ -594,19 +637,30 @@ const CandidateDashboard = () => {
     setLoading(true);
     setError("");
     try {
-      const [dashboardRes, profileRes] = await Promise.all([
+      const [dashboardRes, profileRes, resumeRes] = await Promise.all([
         apiGet<CandidateDashboardResponse>("/dashboards/candidate", true),
         apiGet<CandidateProfileResponse>("/users/candidate/me", true).catch(() => null),
+        apiGet<{
+          success: boolean;
+          data: {
+            resumeType: "uploaded" | "generated";
+            resumeId?: string;
+            resumeUrl?: string;
+            resumeFileId?: string;
+            fileName?: string;
+          };
+        }>("/resumes/mine", true).catch(() => null),
       ]);
 
       setDashboard(dashboardRes.data);
-      const nextProfile = profileRes?.data || dashboardRes.data?.profile || null;
-      setProfile(nextProfile);
-      syncResumeFormFromProfile(nextProfile);
+        const nextProfile = profileRes?.data || dashboardRes.data?.profile || null;
+        setProfile(nextProfile);
+        setResumeMeta(resumeRes?.data || null);
+        syncResumeFormFromProfile(nextProfile);
 
-      await Promise.all([refreshApplications(), fetchJobsPage(1)]);
-      void loadProfilePhoto();
-      void loadCertificates();
+        await Promise.all([refreshApplications(), fetchJobsPage(1)]);
+        void loadProfilePhoto(nextProfile);
+        void loadCertificates();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load dashboard");
     } finally {
@@ -815,15 +869,98 @@ const CandidateDashboard = () => {
         };
       }
 
+      const generatedResumeData = {
+        name: profile?.fullName?.trim() || inlineProfileDrafts.fullName.trim() || "Candidate",
+        summary: resumeForm.summary.trim(),
+        skills,
+        education: highestQualification
+          ? [
+              {
+                degree: highestQualification,
+                institution: "",
+                year: "",
+                description: "",
+              },
+            ]
+          : [],
+        experience:
+          resumeForm.experienceStatus === "experienced"
+            ? [
+                {
+                  title: resumeForm.experienceDetails.designation.trim(),
+                  company: resumeForm.experienceDetails.currentCompany.trim(),
+                  duration: resumeForm.experienceDetails.totalExperience.trim(),
+                  description: resumeForm.experienceDetails.industry.trim(),
+                },
+              ].filter((item) => item.title || item.company || item.duration || item.description)
+            : [],
+      };
+
+      if (resumeFile) {
+        const asset = await uploadFile(resumeFile, "resumes");
+        payload.resumeType = "uploaded";
+        payload.resumeUrl = asset.url;
+        payload.resumeFileId = asset.fileId;
+        payload.resumeFileName = resumeFile.name;
+      } else {
+        payload.resumeType = "generated";
+        payload.resumeData = generatedResumeData;
+      }
+
       const res = await apiPatch<CandidateProfileResponse>("/users/candidate/me", payload, true);
 
       setProfile(res.data);
       syncResumeFormFromProfile(res.data);
-      setResumeNotice("Resume saved successfully.");
+      setResumeMeta((prev) =>
+        resumeFile
+            ? {
+                resumeType: "uploaded",
+                resumeUrl: payload.resumeUrl as string,
+                resumeFileId: payload.resumeFileId as string,
+                fileName: resumeFile.name,
+                resumeId: prev?.resumeId,
+              }
+            : {
+                resumeType: "generated",
+                resumeId: prev?.resumeId,
+                resumeUrl: "",
+                resumeFileId: "",
+                fileName: "",
+              },
+      );
+      setResumeFile(null);
+      setResumeNotice(
+        resumeFile
+          ? "Resume PDF uploaded and saved successfully."
+          : "Resume saved as generated resume successfully.",
+      );
+      void refreshResumeMeta();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save resume");
     } finally {
       setResumeSaving(false);
+    }
+  };
+
+  const handleResumeFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setError("");
+
+    if (!file) {
+      setResumeFile(null);
+      return;
+    }
+
+    try {
+      validateUploadFile(file, "resumes");
+      setResumeFile(file);
+      setResumeNotice(
+        "New resume selected. Click Save to upload it. If you save without a PDF selected, your text edits will be saved as a generated resume.",
+      );
+    } catch (err) {
+      setResumeFile(null);
+      setError(err instanceof Error ? err.message : "Invalid resume file");
+      e.currentTarget.value = "";
     }
   };
 
@@ -948,10 +1085,32 @@ const CandidateDashboard = () => {
       const session = getSession();
       if (!session?.accessToken) throw new Error("Not authenticated");
 
-      const res = await fetch(`${API_BASE}/resumes/generated`, {
-        method: "GET",
-        credentials: "include",
-        headers: { Authorization: `Bearer ${session.accessToken}` },
+        const resumeMeta = await apiGet<{
+          success?: boolean;
+          data?: {
+            resumeId?: string;
+            resumeType?: "uploaded" | "generated";
+            resumeUrl?: string;
+          };
+        }>("/resumes/mine", true);
+
+        if (resumeMeta?.data?.resumeType === "uploaded") {
+          if (!resumeMeta.data.resumeUrl) {
+            throw new Error("Resume URL is missing");
+          }
+
+          window.open(resumeMeta.data.resumeUrl, "_blank", "noopener,noreferrer");
+          return;
+        }
+
+        if (!resumeMeta?.data?.resumeId) {
+          throw new Error("Resume record is missing");
+        }
+
+        const res = await fetch(`${API_BASE}/resume/download/${resumeMeta.data.resumeId}`, {
+          method: "GET",
+          credentials: "include",
+          headers: { Authorization: `Bearer ${session.accessToken}` },
       });
 
       if (!res.ok) {
@@ -979,40 +1138,11 @@ const CandidateDashboard = () => {
     }
   };
 
-  const loadProfilePhoto = async () => {
+  const loadProfilePhoto = async (profileData?: CandidateProfileResponse["data"] | null) => {
     setProfilePhotoLoading(true);
     try {
-      const session = getSession();
-      if (!session?.accessToken) {
-        setProfilePhotoUrl(null);
-        return;
-      }
-
-      const res = await fetch(`${API_BASE}/users/candidate/profile-photo`, {
-        method: "GET",
-        credentials: "include",
-        headers: { Authorization: `Bearer ${session.accessToken}` },
-      });
-
-      if (res.status === 204) {
-        setProfilePhotoUrl((prev) => {
-          if (prev) URL.revokeObjectURL(prev);
-          return null;
-        });
-        return;
-      }
-
-      if (!res.ok) {
-        setProfilePhotoUrl(null);
-        return;
-      }
-
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      setProfilePhotoUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return url;
-      });
+      const nextUrl = profileData?.profilePhotoUrl || profile?.profilePhotoUrl || null;
+      setProfilePhotoUrl(nextUrl);
     } finally {
       setProfilePhotoLoading(false);
     }
@@ -1020,26 +1150,44 @@ const CandidateDashboard = () => {
 
   const uploadProfilePhoto = async (file: File) => {
     setError("");
+    setProfilePhotoLoading(true);
     try {
-      const fd = new FormData();
-      fd.append("photo", file);
-      await apiPost("/users/candidate/profile-photo", fd, true);
-      await loadProfilePhoto();
+      const asset = await uploadFile(file, "profiles");
+      const res = await apiPatch<CandidateProfileResponse>(
+        "/users/candidate/me",
+        {
+          profilePhotoUrl: asset.url,
+          profilePhotoFileId: asset.fileId,
+        },
+        true,
+      );
+      setProfile(res.data);
+      await loadProfilePhoto(res.data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to upload photo");
+    } finally {
+      setProfilePhotoLoading(false);
     }
   };
 
   const removeProfilePhoto = async () => {
     setError("");
+    setProfilePhotoLoading(true);
     try {
-      await apiDelete("/users/candidate/profile-photo", true);
-      setProfilePhotoUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return null;
-      });
+      const res = await apiPatch<CandidateProfileResponse>(
+        "/users/candidate/me",
+        {
+          profilePhotoUrl: "",
+          profilePhotoFileId: "",
+        },
+        true,
+      );
+      setProfile(res.data);
+      setProfilePhotoUrl(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to remove photo");
+    } finally {
+      setProfilePhotoLoading(false);
     }
   };
 
@@ -2666,6 +2814,14 @@ const CandidateDashboard = () => {
                   <p className="text-sm text-muted-foreground">
                     Fill only what you have; empty sections will be hidden in the PDF.
                   </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Current resume type: {resumeMeta?.resumeType === "uploaded" ? "Uploaded PDF" : "Generated from form"}
+                  </p>
+                  {resumeMeta?.resumeType === "uploaded" && !resumeFile && resumeMeta.fileName ? (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Current file: {resumeMeta.fileName}
+                    </p>
+                  ) : null}
                   {resumeNotice && <p className="mt-2 text-sm text-green-600">{resumeNotice}</p>}
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row">
@@ -2684,6 +2840,33 @@ const CandidateDashboard = () => {
                     {resumeDownloading ? "Preparing..." : "Download PDF"}
                   </button>
                 </div>
+              </div>
+
+              <div className="rounded-lg border border-dashed border-border bg-background/60 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground">Upload Resume PDF</h3>
+                    <p className="text-xs text-muted-foreground">
+                      PDF only, max {Math.round(uploadRules.resumeMaxBytes / (1024 * 1024))}MB. Save with a selected file to keep this resume as uploaded.
+                    </p>
+                  </div>
+                  <input
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    onChange={handleResumeFileSelect}
+                    className="text-sm"
+                    disabled={resumeSaving}
+                  />
+                </div>
+                {resumeFile ? (
+                  <p className="mt-3 text-sm text-foreground">
+                    Selected PDF: {resumeFile.name}
+                  </p>
+                ) : (
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    If you save without selecting a PDF, this resume will be saved as generated from the fields below.
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

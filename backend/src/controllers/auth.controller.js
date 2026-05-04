@@ -7,7 +7,7 @@ import { ClientProfile } from '../models/ClientProfile.js';
 import { Resume } from '../models/Resume.js';
 import { User } from '../models/User.js';
 import { sendPasswordResetEmail } from '../services/mail.service.js';
-import { generateResumePdfBuffer, extractResumeText } from '../services/resume.service.js';
+import { buildGeneratedResumeData } from '../services/resume.service.js';
 import { ApiError } from '../utils/ApiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import {
@@ -71,7 +71,7 @@ const buildResetPasswordUrl = (token) => {
   return `${base}/reset-password/${encodeURIComponent(token)}`;
 };
 
-const syncCandidateLegacyFields = ({ profile, user, resumeFileName = '' }) => {
+const syncCandidateLegacyFields = ({ profile, user, resumeLocation = '' }) => {
   const summary = profile.summary || '';
   const preferredLocation = profile.preferences?.preferredLocation || '';
   const preferredIndustry = profile.preferences?.preferredIndustry || '';
@@ -89,7 +89,7 @@ const syncCandidateLegacyFields = ({ profile, user, resumeFileName = '' }) => {
   profile.preferredIndustry = preferredIndustry;
   profile.preferredLocation = preferredLocation;
   profile.preferredRole = preferredRole;
-  profile.resumePath = resumeFileName ? `resumes/${resumeFileName}` : profile.resumePath || '';
+  profile.resumePath = resumeLocation || profile.resumePath || '';
   profile.workModes = workModes;
 };
 
@@ -111,6 +111,13 @@ const syncClientLegacyFields = ({ profile, user }) => {
   profile.phone = spocMobile;
   profile.requirements = profile.requirements || '';
   profile.website = profile.companyWebsite || '';
+};
+
+const getRoleLabel = (role) => {
+  if (role === 'client') return 'Employer';
+  if (role === 'candidate') return 'Candidate';
+  if (role === 'admin') return 'Admin';
+  return 'User';
 };
 
 export const registerCandidate = asyncHandler(async (req, res) => {
@@ -160,60 +167,28 @@ export const registerCandidate = asyncHandler(async (req, res) => {
     representationAuthorized: payload.representationAuthorized,
   });
 
-  let generatedResumePayload = null;
-  let storedResumeFileName = '';
-  if (payload.resume?.dataBase64) {
-    const resumeBuffer = Buffer.from(payload.resume.dataBase64, 'base64');
-    const resumeText = await extractResumeText({
-      mimeType: payload.resume.mimeType,
-      buffer: resumeBuffer,
-    });
+  const generatedResumeData =
+    payload.resumeType === 'generated'
+      ? buildGeneratedResumeData({
+          ...payload,
+          skills: payload.resumeData?.skills,
+        })
+      : null;
 
-    await Resume.create({
-      candidateUserId: user.id,
-      fileName: payload.resume.fileName,
-      mimeType: payload.resume.mimeType,
-      source: 'uploaded',
-      textExtract: resumeText,
-      data: resumeBuffer,
-    });
-    storedResumeFileName = payload.resume.fileName;
-  } else {
-    const generatedBuffer = await generateResumePdfBuffer({
-      fullName: payload.fullName,
-      email: payload.email,
-      mobile: payload.mobile,
-      address: payload.address,
-      pincode: payload.pincode,
-      dateOfBirth: payload.dateOfBirth,
-      gender: payload.gender,
-      highestQualification: payload.highestQualification,
-      linkedinUrl: payload.linkedinUrl,
-      portfolioUrl: payload.portfolioUrl,
-      experienceStatus: payload.experienceStatus,
-      experienceDetails: payload.experienceDetails,
-      preferences: payload.preferences,
-    });
+  await Resume.create({
+    candidateUserId: user.id,
+    resumeType: payload.resumeType,
+    resumeUrl: payload.resumeType === 'uploaded' ? payload.resumeUrl : '',
+    resumeFileId: payload.resumeType === 'uploaded' ? payload.resumeFileId : '',
+    resumeFileName: payload.resumeType === 'uploaded' ? payload.resumeFileName || '' : '',
+    resumeData: payload.resumeType === 'generated' ? generatedResumeData : undefined,
+  });
 
-    const generatedFileName = `${payload.fullName.replace(/\s+/g, '_')}_Resume.pdf`;
-    await Resume.create({
-      candidateUserId: user.id,
-      fileName: generatedFileName,
-      mimeType: 'application/pdf',
-      source: 'generated',
-      textExtract: '',
-      data: generatedBuffer,
-    });
-    storedResumeFileName = generatedFileName;
-
-    generatedResumePayload = {
-      fileName: generatedFileName,
-      mimeType: 'application/pdf',
-      dataBase64: generatedBuffer.toString('base64'),
-    };
-  }
-
-  syncCandidateLegacyFields({ profile: candidateProfile, user, resumeFileName: storedResumeFileName });
+  syncCandidateLegacyFields({
+    profile: candidateProfile,
+    user,
+    resumeLocation: payload.resumeType === 'uploaded' ? payload.resumeUrl : 'generated',
+  });
   await candidateProfile.save();
 
   const tokens = await issueTokensAndPersistRefresh(user);
@@ -227,7 +202,7 @@ export const registerCandidate = asyncHandler(async (req, res) => {
       refreshToken: tokens.refreshToken,
       user: { id: user.id, email: user.email, role: user.role },
       profileId: candidateProfile.id,
-      generatedResume: generatedResumePayload,
+      resumeType: payload.resumeType,
     },
   });
 });
@@ -286,13 +261,23 @@ export const login = asyncHandler(async (req, res) => {
     .select('+passwordHash +refreshTokenHash +refreshTokenJti +refreshTokenExpiresAt')
     .exec();
 
-  if (!user || user.role !== role) {
-    throw new ApiError(StatusCodes.UNAUTHORIZED, 'Invalid credentials');
+  if (!user) {
+    throw new ApiError(
+      StatusCodes.UNAUTHORIZED,
+      'This account is not registered. Please sign up first.',
+    );
+  }
+
+  if (user.role !== role) {
+    throw new ApiError(
+      StatusCodes.UNAUTHORIZED,
+      `This email is registered as ${getRoleLabel(user.role)}. Please choose the correct login type.`,
+    );
   }
 
   const passwordOk = await verifyPassword(user.passwordHash, password);
   if (!passwordOk) {
-    throw new ApiError(StatusCodes.UNAUTHORIZED, 'Invalid credentials');
+    throw new ApiError(StatusCodes.UNAUTHORIZED, 'Password does not match. Please try again.');
   }
 
   const tokens = await issueTokensAndPersistRefresh(user);

@@ -8,7 +8,11 @@ import { JobRequirement } from '../models/JobRequirement.js';
 import { Resume } from '../models/Resume.js';
 import { User } from '../models/User.js';
 import { publishLiveUpdate } from '../services/liveUpdate.service.js';
-import { generateResumePdfBuffer } from '../services/resume.service.js';
+import {
+  buildGeneratedResumeData,
+  generateResumePdfBuffer,
+  generateStructuredResumePdfBuffer,
+} from '../services/resume.service.js';
 import { ApiError } from '../utils/ApiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
@@ -510,29 +514,22 @@ const buildJobDocumentPayload = (body, clientProfile, clientId) => {
 };
 
 const ensureCandidateResume = async ({ candidateUser, candidateProfile }) => {
-  let resume = await Resume.findOne({ candidateUserId: candidateUser._id }).select('+data fileName source').lean();
+  let resume = await Resume.findOne({ candidateUserId: candidateUser._id }).lean();
   if (resume) return resume;
-
-  const fileName = `${String(candidateProfile?.fullName || 'Resume')
-    .replace(/[^\w\s-]/g, '')
-    .trim()
-    .replace(/\s+/g, '_') || 'Resume'}_Resume.pdf`;
-
-  const pdfBuffer = await generateResumePdfBuffer({
-    ...candidateProfile,
-    email: candidateUser.email,
-    mobile: candidateUser.mobile,
-  });
 
   await Resume.findOneAndUpdate(
     { candidateUserId: candidateUser._id },
     {
       candidateUserId: candidateUser._id,
-      fileName,
-      mimeType: 'application/pdf',
-      source: 'generated',
-      textExtract: '',
-      data: pdfBuffer,
+      resumeType: 'generated',
+      resumeUrl: '',
+      resumeData: buildGeneratedResumeData({
+        ...candidateProfile,
+        name: candidateProfile?.fullName,
+        fullName: candidateProfile?.fullName,
+        email: candidateUser.email,
+        mobile: candidateUser.mobile,
+      }),
     },
     {
       upsert: true,
@@ -542,7 +539,7 @@ const ensureCandidateResume = async ({ candidateUser, candidateProfile }) => {
     },
   );
 
-  resume = await Resume.findOne({ candidateUserId: candidateUser._id }).select('+data fileName source').lean();
+  resume = await Resume.findOne({ candidateUserId: candidateUser._id }).lean();
   return resume;
 };
 
@@ -762,9 +759,9 @@ export const applyToJob = asyncHandler(async (req, res) => {
           candidateProfile?.experienceStatus === 'experienced' ? 'Experienced' : 'Fresher',
       },
     ],
-    resumePath: resume?.fileName ? `resumes/${resume.fileName}` : '',
-    resumeData: resume?.data,
-    hasCustomResume: resume?.source === 'uploaded',
+    resumePath: resume?.resumeType === 'uploaded' ? resume.resumeUrl || '' : 'generated',
+    resumeData: undefined,
+    hasCustomResume: resume?.resumeType === 'uploaded',
     submittedAt: new Date(),
     notes: '',
     appliedFor: jobTitle.trim() || undefined,
@@ -876,7 +873,7 @@ export const getClientApplicationDetails = asyncHandler(async (req, res) => {
   const [candidateProfile, resume] = await Promise.all([
     CandidateProfile.findOne({ userId: application.candidateId?._id || application.candidateId }),
     Resume.findOne({ candidateUserId: application.candidateId?._id || application.candidateId }).select(
-      '_id fileName mimeType source updatedAt',
+      '_id resumeType resumeUrl resumeFileName updatedAt',
     ),
   ]);
 
@@ -893,13 +890,33 @@ export const getClientApplicationDetails = asyncHandler(async (req, res) => {
   };
 
   const fallbackResume =
-    resume ||
+    (resume
+        ? {
+            _id: String(resume._id),
+          resumeId: String(resume._id),
+          fileName:
+            resume.resumeType === 'uploaded'
+              ? String(resume.resumeFileName || '').trim() ||
+                String(resume.resumeUrl || '').split(/[\\/]/).pop() ||
+                'candidate_resume.pdf'
+              : `${String(candidateProfile?.fullName || application.fullName || 'Resume').replace(/\s+/g, '_')}_RecruitKr.pdf`,
+          mimeType: 'application/pdf',
+          source: resume.resumeType || 'generated',
+          resumeUrl: resume.resumeType === 'uploaded' ? resume.resumeUrl || '' : '',
+          updatedAt: toISOStringSafe(resume.updatedAt, new Date().toISOString()),
+        }
+      : null) ||
     (application.resumePath || application.resumeData
       ? {
           _id: String(application._id),
-          fileName: String(application.resumePath || '').split(/[\\/]/).pop() || 'candidate_resume.pdf',
+          resumeId: '',
+          fileName:
+            application.hasCustomResume
+              ? String(application.resumePath || '').split(/[\\/]/).pop() || 'candidate_resume.pdf'
+              : `${String(application.fullName || 'Resume').replace(/\s+/g, '_')}_RecruitKr.pdf`,
           mimeType: 'application/pdf',
           source: application.hasCustomResume ? 'uploaded' : 'generated',
+          resumeUrl: application.hasCustomResume ? application.resumePath || '' : '',
           updatedAt: toISOStringSafe(application.updatedAt, new Date().toISOString()),
         }
       : undefined);
@@ -950,9 +967,16 @@ export const downloadClientApplicationResume = asyncHandler(async (req, res) => 
     return;
   }
 
-  const resume = await Resume.findOne({ candidateUserId: application.candidateId }).select('+data').exec();
+  const [resume, candidateProfile, candidateUser] = await Promise.all([
+    Resume.findOne({ candidateUserId: application.candidateId }).lean().exec(),
+    CandidateProfile.findOne({ userId: application.candidateId }).lean().exec(),
+    User.findById(application.candidateId).select('email mobile').lean().exec(),
+  ]);
   if (!resume) {
     const applicationWithResume = await Application.findById(applicationId).select('+resumeData resumePath hasCustomResume').lean();
+    if (applicationWithResume?.hasCustomResume && applicationWithResume.resumePath) {
+      return res.redirect(applicationWithResume.resumePath);
+    }
     if (!applicationWithResume?.resumeData) {
       throw new ApiError(StatusCodes.NOT_FOUND, 'Resume not found');
     }
@@ -965,9 +989,27 @@ export const downloadClientApplicationResume = asyncHandler(async (req, res) => 
     return;
   }
 
-  res.setHeader('Content-Type', resume.mimeType);
-  res.setHeader('Content-Disposition', `attachment; filename="${resume.fileName}"`);
-  res.send(resume.data);
+  if (resume.resumeType === 'uploaded') {
+    if (!resume.resumeUrl) {
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Resume URL not found');
+    }
+
+    return res.redirect(resume.resumeUrl);
+  }
+
+  const pdfBuffer = resume.resumeData?.name
+    ? await generateStructuredResumePdfBuffer(resume.resumeData)
+    : await generateResumePdfBuffer({
+        ...(candidateProfile || {}),
+        email: candidateUser?.email || '',
+        mobile: candidateUser?.mobile || '',
+      });
+
+  const downloadName = `${String(candidateProfile?.fullName || 'Resume').replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_') || 'Resume'}_RecruitKr.pdf`;
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`);
+  res.send(pdfBuffer);
 });
 
 export const updateApplicationStatus = asyncHandler(async (req, res) => {

@@ -4,11 +4,14 @@ import { CandidateProfile } from '../models/CandidateProfile.js';
 import { ClientProfile } from '../models/ClientProfile.js';
 import { Resume } from '../models/Resume.js';
 import { User } from '../models/User.js';
-import { generateResumePdfBuffer } from '../services/resume.service.js';
+import { buildGeneratedResumeData } from '../services/resume.service.js';
+import { deleteImageKitFile } from '../services/imagekit.js';
 import { ApiError } from '../utils/ApiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
-const syncCandidateLegacyFields = ({ profile, user, resumeFileName = '' }) => {
+const DEFAULT_LEGACY_DATE_OF_BIRTH = new Date('2000-01-01T00:00:00.000Z');
+
+const syncCandidateLegacyFields = ({ profile, user, resumeLocation = '' }) => {
   const summary = profile.summary || '';
   const preferredLocation = profile.preferences?.preferredLocation || '';
   const preferredIndustry = profile.preferences?.preferredIndustry || '';
@@ -26,34 +29,135 @@ const syncCandidateLegacyFields = ({ profile, user, resumeFileName = '' }) => {
   profile.preferredIndustry = preferredIndustry;
   profile.preferredLocation = preferredLocation;
   profile.preferredRole = preferredRole;
-  if (resumeFileName) {
-    profile.resumePath = `resumes/${resumeFileName}`;
+  if (resumeLocation) {
+    profile.resumePath = resumeLocation;
   }
   profile.workModes = workModes;
 };
 
-const upsertCandidateResume = async ({ profile, user }) => {
-  const fileName = `${String(profile.fullName || 'Resume')
-    .replace(/[^\w\s-]/g, '')
-    .trim()
-    .replace(/\s+/g, '_') || 'Resume'}_Resume.pdf`;
+const ensureCandidateProfile = async ({ reqUserId, user, body = {} }) => {
+  const existingProfile = await CandidateProfile.findOne({ userId: reqUserId });
+  if (existingProfile) return existingProfile;
 
-  const pdfBuffer = await generateResumePdfBuffer({
-    ...profile.toObject(),
+  const preferences = body.preferences || {};
+
+  const profile = await CandidateProfile.create({
+    userId: reqUserId,
+    fullName: body.fullName || user?.email?.split('@')[0] || 'Candidate',
+    dateOfBirth: body.dateOfBirth || DEFAULT_LEGACY_DATE_OF_BIRTH,
+    gender: body.gender || 'Prefer Not to Say',
+    address: body.address || 'Not provided',
+    pincode: body.pincode || '000000',
+    linkedinUrl: body.linkedinUrl || '',
+    portfolioUrl: body.portfolioUrl || '',
+    highestQualification: body.highestQualification || 'Not specified',
+    experienceStatus: body.experienceStatus || 'fresher',
+    experienceDetails: body.experienceDetails,
+    preferences: {
+      preferredLocation: preferences.preferredLocation || 'Not specified',
+      preferredIndustry: preferences.preferredIndustry || 'Not specified',
+      preferredRole: preferences.preferredRole || 'Not specified',
+      workModes: preferences.workModes || [],
+    },
+    summary: body.summary || '',
+    skills: Array.isArray(body.skills) ? body.skills : [],
+    projects: Array.isArray(body.projects) ? body.projects : [],
+    certifications: Array.isArray(body.certifications) ? body.certifications : [],
+    referral: body.referral || '',
+    email: user?.email || '',
+    mobile: user?.mobile || '',
+    name: body.fullName || user?.email?.split('@')[0] || 'Candidate',
+    phone: user?.mobile || '',
+    declarationAccepted: true,
+    representationAuthorized: true,
+  });
+
+  syncCandidateLegacyFields({ profile, user, resumeLocation: '' });
+  await profile.save();
+  return profile;
+};
+
+const upsertCandidateResume = async ({ profile, user, body }) => {
+  const existingResume = await Resume.findOne({ candidateUserId: user._id });
+  const hasExplicitResumePayload =
+    body.resumeType !== undefined ||
+    body.resumeUrl !== undefined ||
+    body.resumeFileId !== undefined ||
+    body.resumeData !== undefined;
+
+  if (!hasExplicitResumePayload && existingResume?.resumeType === 'uploaded') {
+    return {
+      resumeLocation: existingResume.resumeUrl || '',
+      resumeFileId: existingResume.resumeFileId || '',
+    };
+  }
+
+  if (body.resumeType === 'uploaded') {
+    const isReplacingUploadedResume =
+      existingResume?.resumeType === 'uploaded' &&
+      existingResume.resumeFileId &&
+      existingResume.resumeFileId !== body.resumeFileId;
+    if (isReplacingUploadedResume) {
+      try {
+        await deleteImageKitFile(existingResume.resumeFileId);
+      } catch (error) {
+        console.error('[resume] failed to delete previous uploaded resume', error);
+      }
+    }
+
+    const savedResume = await Resume.findOneAndUpdate(
+      { candidateUserId: user._id },
+      {
+        candidateUserId: user._id,
+        resumeType: 'uploaded',
+        resumeUrl: body.resumeUrl,
+        resumeFileId: body.resumeFileId,
+        resumeFileName: body.resumeFileName || '',
+        resumeData: undefined,
+      },
+      {
+        upsert: true,
+        new: true,
+        setDefaultsOnInsert: true,
+        runValidators: true,
+      },
+    );
+
+      return {
+        resumeLocation: savedResume?.resumeUrl || '',
+        resumeFileId: savedResume?.resumeFileId || '',
+        resumeFileName: savedResume?.resumeFileName || '',
+      };
+  }
+
+  if (existingResume?.resumeType === 'uploaded' && existingResume.resumeFileId) {
+    try {
+      await deleteImageKitFile(existingResume.resumeFileId);
+    } catch (error) {
+      console.error('[resume] failed to delete previous uploaded resume', error);
+    }
+  }
+
+  const explicitResumeData = body.resumeType === 'generated' ? body.resumeData : null;
+
+  const resumeData = buildGeneratedResumeData({
+    ...(explicitResumeData ? { resumeData: explicitResumeData } : profile.toObject()),
+    name: explicitResumeData?.name || profile.fullName,
+    fullName: profile.fullName,
     email: user.email,
     mobile: user.mobile,
   });
 
-  await Resume.findOneAndUpdate(
+  const savedResume = await Resume.findOneAndUpdate(
     { candidateUserId: user._id },
-    {
-      candidateUserId: user._id,
-      fileName,
-      mimeType: 'application/pdf',
-      source: 'generated',
-      textExtract: '',
-      data: pdfBuffer,
-    },
+      {
+        candidateUserId: user._id,
+        resumeType: 'generated',
+        resumeUrl: '',
+        resumeFileId: '',
+        resumeFileName: '',
+        resumeData,
+      },
     {
       upsert: true,
       new: true,
@@ -62,7 +166,7 @@ const upsertCandidateResume = async ({ profile, user }) => {
     },
   );
 
-  return fileName;
+  return { resumeLocation: 'generated', resumeFileId: '', resumeFileName: '' };
 };
 
 export const getMe = asyncHandler(async (req, res) => {
@@ -74,23 +178,22 @@ export const getMe = asyncHandler(async (req, res) => {
 });
 
 export const getCandidateProfile = asyncHandler(async (req, res) => {
-  const profile = await CandidateProfile.findOne({ userId: req.user.id });
-  if (!profile) {
-    throw new ApiError(StatusCodes.NOT_FOUND, 'Candidate profile not found');
+  const user = await User.findById(req.user.id).select('email mobile');
+  if (!user) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
   }
+  const profile = await ensureCandidateProfile({ reqUserId: req.user.id, user, body: {} });
   res.json({ success: true, data: profile });
 });
 
 export const updateCandidateProfile = asyncHandler(async (req, res) => {
   const body = req.body;
 
-  const [profile, user] = await Promise.all([
-    CandidateProfile.findOne({ userId: req.user.id }),
-    User.findById(req.user.id).select('email mobile'),
-  ]);
-  if (!profile) {
-    throw new ApiError(StatusCodes.NOT_FOUND, 'Candidate profile not found');
+  const user = await User.findById(req.user.id).select('email mobile');
+  if (!user) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
   }
+  const profile = await ensureCandidateProfile({ reqUserId: req.user.id, user, body });
 
   const assignIfDefined = (key, value) => {
     if (value === undefined) return;
@@ -132,9 +235,23 @@ export const updateCandidateProfile = asyncHandler(async (req, res) => {
   if (body.projects !== undefined) profile.projects = body.projects;
   if (body.certifications !== undefined) profile.certifications = body.certifications;
   assignIfDefined('referral', body.referral);
+  if (body.profilePhotoUrl !== undefined) {
+    const nextFileId = String(body.profilePhotoFileId || '').trim();
+    const previousFileId = String(profile.profilePhotoFileId || '').trim();
+    if (previousFileId && previousFileId !== nextFileId) {
+      try {
+        await deleteImageKitFile(previousFileId);
+      } catch (error) {
+        console.error('[profile-photo] failed to delete previous candidate profile photo', error);
+      }
+    }
 
-  const resumeFileName = await upsertCandidateResume({ profile, user });
-  syncCandidateLegacyFields({ profile, user, resumeFileName });
+    profile.profilePhotoUrl = body.profilePhotoUrl || '';
+    profile.profilePhotoFileId = nextFileId;
+  }
+
+  const { resumeLocation } = await upsertCandidateResume({ profile, user, body });
+  syncCandidateLegacyFields({ profile, user, resumeLocation });
 
   await profile.save();
 

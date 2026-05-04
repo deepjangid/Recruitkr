@@ -64,8 +64,62 @@ export const updateCandidateProfileSchema = z
     projects: z.array(resumeProjectSchema).max(20).optional(),
     certifications: z.array(resumeCertificationSchema).max(20).optional(),
     referral: trimString().max(200).optional(),
+    profilePhotoUrl: optionalUrl,
+    profilePhotoFileId: trimString().min(3).max(255).optional(),
+    resumeType: z.enum(['uploaded', 'generated']).optional(),
+    resumeUrl: optionalUrl,
+    resumeFileId: trimString().min(3).max(255).optional(),
+    resumeFileName: trimString().min(1).max(255).optional(),
+    resumeData: z
+      .object({
+        name: trimString().min(2).max(120),
+        summary: trimString().max(1200).optional(),
+        skills: z.array(trimString().min(1).max(80)).max(50),
+        education: z
+          .array(
+            z
+              .object({
+                degree: trimString().max(120).optional(),
+                institution: trimString().max(160).optional(),
+                year: trimString().max(40).optional(),
+                description: trimString().max(400).optional(),
+              })
+              .strict(),
+          )
+          .max(20)
+          .optional(),
+        experience: z
+          .array(
+            z
+              .object({
+                title: trimString().max(120).optional(),
+                company: trimString().max(160).optional(),
+                duration: trimString().max(80).optional(),
+                description: trimString().max(400).optional(),
+              })
+              .strict(),
+          )
+          .max(20)
+          .optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict()
+  .refine(
+    (payload) => {
+      if (!payload.resumeType) return true;
+      if (payload.resumeType === 'uploaded') {
+        return Boolean(payload.resumeUrl) && Boolean(payload.resumeFileId) && !payload.resumeData;
+      }
+
+      return Boolean(payload.resumeData) && !payload.resumeUrl && !payload.resumeFileId;
+    },
+    {
+      message: 'Send either resumeUrl + resumeFileId for uploaded resumes or resumeData for generated resumes',
+      path: ['resumeType'],
+    },
+  )
   .refine((payload) => Object.keys(payload).length > 0, {
     message: 'At least one field is required',
   });

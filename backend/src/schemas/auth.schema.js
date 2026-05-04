@@ -22,6 +22,38 @@ const optionalLinkedinUrl = z.preprocess(
   z.string().url().optional().or(z.literal('')),
 );
 
+const generatedResumeDataSchema = z
+  .object({
+    name: z.string().trim().min(2).max(120),
+    summary: z.string().trim().max(1200).optional().default(''),
+    skills: z.array(z.string().trim().min(1).max(80)).max(50),
+    education: z
+      .array(
+        z
+          .object({
+            degree: z.string().trim().max(120).optional().default(''),
+            institution: z.string().trim().max(160).optional().default(''),
+            year: z.string().trim().max(40).optional().default(''),
+            description: z.string().trim().max(400).optional().default(''),
+          })
+          .strict(),
+      )
+      .max(20),
+    experience: z
+      .array(
+        z
+          .object({
+            title: z.string().trim().max(120).optional().default(''),
+            company: z.string().trim().max(160).optional().default(''),
+            duration: z.string().trim().max(80).optional().default(''),
+            description: z.string().trim().max(400).optional().default(''),
+          })
+          .strict(),
+      )
+      .max(20),
+  })
+  .strict();
+
 export const loginSchema = z
   .object({
     email,
@@ -67,17 +99,27 @@ export const candidateRegisterSchema = z
       .strict(),
     declarationAccepted: z.literal(true),
     representationAuthorized: z.literal(true),
-    resume: z
-      .object({
-        fileName: z.string().trim().min(1).max(180),
-        mimeType: z.enum([
-          'application/pdf',
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        ]),
-        dataBase64: z.string().min(20),
-      })
-      .optional(),
+    resumeType: z.enum(['uploaded', 'generated']),
+    resumeUrl: optionalHttpUrl.optional(),
+    resumeFileId: z.string().trim().min(3).max(255).optional(),
+    resumeFileName: z.string().trim().min(1).max(255).optional(),
+    resumeData: generatedResumeDataSchema.optional(),
   })
+  .refine(
+    (payload) =>
+      (payload.resumeType === 'uploaded' &&
+        Boolean(payload.resumeUrl) &&
+        Boolean(payload.resumeFileId) &&
+        !payload.resumeData) ||
+      (payload.resumeType === 'generated' &&
+        Boolean(payload.resumeData) &&
+        !payload.resumeUrl &&
+        !payload.resumeFileId),
+    {
+      message: 'Send either resumeUrl + resumeFileId for uploaded resumes or resumeData for generated resumes',
+      path: ['resumeType'],
+    },
+  )
   .strict();
 
 export const clientRegisterSchema = z
