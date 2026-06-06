@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import OptimizedLogo from "@/components/OptimizedLogo";
+import ApplicationStepTracker from "@/components/ApplicationStepTracker";
 import { API_BASE, apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
 import { clearSession, getSession } from "@/lib/auth";
 import { useServerEvents, type SseConnectionStatus } from "@/hooks/useServerEvents";
@@ -27,6 +28,9 @@ const brandCardClass =
   "rounded-[28px] border border-[#264a7f]/10 bg-white/92 shadow-[0_20px_60px_rgba(38,74,127,0.08)] backdrop-blur";
 const statCardClass =
   "rounded-2xl border border-[#264a7f]/10 bg-white/95 p-5 shadow-[0_16px_40px_rgba(38,74,127,0.08)]";
+// Consistent inner card used across the application-detail panel so the sections
+// share one clean, brand-aligned style instead of mismatched grey borders.
+const detailCardClass = "rounded-2xl border border-[#264a7f]/10 bg-white p-5 shadow-sm";
 
 type InterviewDetails = {
   scheduledAt?: string;
@@ -64,6 +68,15 @@ const STATUS_LABELS: Record<ApplicationTimelineItem["status"], string> = {
 const formatStatusLabel = (status?: string) =>
   (status && STATUS_LABELS[status as ApplicationTimelineItem["status"]]) ||
   (status ? status.replace(/-/g, " ") : "Status pending");
+
+// Convert a stored UTC ISO timestamp into the local "YYYY-MM-DDTHH:mm" value a
+// datetime-local input expects, so a saved interview time reopens correctly.
+const isoToLocalDatetimeInput = (iso?: string) => {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+};
 
 const INTERVIEW_MODE_OPTIONS: Array<{ value: NonNullable<InterviewDetails["mode"]>; label: string }> = [
   { value: "onsite", label: "On-site" },
@@ -404,8 +417,16 @@ const ClientDashboard = () => {
 
       setSessionState(session);
 
-      if (!session?.accessToken || session.user.role !== "client") {
+      if (!session?.accessToken) {
         navigate("/login?role=client");
+        return;
+      }
+
+      // The stored session belongs to a different role (e.g. a candidate signed
+      // in on this browser). Send them to their own dashboard rather than logging
+      // them out, so a refresh never dumps a valid session at the login page.
+      if (session.user.role !== "client") {
+        navigate(session.user.role === "candidate" ? "/dashboard/candidate" : "/login");
         return;
       }
 
@@ -1038,8 +1059,14 @@ const ClientDashboard = () => {
               </div>
             </div>
 
+            <ApplicationStepTracker
+              status={selectedApplicationDetails.application.status}
+              timeline={selectedApplicationDetails.application.timeline}
+              className={detailCardClass}
+            />
+
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-lg border border-border p-4">
+              <div className={detailCardClass}>
                 <p className="text-sm font-medium">Contact</p>
                 <p className="mt-2 text-sm text-muted-foreground break-all">
                   Email: {selectedApplicationDetails.application.candidateId?.email || "-"}
@@ -1049,7 +1076,7 @@ const ClientDashboard = () => {
                 </p>
               </div>
 
-              <div className="rounded-lg border border-border p-4">
+              <div className={detailCardClass}>
                 <p className="text-sm font-medium">Resume</p>
                 {selectedApplicationDetails.resume ? (
                   <>
@@ -1077,7 +1104,7 @@ const ClientDashboard = () => {
               </div>
             </div>
 
-            <div className="rounded-xl border border-border p-5 space-y-4">
+            <div className={`${detailCardClass} space-y-4`}>
               <h4 className="font-medium">Candidate Form</h4>
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
@@ -1176,7 +1203,7 @@ const ClientDashboard = () => {
 
             <div className="flex flex-wrap gap-3">
               <button
-                className="rounded-lg border border-border bg-card px-4 py-2 text-sm"
+                className="rounded-lg bg-[#264a7f] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#1f3c66]"
                 onClick={() => {
                   setDetailsFormVisible(true);
                   updateApplicationField(selectedApplicationDetails.application._id, "status", "under-review");
@@ -1185,7 +1212,7 @@ const ClientDashboard = () => {
                 Accept
               </button>
               <button
-                className="rounded-lg border border-border bg-card px-4 py-2 text-sm text-red-600"
+                className="rounded-lg border border-red-200 bg-white px-5 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-60"
                 onClick={() => void rejectApplication(selectedApplicationDetails.application._id)}
                 disabled={savingApplicationId === selectedApplicationDetails.application._id}
               >
@@ -1194,7 +1221,7 @@ const ClientDashboard = () => {
             </div>
 
             {detailsFormVisible && (
-              <div className="rounded-xl border border-border p-5 space-y-4">
+              <div className={`${detailCardClass} space-y-4`}>
                 <div>
                   <h4 className="font-medium">Status and interview form</h4>
                   <p className="text-sm text-muted-foreground">
@@ -1248,11 +1275,9 @@ const ClientDashboard = () => {
                     <label className="text-sm font-medium">Date and time</label>
                     <input
                       type="datetime-local"
-                      value={
-                        selectedApplicationDetails.application.interviewDetails?.scheduledAt
-                          ? selectedApplicationDetails.application.interviewDetails.scheduledAt.slice(0, 16)
-                          : ""
-                      }
+                      value={isoToLocalDatetimeInput(
+                        selectedApplicationDetails.application.interviewDetails?.scheduledAt,
+                      )}
                       onChange={(e) =>
                         updateInterviewField(
                           selectedApplicationDetails.application._id,
@@ -1461,7 +1486,7 @@ const ClientDashboard = () => {
 
                 <div className="flex justify-end">
                   <button
-                    className="rounded-lg border border-border bg-card px-4 py-2 text-sm disabled:opacity-60"
+                    className="rounded-lg bg-[#264a7f] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#1f3c66] disabled:opacity-60"
                     onClick={() => void saveApplicationUpdate(selectedApplicationDetails.application._id)}
                     disabled={savingApplicationId === selectedApplicationDetails.application._id}
                   >
@@ -1478,7 +1503,7 @@ const ClientDashboard = () => {
                   {selectedApplicationDetails.application.timeline.map((item, index) => (
                     <div
                       key={`${selectedApplicationDetails.application._id}-${item.status}-${index}`}
-                      className="rounded-lg border border-border p-3"
+                      className="rounded-xl border border-[#264a7f]/10 bg-white p-3"
                     >
                       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                         <p className="text-sm font-medium">{formatStatusLabel(item.status)}</p>

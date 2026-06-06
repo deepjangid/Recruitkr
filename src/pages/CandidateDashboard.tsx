@@ -679,8 +679,16 @@ const CandidateDashboard = () => {
 
       setSessionState(session);
 
-      if (!session?.accessToken || session.user.role !== "candidate") {
+      if (!session?.accessToken) {
         navigate("/login?role=candidate");
+        return;
+      }
+
+      // The stored session belongs to a different role (e.g. a client signed in
+      // on this browser). Send them to their own dashboard rather than logging
+      // them out, so a refresh never dumps a valid session at the login page.
+      if (session.user.role !== "candidate") {
+        navigate(session.user.role === "client" ? "/dashboard/client" : "/login");
         return;
       }
 
@@ -792,16 +800,64 @@ const CandidateDashboard = () => {
     });
   }, [applications]);
 
-  const activeApplicationId = expandedApplicationId || applications[0]?._id || null;
+  const activeApplicationId = expandedApplicationId;
   const mobileApplicationOpen = Boolean(expandedApplicationId);
 
   const selectedApplication = useMemo(
     () =>
-      applications.find((application) => application._id === activeApplicationId) ||
-      applications[0] ||
-      null,
+      activeApplicationId
+        ? applications.find((application) => application._id === activeApplicationId) || null
+        : null,
     [activeApplicationId, applications],
   );
+
+  const reachedStatuses = useMemo(() => {
+    const set = new Set<string>();
+    if (!selectedApplication) return set;
+
+    // Linear progress: mark every stage up to the current status as reached,
+    // even when the client skipped intermediate stages, so the journey never
+    // shows green stages with a grey gap in between.
+    const order = ["applied", "under-review", "screening", "interview", "offer", "hired"];
+    const currentIdx = order.indexOf(selectedApplication.status);
+    const reachedUpTo = currentIdx >= 0 ? currentIdx : 0;
+    for (let i = 0; i <= reachedUpTo; i += 1) {
+      set.add(order[i]);
+    }
+    set.add("applied");
+
+    // For a rejected application, still show how far it had progressed.
+    if (selectedApplication.status === "rejected") {
+      (selectedApplication.timeline || []).forEach((item) => {
+        if (item.status && item.status !== "rejected") set.add(item.status);
+      });
+      set.add("rejected");
+    }
+
+    return set;
+  }, [selectedApplication]);
+
+  const steps = useMemo(() => {
+    const baseSteps = [
+      { id: "applied", label: "Applied", desc: "Submitted successfully" },
+      { id: "under-review", label: "Under Review", desc: "Recruiter reviewed" },
+      { id: "screening", label: "Shortlisted", desc: "Passed screening" },
+      { id: "interview", label: "Interview", desc: "Interviews scheduled" },
+      { id: "offer", label: "Offer Received", desc: "Job offer shared" },
+    ];
+
+    if (selectedApplication?.status === "rejected") {
+      return [
+        ...baseSteps,
+        { id: "rejected", label: "Rejected", desc: "Application closed" },
+      ];
+    }
+
+    return [
+      ...baseSteps,
+      { id: "hired", label: "Hired", desc: "Welcomed to the team!" },
+    ];
+  }, [selectedApplication?.status]);
 
   const applyToJob = async (jobId: string) => {
     setApplyLoadingJobId(jobId);
@@ -1730,643 +1786,284 @@ const CandidateDashboard = () => {
             </div>
 
             {(applications || []).length > 0 ? (
-              <>
-                <div className="grid gap-3 border-b border-[#264a7f]/10 bg-white px-4 py-4 sm:grid-cols-2 xl:grid-cols-4 sm:px-6">
-                  <div className="rounded-2xl border border-[#264a7f]/10 bg-slate-50 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#264a7f]">Total Applications</p>
-                    <p className="mt-3 text-3xl font-bold text-slate-900">{applications.length}</p>
-                    <p className="mt-1 text-sm text-slate-500">All jobs you have applied to</p>
+              !selectedApplication ? (
+                <>
+                  <div className="grid gap-3 border-b border-[#264a7f]/10 bg-white px-4 py-4 sm:grid-cols-2 xl:grid-cols-4 sm:px-6">
+                    <div className="rounded-2xl border border-[#264a7f]/10 bg-slate-50 p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#264a7f]">Total Applications</p>
+                      <p className="mt-3 text-3xl font-bold text-slate-900">{applications.length}</p>
+                      <p className="mt-1 text-sm text-slate-500">All jobs you have applied to</p>
+                    </div>
+                    <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Active</p>
+                      <p className="mt-3 text-3xl font-bold text-slate-900">
+                        {applications.filter((item) => !["rejected", "hired"].includes(item.status)).length}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-500">Applications currently moving</p>
+                    </div>
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Shortlisted / Interview</p>
+                      <p className="mt-3 text-3xl font-bold text-slate-900">
+                        {applications.filter((item) => ["screening", "interview", "offer"].includes(item.status)).length}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-500">Best opportunities in progress</p>
+                    </div>
+                    <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-700">Rejected</p>
+                      <p className="mt-3 text-3xl font-bold text-slate-900">
+                        {applications.filter((item) => item.status === "rejected").length}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-500">Closed applications</p>
+                    </div>
                   </div>
-                  <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Active</p>
-                    <p className="mt-3 text-3xl font-bold text-slate-900">
-                      {applications.filter((item) => !["rejected", "hired"].includes(item.status)).length}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-500">Applications currently moving</p>
-                  </div>
-                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Shortlisted / Interview</p>
-                    <p className="mt-3 text-3xl font-bold text-slate-900">
-                      {applications.filter((item) => ["screening", "interview", "offer"].includes(item.status)).length}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-500">Best opportunities in progress</p>
-                  </div>
-                  <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-700">Rejected</p>
-                    <p className="mt-3 text-3xl font-bold text-slate-900">
-                      {applications.filter((item) => item.status === "rejected").length}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-500">Closed applications</p>
-                  </div>
-                </div>
 
-              <div className="grid gap-0 lg:grid-cols-[320px,minmax(0,1fr)]">
-                <div
-                  className={`border-b border-[#264a7f]/10 bg-slate-50/70 p-2 lg:max-h-[calc(100vh-16rem)] lg:overflow-y-auto lg:border-b-0 lg:border-r ${
-                    mobileApplicationOpen ? "hidden lg:block" : "block"
-                  }`}
-                >
-                  <div className="space-y-2">
-                    {(applications || []).map((application) => {
-                      const isActive = activeApplicationId === application._id;
-                      const applicationResponse = getApplicationResponseSnapshot(application as Record<string, any>);
-                      const timelineItems =
-                        application.timeline && application.timeline.length
-                          ? application.timeline
-                          : [
-                              {
-                                status: application.status,
-                                changedAt: application.statusUpdatedAt || application.createdAt,
-                                note: application.statusNote,
-                              },
-                            ];
+                  <div className="bg-slate-50/50 p-4 sm:p-6 lg:max-h-[calc(100vh-16rem)] lg:overflow-y-auto">
+                    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                      {(applications || []).map((application) => {
+                        const applicationResponse = getApplicationResponseSnapshot(application as Record<string, any>);
+                        const latestNote = applicationResponse.statusNote
+                          ? applicationResponse.statusNote
+                          : applicationResponse.interviewDetails?.scheduledAt
+                            ? `Interview ${formatInterviewDate(applicationResponse.interviewDetails.scheduledAt)} at ${formatInterviewTime(applicationResponse.interviewDetails.scheduledAt)}`
+                            : "Open this application to read all recruiter updates.";
 
-                      return (
-                        <button
-                          key={application._id}
-                          type="button"
-                          onClick={() => setExpandedApplicationId(application._id)}
-                          className={`w-full rounded-2xl border p-4 text-left transition ${
-                            isActive
-                              ? "border-[#264a7f]/20 bg-white shadow-sm"
-                              : "border-transparent bg-white/80 hover:border-[#264a7f]/10 hover:bg-white"
+                        return (
+                          <div
+                            key={application._id}
+                            className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:border-[#264a7f]/20 hover:shadow-md transition duration-300"
+                          >
+                            <div>
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <h3 className="line-clamp-1 text-base font-semibold text-slate-900" title={application.jobId?.jobTitle || "Job"}>
+                                    {application.jobId?.jobTitle || "Job"}
+                                  </h3>
+                                  <p className="mt-1 truncate text-xs text-slate-500">
+                                    {application.jobId?.sourceLabel ||
+                                      (application.jobId?.sourceCollection === "openings"
+                                        ? "RecruitKr Hiring"
+                                        : application.jobId?.sourceCollection
+                                          ? "Client Requirement"
+                                          : "Hiring Team")}
+                                  </p>
+                                </div>
+                                <span
+                                  className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                                    PROFILE_STATUS_BADGE_CLASSNAMES[application.status]
+                                  }`}
+                                >
+                                  {PROFILE_STATUS_LABELS[application.status]}
+                                </span>
+                              </div>
+
+                              <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
+                                <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1">
+                                  <MapPin className="h-3 w-3" />
+                                  {application.jobId?.jobLocation || "Location pending"}
+                                </span>
+                                <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1">
+                                  <Clock3 className="h-3 w-3" />
+                                  Applied {new Date(application.createdAt).toLocaleDateString()}
+                                </span>
+                              </div>
+
+                              <div className="mt-4 rounded-xl bg-slate-50 p-3">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                                  Latest Update
+                                </p>
+                                <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-600">
+                                  {latestNote}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="mt-5 border-t border-slate-100 pt-4">
+                              <button
+                                type="button"
+                                onClick={() => setExpandedApplicationId(application._id)}
+                                className="w-full rounded-xl bg-slate-900 hover:bg-slate-800 text-white py-2 text-xs font-semibold shadow-sm transition flex items-center justify-center gap-1.5"
+                              >
+                                Track Application
+                                <Sparkles className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="bg-white">
+                  <div className="border-b border-[#264a7f]/10 bg-[linear-gradient(135deg,rgba(38,74,127,0.02),rgba(105,164,79,0.02))] p-4 sm:p-6">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedApplicationId(null)}
+                      className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white hover:bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-600 shadow-sm transition"
+                    >
+                      <ArrowLeft className="h-3.5 w-3.5" />
+                      Back to applications
+                    </button>
+
+                    <div className="mt-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">
+                            {selectedApplication.jobId?.jobTitle || "Job"}
+                          </h1>
+                          {(selectedApplication.jobId?.sourceLabel ||
+                            selectedApplication.jobId?.sourceCollection) && (
+                            <span className="rounded-full border border-[#264a7f]/10 bg-[#264a7f]/5 px-3 py-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-[#264a7f]">
+                              {selectedApplication.jobId?.sourceLabel ||
+                                (selectedApplication.jobId?.sourceCollection === "openings"
+                                  ? "RecruitKr Hiring"
+                                  : "Client Requirement")}
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-2 text-sm text-slate-500">
+                          {selectedApplication.jobId?.jobLocation || "Location not shared"} •{" "}
+                          {selectedApplication.jobId?.employmentType || "Employment type pending"}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span
+                          className={`rounded-full border px-3 py-1.5 text-xs font-bold uppercase tracking-wider ${
+                            PROFILE_STATUS_BADGE_CLASSNAMES[selectedApplication.status]
                           }`}
                         >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="truncate text-base font-semibold text-slate-900">
-                                {application.jobId?.jobTitle || "Job"}
-                              </p>
-                              <p className="mt-1 truncate text-sm text-slate-500">
-                                {application.jobId?.sourceLabel ||
-                                  (application.jobId?.sourceCollection === "openings"
-                                    ? "RecruitKr Hiring"
-                                    : application.jobId?.sourceCollection
-                                      ? "Client Requirement"
-                                      : "Hiring Team")}
-                              </p>
-                            </div>
-                            <span
-                              className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
-                                PROFILE_STATUS_BADGE_CLASSNAMES[application.status]
-                              }`}
-                            >
-                              {PROFILE_STATUS_LABELS[application.status]}
-                            </span>
-                          </div>
-
-                          <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-slate-500">
-                            <span className="rounded-full bg-slate-50 px-2.5 py-1">
-                              {application.jobId?.jobLocation || "Location pending"}
-                            </span>
-                            <span className="rounded-full bg-slate-50 px-2.5 py-1">
-                              Applied {new Date(application.createdAt).toLocaleDateString()}
-                            </span>
-                          </div>
-
-                          <div className="mt-3 rounded-xl bg-slate-50 p-3">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                              Latest update
-                            </p>
-                            <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-700">
-                              {applicationResponse.statusNote
-                                ? applicationResponse.statusNote
-                                : applicationResponse.interviewDetails?.scheduledAt
-                                  ? `Interview ${formatInterviewDate(applicationResponse.interviewDetails.scheduledAt)} at ${formatInterviewTime(applicationResponse.interviewDetails.scheduledAt)}`
-                                  : "Open this application to read all recruiter updates."}
-                            </p>
-                          </div>
-
-                          <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500">
-                            <span>{timelineItems.length} update{timelineItems.length > 1 ? "s" : ""}</span>
-                            <span>
-                              Updated {new Date(application.statusUpdatedAt || application.createdAt).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </button>
-                      );
-                    })}
+                          {PROFILE_STATUS_LABELS[selectedApplication.status]}
+                        </span>
+                        <span className="rounded-full bg-slate-100 px-3.5 py-1.5 text-xs font-medium text-slate-600">
+                          Applied {new Date(selectedApplication.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                </div>
 
-                {selectedApplication && (
-                  <div className={`bg-white p-2 sm:p-3 ${mobileApplicationOpen ? "block" : "hidden lg:block"}`}>
-                    {(() => {
-                      const selectedResponse = getApplicationResponseSnapshot(
-                        selectedApplication as Record<string, any>,
-                      );
-                      return (
-                    <div className="rounded-2xl border border-[#264a7f]/10 bg-white shadow-sm">
-                      <div className="border-b border-[#264a7f]/10 px-4 py-3 lg:hidden">
-                        <button
-                          type="button"
-                          onClick={() => setExpandedApplicationId(null)}
-                          className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600"
-                        >
-                          <ArrowLeft className="h-3.5 w-3.5" />
-                          Back to applications
-                        </button>
-                      </div>
-                      <div className="border-b border-[#264a7f]/10 px-4 py-3 sm:px-5">
-                        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                          <div className="space-y-2">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="text-base font-semibold text-slate-900 sm:text-lg">
-                                {selectedApplication.jobId?.jobTitle || "Job"}
-                              </p>
-                              {(selectedApplication.jobId?.sourceLabel ||
-                                selectedApplication.jobId?.sourceCollection) && (
-                                <span className="hidden rounded-full border border-[#264a7f]/10 bg-[#264a7f]/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#264a7f]">
-                                  {selectedApplication.jobId?.sourceLabel ||
-                                    (selectedApplication.jobId?.sourceCollection === "openings"
-                                      ? "RecruitKr Hiring"
-                                      : "Client Requirement")}
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-sm text-slate-500">
-                              {selectedApplication.jobId?.jobLocation || "Location not shared"} •{" "}
-                              {selectedApplication.jobId?.employmentType || "Employment type pending"}
-                            </p>
-                          </div>
+                  <div className="border-b border-slate-100 bg-slate-50/30 p-4 sm:p-6">
+                    <div className="mx-auto max-w-5xl">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 mb-6">
+                        Application Journey
+                      </p>
+                      
+                      <div className="hidden md:flex items-start justify-between relative">
+                        {steps.map((step, index) => {
+                          const isCompleted = reachedStatuses.has(step.id) && step.id !== selectedApplication.status && step.id !== "rejected";
+                          const isActive = step.id === selectedApplication.status;
+                          const isRejectedStep = step.id === "rejected";
+                          
+                          let iconBg = "bg-slate-100 text-slate-400 border-2 border-slate-200";
+                          let textColor = "text-slate-500";
+                          let titleColor = "text-slate-700 font-medium";
+                          let iconContent = <div className="h-2.5 w-2.5 rounded-full bg-slate-300" />;
 
-                          <div className="flex flex-wrap gap-2">
-                            <span
-                              className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                                PROFILE_STATUS_BADGE_CLASSNAMES[selectedApplication.status]
-                              }`}
-                            >
-                              {PROFILE_STATUS_LABELS[selectedApplication.status]}
-                            </span>
-                            <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600">
-                              Applied {new Date(selectedApplication.createdAt).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="space-y-3 px-4 py-4 sm:px-5">
-                        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Current status</p>
-                            <p className="mt-2 text-sm font-semibold text-slate-900">
-                              {PROFILE_STATUS_LABELS[selectedApplication.status]}
-                            </p>
-                          </div>
-                          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Applied on</p>
-                            <p className="mt-2 text-sm font-semibold text-slate-900">
-                              {new Date(selectedApplication.createdAt).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Last changed</p>
-                            <p className="mt-2 text-sm font-semibold text-slate-900">
-                              {new Date(
-                                selectedApplication.statusUpdatedAt || selectedApplication.createdAt,
-                              ).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Interview state</p>
-                            <p className="mt-2 text-sm font-semibold text-slate-900">
-                              {getInterviewTimingMeta(selectedApplication.interviewDetails?.scheduledAt).label}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                          <p className="text-xs font-semibold text-slate-500">Latest update</p>
-                          <p className="mt-2 break-words text-sm leading-6 text-slate-900">
-                            {selectedResponse.statusNote || "No written update yet."}
-                          </p>
-                          <p className="mt-2 text-xs text-slate-500">
-                            Last changed{" "}
-                            {new Date(
-                              selectedApplication.statusUpdatedAt || selectedApplication.createdAt,
-                            ).toLocaleString()}
-                          </p>
-                        </div>
-
-                        {(() => {
-                          const responseItems = [
-                            {
-                              label: "Status",
-                              value: formatStatusLabel(selectedApplication.status),
-                            },
-                            selectedResponse.statusNote
-                              ? {
-                                  label: "Candidate message",
-                                  value: selectedResponse.statusNote,
-                                }
-                              : null,
-                            selectedResponse.interviewDetails?.mode
-                              ? {
-                                  label: "Interview mode",
-                                  value:
-                                    INTERVIEW_MODE_LABELS[selectedResponse.interviewDetails.mode],
-                                }
-                              : null,
-                            selectedResponse.interviewDetails?.scheduledAt
-                              ? {
-                                  label: "Interview date",
-                                  value: formatInterviewDate(
-                                    selectedResponse.interviewDetails.scheduledAt,
-                                  ),
-                                }
-                              : null,
-                            selectedResponse.interviewDetails?.scheduledAt
-                              ? {
-                                  label: "Interview time",
-                                  value: formatInterviewTime(
-                                    selectedResponse.interviewDetails.scheduledAt,
-                                  ),
-                                }
-                              : null,
-                            selectedResponse.interviewDetails?.locationText
-                              ? {
-                                  label: "Interview location",
-                                  value: selectedResponse.interviewDetails.locationText,
-                                }
-                              : null,
-                            selectedResponse.interviewDetails?.contactPerson
-                              ? {
-                                  label: "Contact person",
-                                  value: selectedResponse.interviewDetails.contactPerson,
-                                }
-                              : null,
-                            selectedResponse.interviewDetails?.contactPhone
-                              ? {
-                                  label: "Contact phone",
-                                  value: selectedResponse.interviewDetails.contactPhone,
-                                }
-                              : null,
-                            selectedResponse.interviewDetails?.contactEmail
-                              ? {
-                                  label: "Contact email",
-                                  value: selectedResponse.interviewDetails.contactEmail,
-                                }
-                              : null,
-                            selectedResponse.interviewDetails?.googleMapsUrl
-                              ? {
-                                  label: "Google map location",
-                                  value: selectedResponse.interviewDetails.googleMapsUrl,
-                                  href: selectedResponse.interviewDetails.googleMapsUrl,
-                                }
-                              : null,
-                            selectedResponse.interviewDetails?.reportingNotes
-                              ? {
-                                  label: "Reporting notes",
-                                  value: selectedResponse.interviewDetails.reportingNotes,
-                                }
-                              : null,
-                            selectedResponse.interviewDetails?.documentsRequired
-                              ? {
-                                  label: "Documents required",
-                                  value: selectedResponse.interviewDetails.documentsRequired,
-                                }
-                              : null,
-                            selectedResponse.interviewDetails?.additionalInstructions
-                              ? {
-                                  label: "Additional instructions",
-                                  value:
-                                    selectedResponse.interviewDetails.additionalInstructions,
-                                }
-                              : null,
-                          ].filter(Boolean) as Array<{
-                            label: string;
-                            value: string;
-                            href?: string;
-                          }>;
+                          if (isCompleted) {
+                            iconBg = "bg-emerald-500 text-white border-2 border-emerald-500";
+                            textColor = "text-slate-600";
+                            titleColor = "text-slate-900 font-semibold";
+                            iconContent = <CheckCircle2 className="h-5 w-5" />;
+                          } else if (isActive) {
+                            if (isRejectedStep) {
+                              iconBg = "bg-red-500 text-white border-2 border-red-500 shadow-[0_0_12px_rgba(239,68,68,0.3)]";
+                              textColor = "text-slate-900";
+                              titleColor = "text-red-600 font-bold";
+                              iconContent = <X className="h-5 w-5" />;
+                            } else if (step.id === "hired") {
+                              iconBg = "bg-emerald-500 text-white border-2 border-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.3)]";
+                              textColor = "text-slate-900";
+                              titleColor = "text-emerald-600 font-bold";
+                              iconContent = <Sparkles className="h-5 w-5" />;
+                            } else {
+                              iconBg = "bg-[#264a7f] text-white border-2 border-[#264a7f] shadow-[0_0_12px_rgba(38,74,127,0.3)]";
+                              textColor = "text-slate-900";
+                              titleColor = "text-[#264a7f] font-bold";
+                              iconContent = <div className="h-2.5 w-2.5 rounded-full bg-white animate-pulse" />;
+                            }
+                          }
 
                           return (
-                            <div className="rounded-xl border border-[#264a7f]/10 bg-[#f8fbff] p-4">
-                              <p className="text-sm font-semibold text-slate-900">Client response</p>
-                              <div className="mt-3 grid gap-3 md:grid-cols-2">
-                                {responseItems.map((item) => (
-                                  <div
-                                    key={item.label}
-                                    className={`min-w-0 rounded-xl bg-white p-3 ${
-                                      item.label === "Contact email" ||
-                                      item.label === "Google map location" ||
-                                      item.label === "Reporting notes" ||
-                                      item.label === "Documents required" ||
-                                      item.label === "Additional instructions"
-                                        ? "sm:col-span-2"
-                                        : ""
+                            <div key={step.id} className="flex flex-1 items-center last:flex-initial">
+                              <div className="flex flex-col items-center text-center flex-1">
+                                <div className={`flex h-10 w-10 items-center justify-center rounded-full transition-all duration-300 ${iconBg}`}>
+                                  {iconContent}
+                                </div>
+                                <p className={`mt-2.5 text-xs ${titleColor}`}>{step.label}</p>
+                                <p className={`mt-0.5 text-[10px] ${textColor} max-w-[120px] hidden lg:block`}>{step.desc}</p>
+                              </div>
+                              {index < steps.length - 1 && (
+                                <div className="flex-1 h-0.5 mx-2 bg-slate-200 relative top-[-10px] lg:top-[-20px]">
+                                  <div 
+                                    className={`h-full transition-all duration-500 ${
+                                      reachedStatuses.has(steps[index + 1].id) ? "bg-emerald-500" : "bg-slate-200"
                                     }`}
-                                  >
-                                    <p className="text-xs font-semibold text-slate-500">{item.label}</p>
-                                    <div className="mt-1 flex flex-wrap items-center gap-2">
-                                      <p className="break-words text-sm leading-6 text-slate-900">{item.value}</p>
-                                      {item.href && (
-                                        <a
-                                          href={item.href}
-                                          target="_blank"
-                                          rel="noreferrer"
-                                          className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700"
-                                        >
-                                          Open map
-                                        </a>
-                                      )}
-                                    </div>
-                                  </div>
-                                ))}
+                                    style={{ width: reachedStatuses.has(steps[index + 1].id) ? "100%" : "0%" }}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <div className="md:hidden space-y-4">
+                        {steps.map((step, index) => {
+                          const isCompleted = reachedStatuses.has(step.id) && step.id !== selectedApplication.status && step.id !== "rejected";
+                          const isActive = step.id === selectedApplication.status;
+                          const isRejectedStep = step.id === "rejected";
+                          
+                          let iconBg = "bg-slate-100 text-slate-400 border-2 border-slate-200";
+                          let textColor = "text-slate-500";
+                          let titleColor = "text-slate-700 font-medium";
+                          let iconContent = <div className="h-1.5 w-1.5 rounded-full bg-slate-300" />;
+
+                          if (isCompleted) {
+                            iconBg = "bg-emerald-500 text-white border-2 border-emerald-500";
+                            textColor = "text-slate-600";
+                            titleColor = "text-slate-900 font-semibold";
+                            iconContent = <CheckCircle2 className="h-4 w-4" />;
+                          } else if (isActive) {
+                            if (isRejectedStep) {
+                              iconBg = "bg-red-500 text-white border-2 border-red-500 shadow-sm";
+                              textColor = "text-slate-900";
+                              titleColor = "text-red-600 font-bold";
+                              iconContent = <X className="h-4 w-4" />;
+                            } else if (step.id === "hired") {
+                              iconBg = "bg-emerald-500 text-white border-2 border-emerald-500 shadow-sm";
+                              textColor = "text-slate-900";
+                              titleColor = "text-emerald-600 font-bold";
+                              iconContent = <Sparkles className="h-4 w-4" />;
+                            } else {
+                              iconBg = "bg-[#264a7f] text-white border-2 border-[#264a7f] shadow-sm";
+                              textColor = "text-slate-900";
+                              titleColor = "text-[#264a7f] font-bold";
+                              iconContent = <div className="h-2 w-2 rounded-full bg-white animate-pulse" />;
+                            }
+                          }
+
+                          return (
+                            <div key={step.id} className="flex items-start gap-3">
+                              <div className="flex flex-col items-center">
+                                <div className={`flex h-8 w-8 items-center justify-center rounded-full transition-all duration-300 ${iconBg}`}>
+                                  {iconContent}
+                                </div>
+                                {index < steps.length - 1 && (
+                                  <div className={`w-0.5 h-6 my-1 ${reachedStatuses.has(steps[index + 1].id) ? "bg-emerald-500" : "bg-slate-200"}`} />
+                                )}
+                              </div>
+                              <div className="pt-0.5">
+                                <p className={`text-xs ${titleColor}`}>{step.label}</p>
+                                <p className={`text-[10px] ${textColor}`}>{step.desc}</p>
                               </div>
                             </div>
                           );
-                        })()}
-
-                        <div className="grid gap-3 lg:grid-cols-2">
-                          <div className="rounded-xl border border-slate-200 p-4">
-                            <p className="mb-3 text-sm font-semibold text-slate-900">Application Information</p>
-                            <div className="grid gap-3 sm:grid-cols-2">
-                              <div className="rounded-xl bg-slate-50 p-3">
-                                <p className="text-xs font-semibold text-slate-500">Applied for</p>
-                                <p className="mt-1 text-sm text-slate-900">
-                                  {selectedApplication.appliedFor || selectedApplication.jobId?.jobTitle || "Job"}
-                                </p>
-                              </div>
-                              <div className="rounded-xl bg-slate-50 p-3">
-                                <p className="text-xs font-semibold text-slate-500">Qualification</p>
-                                <p className="mt-1 text-sm text-slate-900">
-                                  {selectedApplication.qualification || "Not shared"}
-                                </p>
-                              </div>
-                              <div className="rounded-xl bg-slate-50 p-3">
-                                <p className="text-xs font-semibold text-slate-500">Experience</p>
-                                <p className="mt-1 text-sm text-slate-900">
-                                  {selectedApplication.experience?.[0]?.jobProfile || "Not shared"}
-                                </p>
-                              </div>
-                              <div className="rounded-xl bg-slate-50 p-3">
-                                <p className="text-xs font-semibold text-slate-500">Source</p>
-                                <p className="mt-1 text-sm text-slate-900">
-                                  {selectedApplication.jobId?.sourceLabel || "RecruitKr"}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="rounded-xl border border-slate-200 p-4">
-                            <p className="mb-3 text-sm font-semibold text-slate-900">Candidate Details</p>
-                            <div className="grid gap-3 sm:grid-cols-2">
-                              <div className="rounded-xl bg-slate-50 p-3">
-                                <p className="text-xs font-semibold text-slate-500">Candidate name</p>
-                                <p className="mt-1 text-sm text-slate-900">
-                                  {selectedApplication.fullName || profile?.fullName || "Not shared"}
-                                </p>
-                              </div>
-                              <div className="rounded-xl bg-slate-50 p-3">
-                                <p className="text-xs font-semibold text-slate-500">Email</p>
-                                <p className="mt-1 break-all text-sm text-slate-900">
-                                  {selectedApplication.email || "No email"}
-                                </p>
-                              </div>
-                              <div className="rounded-xl bg-slate-50 p-3">
-                                <p className="text-xs font-semibold text-slate-500">Phone</p>
-                                <p className="mt-1 text-sm text-slate-900">
-                                  {selectedApplication.phone || "No phone"}
-                                </p>
-                              </div>
-                              <div className="rounded-xl bg-slate-50 p-3">
-                                <p className="text-xs font-semibold text-slate-500">Current city</p>
-                                <p className="mt-1 text-sm text-slate-900">
-                                  {selectedApplication.currentCity || "Not shared"}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {selectedResponse.interviewDetails &&
-                          (selectedResponse.interviewDetails.scheduledAt ||
-                            selectedResponse.interviewDetails.mode ||
-                            selectedResponse.interviewDetails.locationText ||
-                            selectedResponse.interviewDetails.contactPerson ||
-                            selectedResponse.interviewDetails.contactEmail ||
-                            selectedResponse.interviewDetails.contactPhone ||
-                            selectedResponse.interviewDetails.notes ||
-                            selectedResponse.interviewDetails.reportingNotes ||
-                            selectedResponse.interviewDetails.documentsRequired ||
-                            selectedResponse.interviewDetails.additionalInstructions) && (
-                          <div className="rounded-xl border border-sky-200 bg-sky-50 p-4">
-                            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                              <div>
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <p className="text-sm font-semibold text-slate-900">Interview details shared by client</p>
-                                  <span
-                                    className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
-                                      getInterviewTimingMeta(selectedResponse.interviewDetails.scheduledAt).tone
-                                    }`}
-                                  >
-                                    {getInterviewTimingMeta(selectedResponse.interviewDetails.scheduledAt).label}
-                                  </span>
-                                </div>
-                                <p className="mt-2 text-sm leading-6 text-slate-600">
-                                  {selectedResponse.interviewDetails.scheduledAt
-                                    ? `${formatInterviewDate(selectedResponse.interviewDetails.scheduledAt)} at ${formatInterviewTime(selectedResponse.interviewDetails.scheduledAt)}${selectedResponse.interviewDetails.timezone ? ` (${selectedResponse.interviewDetails.timezone})` : ""}`
-                                    : "The client moved your application to interview and timing details are still pending."}
-                                </p>
-                              </div>
-
-                              <div className="rounded-2xl bg-white/80 px-4 py-3 text-sm text-slate-700 shadow-sm">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                  Next step
-                                </p>
-                                <p className="mt-2 leading-6">{getInterviewTimingMeta(selectedResponse.interviewDetails.scheduledAt).hint}</p>
-                              </div>
-                            </div>
-
-                            <div className="mt-3 grid gap-3 lg:grid-cols-2">
-                              <div className="rounded-xl bg-white p-3">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                  Meeting setup
-                                </p>
-                                <div className="mt-2 space-y-2 text-sm text-slate-700">
-                                  <p>Mode: {selectedResponse.interviewDetails.mode ? INTERVIEW_MODE_LABELS[selectedResponse.interviewDetails.mode] : "Not shared yet"}</p>
-                                  <p>Contact: {selectedResponse.interviewDetails.contactPerson || "Will be shared by client"}</p>
-                                  {selectedResponse.interviewDetails.locationText && <p className="break-words">{selectedResponse.interviewDetails.locationText}</p>}
-                                </div>
-                                <div className="mt-3 flex flex-wrap gap-2">
-                                  {selectedResponse.interviewDetails.meetingLink && (
-                                    <a
-                                      href={selectedResponse.interviewDetails.meetingLink}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white"
-                                    >
-                                      Open meeting link
-                                    </a>
-                                  )}
-                                  {selectedResponse.interviewDetails.googleMapsUrl && (
-                                    <a
-                                      href={selectedResponse.interviewDetails.googleMapsUrl}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700"
-                                    >
-                                      Open map
-                                    </a>
-                                  )}
-                                </div>
-                              </div>
-
-                              <div className="rounded-xl bg-white p-3">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                  Notes and support
-                                </p>
-                                <div className="mt-2 space-y-2 text-sm text-slate-700">
-                                  {selectedResponse.interviewDetails.contactEmail && (
-                                    <p className="break-all">Email: {selectedResponse.interviewDetails.contactEmail}</p>
-                                  )}
-                                  {selectedResponse.interviewDetails.contactPhone && (
-                                    <p>Phone: {selectedResponse.interviewDetails.contactPhone}</p>
-                                  )}
-                                  <div className="space-y-2">
-                                    <div className="rounded-xl bg-slate-50 px-3 py-2 text-slate-600">
-                                      <p className="text-xs font-semibold text-slate-500">Candidate message</p>
-                                      <p className="mt-1 break-words leading-6">
-                                        {selectedResponse.interviewDetails.notes || "No extra note shared yet."}
-                                      </p>
-                                    </div>
-
-                                    {selectedResponse.interviewDetails.reportingNotes && (
-                                      <div className="rounded-xl bg-slate-50 px-3 py-2 text-slate-600">
-                                        <p className="text-xs font-semibold text-slate-500">Reporting notes</p>
-                                        <p className="mt-1 break-words leading-6">{selectedResponse.interviewDetails.reportingNotes}</p>
-                                      </div>
-                                    )}
-
-                                    {selectedResponse.interviewDetails.documentsRequired && (
-                                      <div className="rounded-xl bg-slate-50 px-3 py-2 text-slate-600">
-                                        <p className="text-xs font-semibold text-slate-500">Documents required</p>
-                                        <p className="mt-1 break-words leading-6">{selectedResponse.interviewDetails.documentsRequired}</p>
-                                      </div>
-                                    )}
-
-                                    {selectedResponse.interviewDetails.additionalInstructions && (
-                                      <div className="rounded-xl bg-slate-50 px-3 py-2 text-slate-600">
-                                        <p className="text-xs font-semibold text-slate-500">Additional instructions</p>
-                                        <p className="mt-1 break-words leading-6">{selectedResponse.interviewDetails.additionalInstructions}</p>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          <div className="rounded-xl border border-slate-200 p-3">
-                            <p className="text-xs font-semibold text-slate-500">Candidate name</p>
-                            <p className="mt-1 text-sm text-slate-900">
-                              {selectedApplication.fullName || profile?.fullName || "Not shared"}
-                            </p>
-                          </div>
-                          <div className="rounded-xl border border-slate-200 p-3">
-                            <p className="text-xs font-semibold text-slate-500">Email</p>
-                            <p className="mt-1 break-all text-sm text-slate-900">
-                              {selectedApplication.email || "No email"}
-                            </p>
-                          </div>
-                          <div className="rounded-xl border border-slate-200 p-3">
-                            <p className="text-xs font-semibold text-slate-500">Phone</p>
-                            <p className="mt-1 text-sm text-slate-900">
-                              {selectedApplication.phone || "No phone"}
-                            </p>
-                          </div>
-                          <div className="rounded-xl border border-slate-200 p-3">
-                            <p className="text-xs font-semibold text-slate-500">Current city</p>
-                            <p className="mt-1 text-sm text-slate-900">
-                              {selectedApplication.currentCity || "Not shared"}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="rounded-xl border border-slate-200 bg-white p-3">
-                          <div className="flex items-center justify-between gap-3">
-                            <div>
-                              <p className="text-sm font-semibold text-slate-900">Status Timeline</p>
-                              <p className="mt-1 text-xs text-slate-500">Follow each step of this application.</p>
-                            </div>
-                            <span className="hidden rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600 sm:inline-flex">
-                              Live thread
-                            </span>
-                          </div>
-
-                          <div className="mt-4 space-y-4">
-                            {(selectedApplication.timeline && selectedApplication.timeline.length
-                              ? selectedApplication.timeline
-                              : [
-                                  {
-                                    status: selectedApplication.status,
-                                    changedAt:
-                                      selectedApplication.statusUpdatedAt || selectedApplication.createdAt,
-                                    note: selectedResponse.statusNote,
-                                  },
-                                ]
-                            ).map((item, index) => {
-                              const isCandidate = item.changedByRole === "candidate";
-                              const isClient = item.changedByRole === "client";
-
-                              return (
-                                <div key={`${selectedApplication._id}-${item.status}-${index}`} className="flex gap-3">
-                                  <div className="flex flex-col items-center">
-                                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#264a7f] text-xs font-semibold text-white">
-                                      {index + 1}
-                                    </span>
-                                    {index < (selectedApplication.timeline && selectedApplication.timeline.length
-                                      ? selectedApplication.timeline.length
-                                      : 1) - 1 && <span className="mt-1 h-full w-px bg-[#264a7f]/20" />}
-                                  </div>
-                                  <div className="min-w-0 flex-1 rounded-xl border border-slate-200 p-3">
-                                    <div className="flex items-start justify-between gap-3">
-                                      <div className="min-w-0">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                          <p className="text-sm font-semibold text-slate-900">
-                                            {PROFILE_STATUS_LABELS[item.status] || formatStatusLabel(item.status)}
-                                          </p>
-                                          <span
-                                            className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
-                                              PROFILE_STATUS_BADGE_CLASSNAMES[item.status]
-                                            }`}
-                                          >
-                                            {isClient
-                                              ? "Recruiter update"
-                                              : isCandidate
-                                                ? "Your update"
-                                                : "System"}
-                                          </span>
-                                        </div>
-                                      </div>
-                                      <p className="text-xs text-slate-500">
-                                        {item.changedAt
-                                          ? new Date(item.changedAt).toLocaleDateString()
-                                          : "Recently updated"}
-                                      </p>
-                                    </div>
-                                    <p className="mt-2 text-sm leading-6 text-slate-700">
-                                      {item.note ||
-                                        (item.status === "applied"
-                                          ? "Your application was submitted."
-                                          : "Status changed with no extra note yet.")}
-                                    </p>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
+                        })}
                       </div>
-                      </div>
-                      );
-                    })()}
+                    </div>
                   </div>
-                )}
-              </div>
-              </>
+                </div>
+              )
             ) : (
               <div className="px-4 py-8 text-center text-sm text-slate-500 sm:px-6">
                 No applications yet.

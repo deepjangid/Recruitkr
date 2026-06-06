@@ -134,9 +134,8 @@ const logProbableDeploymentHint = (url: string) => {
 const buildRetryableServerMessage = (json: ApiErrorPayload | null) =>
   json?.message || json?.error?.message || null;
 
-const refreshAccessToken = async (): Promise<string | null> => {
+const performTokenRefresh = async (): Promise<string | null> => {
   const session = getSession();
-  if (!session?.refreshToken) return null;
 
   try {
     const res = await fetchWithTimeout(
@@ -145,7 +144,9 @@ const refreshAccessToken = async (): Promise<string | null> => {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refreshToken: session.refreshToken }),
+        // Send the stored refresh token when we have one, but still attempt the
+        // refresh using only the httpOnly cookie when localStorage has none.
+        body: JSON.stringify(session?.refreshToken ? { refreshToken: session.refreshToken } : {}),
       },
       API_TIMEOUT_MS,
     );
@@ -161,6 +162,20 @@ const refreshAccessToken = async (): Promise<string | null> => {
     console.error("API ERROR:", error instanceof Error ? error.message : error, `${API_BASE}/auth/refresh`);
     return null;
   }
+};
+
+// Single-flight refresh: many dashboard requests fire at once, so a shared
+// promise prevents concurrent refreshes from rotating each other's tokens.
+let inFlightRefresh: Promise<string | null> | null = null;
+
+const refreshAccessToken = (): Promise<string | null> => {
+  if (!inFlightRefresh) {
+    inFlightRefresh = performTokenRefresh().finally(() => {
+      inFlightRefresh = null;
+    });
+  }
+
+  return inFlightRefresh;
 };
 
 type RetryableResult<T> =

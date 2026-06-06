@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 const normalizeStatusValue = (value) => {
   const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'pending') return 'applied';
   if (normalized === 'reviewing' || normalized === 'reviewed') return 'under-review';
   if (normalized === 'shortlisted' || normalized === 'screening') return 'screening';
   if (normalized === 'offered') return 'offer';
@@ -24,7 +25,7 @@ const normalizeInterviewModeValue = (value) => {
 
 export const applicationStatusEnum = z.preprocess(
   normalizeStatusValue,
-  z.enum(['under-review', 'screening', 'interview', 'offer', 'hired', 'rejected']),
+  z.enum(['applied', 'under-review', 'screening', 'interview', 'offer', 'hired', 'rejected']),
 );
 
 const optionalTrimmedString = (max) => z.string().trim().max(max).optional();
