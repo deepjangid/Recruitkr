@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } f
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, BriefcaseBusiness, Building2, Camera, CheckCircle2, ChevronDown, Clock3, FileText, Filter, MapPin, Pencil, Search, Sparkles, UserCircle2, X, XCircle } from "lucide-react";
 import OptimizedLogo from "@/components/OptimizedLogo";
+import ApplicationStepTracker from "@/components/ApplicationStepTracker";
 import { API_BASE, apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
 import { clearSession, getSession } from "@/lib/auth";
 import { useServerEvents, type SseConnectionStatus } from "@/hooks/useServerEvents";
@@ -1947,119 +1948,10 @@ const CandidateDashboard = () => {
                       <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 mb-6">
                         Application Journey
                       </p>
-                      
-                      <div className="hidden md:flex items-start justify-between relative">
-                        {steps.map((step, index) => {
-                          const isCompleted = reachedStatuses.has(step.id) && step.id !== selectedApplication.status && step.id !== "rejected";
-                          const isActive = step.id === selectedApplication.status;
-                          const isRejectedStep = step.id === "rejected";
-                          
-                          let iconBg = "bg-slate-100 text-slate-400 border-2 border-slate-200";
-                          let textColor = "text-slate-500";
-                          let titleColor = "text-slate-700 font-medium";
-                          let iconContent = <div className="h-2.5 w-2.5 rounded-full bg-slate-300" />;
-
-                          if (isCompleted) {
-                            iconBg = "bg-emerald-500 text-white border-2 border-emerald-500";
-                            textColor = "text-slate-600";
-                            titleColor = "text-slate-900 font-semibold";
-                            iconContent = <CheckCircle2 className="h-5 w-5" />;
-                          } else if (isActive) {
-                            if (isRejectedStep) {
-                              iconBg = "bg-red-500 text-white border-2 border-red-500 shadow-[0_0_12px_rgba(239,68,68,0.3)]";
-                              textColor = "text-slate-900";
-                              titleColor = "text-red-600 font-bold";
-                              iconContent = <X className="h-5 w-5" />;
-                            } else if (step.id === "hired") {
-                              iconBg = "bg-emerald-500 text-white border-2 border-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.3)]";
-                              textColor = "text-slate-900";
-                              titleColor = "text-emerald-600 font-bold";
-                              iconContent = <Sparkles className="h-5 w-5" />;
-                            } else {
-                              iconBg = "bg-[#264a7f] text-white border-2 border-[#264a7f] shadow-[0_0_12px_rgba(38,74,127,0.3)]";
-                              textColor = "text-slate-900";
-                              titleColor = "text-[#264a7f] font-bold";
-                              iconContent = <div className="h-2.5 w-2.5 rounded-full bg-white animate-pulse" />;
-                            }
-                          }
-
-                          return (
-                            <div key={step.id} className="flex flex-1 items-center last:flex-initial">
-                              <div className="flex flex-col items-center text-center flex-1">
-                                <div className={`flex h-10 w-10 items-center justify-center rounded-full transition-all duration-300 ${iconBg}`}>
-                                  {iconContent}
-                                </div>
-                                <p className={`mt-2.5 text-xs ${titleColor}`}>{step.label}</p>
-                                <p className={`mt-0.5 text-[10px] ${textColor} max-w-[120px] hidden lg:block`}>{step.desc}</p>
-                              </div>
-                              {index < steps.length - 1 && (
-                                <div className="flex-1 h-0.5 mx-2 bg-slate-200 relative top-[-10px] lg:top-[-20px]">
-                                  <div 
-                                    className={`h-full transition-all duration-500 ${
-                                      reachedStatuses.has(steps[index + 1].id) ? "bg-emerald-500" : "bg-slate-200"
-                                    }`}
-                                    style={{ width: reachedStatuses.has(steps[index + 1].id) ? "100%" : "0%" }}
-                                  />
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      <div className="md:hidden space-y-4">
-                        {steps.map((step, index) => {
-                          const isCompleted = reachedStatuses.has(step.id) && step.id !== selectedApplication.status && step.id !== "rejected";
-                          const isActive = step.id === selectedApplication.status;
-                          const isRejectedStep = step.id === "rejected";
-                          
-                          let iconBg = "bg-slate-100 text-slate-400 border-2 border-slate-200";
-                          let textColor = "text-slate-500";
-                          let titleColor = "text-slate-700 font-medium";
-                          let iconContent = <div className="h-1.5 w-1.5 rounded-full bg-slate-300" />;
-
-                          if (isCompleted) {
-                            iconBg = "bg-emerald-500 text-white border-2 border-emerald-500";
-                            textColor = "text-slate-600";
-                            titleColor = "text-slate-900 font-semibold";
-                            iconContent = <CheckCircle2 className="h-4 w-4" />;
-                          } else if (isActive) {
-                            if (isRejectedStep) {
-                              iconBg = "bg-red-500 text-white border-2 border-red-500 shadow-sm";
-                              textColor = "text-slate-900";
-                              titleColor = "text-red-600 font-bold";
-                              iconContent = <X className="h-4 w-4" />;
-                            } else if (step.id === "hired") {
-                              iconBg = "bg-emerald-500 text-white border-2 border-emerald-500 shadow-sm";
-                              textColor = "text-slate-900";
-                              titleColor = "text-emerald-600 font-bold";
-                              iconContent = <Sparkles className="h-4 w-4" />;
-                            } else {
-                              iconBg = "bg-[#264a7f] text-white border-2 border-[#264a7f] shadow-sm";
-                              textColor = "text-slate-900";
-                              titleColor = "text-[#264a7f] font-bold";
-                              iconContent = <div className="h-2 w-2 rounded-full bg-white animate-pulse" />;
-                            }
-                          }
-
-                          return (
-                            <div key={step.id} className="flex items-start gap-3">
-                              <div className="flex flex-col items-center">
-                                <div className={`flex h-8 w-8 items-center justify-center rounded-full transition-all duration-300 ${iconBg}`}>
-                                  {iconContent}
-                                </div>
-                                {index < steps.length - 1 && (
-                                  <div className={`w-0.5 h-6 my-1 ${reachedStatuses.has(steps[index + 1].id) ? "bg-emerald-500" : "bg-slate-200"}`} />
-                                )}
-                              </div>
-                              <div className="pt-0.5">
-                                <p className={`text-xs ${titleColor}`}>{step.label}</p>
-                                <p className={`text-[10px] ${textColor}`}>{step.desc}</p>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                      <ApplicationStepTracker
+                        status={selectedApplication.status}
+                        timeline={selectedApplication.timeline}
+                      />
                     </div>
                   </div>
                 </div>
