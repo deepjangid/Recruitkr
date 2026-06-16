@@ -131,12 +131,16 @@ const formatInterviewTime = (value?: string) => {
   });
 };
 
-const parseApplicationScheduledAt = (application: Record<string, any>) => {
-  const nested = application?.interviewDetails?.scheduledAt;
+const asRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+const asText = (value: unknown): string => (typeof value === "string" ? value : "");
+
+const parseApplicationScheduledAt = (application: Record<string, unknown>) => {
+  const nested = asText(asRecord(application.interviewDetails).scheduledAt);
   if (nested) return nested;
 
-  const dateText = String(application?.interviewDate || "").trim();
-  const timeText = String(application?.interviewTime || "").trim();
+  const dateText = String(application.interviewDate || "").trim();
+  const timeText = String(application.interviewTime || "").trim();
   if (!dateText) return "";
   if (!timeText) return dateText;
 
@@ -161,34 +165,35 @@ const parseApplicationScheduledAt = (application: Record<string, any>) => {
   return Number.isNaN(composed.getTime()) ? `${dateText} ${timeText}` : composed.toISOString();
 };
 
-const getApplicationResponseSnapshot = (application: Record<string, any>): ApplicationResponseSnapshot => {
-  const nested = application?.interviewDetails || {};
+const getApplicationResponseSnapshot = (application: Record<string, unknown>): ApplicationResponseSnapshot => {
+  const nested = asRecord(application.interviewDetails);
   const scheduledAt = parseApplicationScheduledAt(application);
 
   return {
     statusNote:
-      application?.statusNote ||
-      application?.candidateResponse ||
-      application?.clientNote ||
-      application?.note ||
-      application?.notes ||
+      asText(application.statusNote) ||
+      asText(application.candidateResponse) ||
+      asText(application.clientNote) ||
+      asText(application.note) ||
+      asText(application.notes) ||
       "",
     interviewDetails: {
       scheduledAt,
-      timezone: nested?.timezone || application?.timezone || "",
-      mode: nested?.mode || application?.interviewMode || application?.mode || "",
-      locationText: nested?.locationText || application?.interviewLocation || application?.locationText || "",
+      timezone: asText(nested.timezone) || asText(application.timezone) || "",
+      mode: asText(nested.mode) || asText(application.interviewMode) || asText(application.mode) || "",
+      locationText:
+        asText(nested.locationText) || asText(application.interviewLocation) || asText(application.locationText) || "",
       googleMapsUrl:
-        nested?.googleMapsUrl || application?.googleMapLocation || application?.googleMapsUrl || "",
-      meetingLink: nested?.meetingLink || application?.meetingLink || "",
-      contactPerson: nested?.contactPerson || application?.contactPerson || "",
-      contactEmail: nested?.contactEmail || application?.contactEmail || "",
-      contactPhone: nested?.contactPhone || application?.contactPhone || "",
-      notes: nested?.notes || "",
-      reportingNotes: nested?.reportingNotes || application?.reportingNotes || "",
-      documentsRequired: nested?.documentsRequired || application?.documentsRequired || "",
+        asText(nested.googleMapsUrl) || asText(application.googleMapLocation) || asText(application.googleMapsUrl) || "",
+      meetingLink: asText(nested.meetingLink) || asText(application.meetingLink) || "",
+      contactPerson: asText(nested.contactPerson) || asText(application.contactPerson) || "",
+      contactEmail: asText(nested.contactEmail) || asText(application.contactEmail) || "",
+      contactPhone: asText(nested.contactPhone) || asText(application.contactPhone) || "",
+      notes: asText(nested.notes) || "",
+      reportingNotes: asText(nested.reportingNotes) || asText(application.reportingNotes) || "",
+      documentsRequired: asText(nested.documentsRequired) || asText(application.documentsRequired) || "",
       additionalInstructions:
-        nested?.additionalInstructions || application?.additionalInstructions || "",
+        asText(nested.additionalInstructions) || asText(application.additionalInstructions) || "",
     },
   };
 };
@@ -1821,7 +1826,7 @@ const CandidateDashboard = () => {
                   <div className="bg-slate-50/50 p-4 sm:p-6 lg:max-h-[calc(100vh-16rem)] lg:overflow-y-auto">
                     <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                       {(applications || []).map((application) => {
-                        const applicationResponse = getApplicationResponseSnapshot(application as Record<string, any>);
+                        const applicationResponse = getApplicationResponseSnapshot(application as Record<string, unknown>);
                         const latestNote = applicationResponse.statusNote
                           ? applicationResponse.statusNote
                           : applicationResponse.interviewDetails?.scheduledAt
